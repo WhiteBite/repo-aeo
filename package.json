@@ -1,0 +1,42 @@
+{
+  "name": "repo-aeo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Repo Discoverability Kit (RDK): make any repository, npm package and docs site maximally findable and recommendable for humans, AI agents and search engines.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "rdk": "node packages/rdk-cli/bin/rdk.js",
+    "audit": "node packages/rdk-cli/bin/rdk.js audit",
+    "audit:json": "node packages/rdk-cli/bin/rdk.js audit --format json",
+    "fix:dry": "node packages/rdk-cli/bin/rdk.js fix --dry-run",
+    "fix": "node packages/rdk-cli/bin/rdk.js fix --apply",
+    "npm-surface": "node packages/rdk-cli/bin/rdk.js npm-surface",
+    "github-sync": "node packages/rdk-cli/bin/rdk.js github-sync --dry-run",
+    "test": "node --test packages/rdk-cli/test/"
+  },
+  "keywords": [
+    "discoverability",
+    "generative-engine-optimization",
+    "answer-engine-optimization",
+    "agent-skills",
+    "llms-txt",
+    "agents-md",
+    "repo-metadata",
+    "developer-tools"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WhiteBite/signal-forge.git"
+  },
+  "homepage": "https://github.com/WhiteBite/signal-forge#readme",
+  "bugs": {
+    "url": "https://github.com/WhiteBite/signal-forge/issues"
+  }
+}
