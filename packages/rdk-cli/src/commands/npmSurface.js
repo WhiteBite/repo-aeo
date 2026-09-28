@@ -3,8 +3,9 @@
  * package.json: exports resolution, types, sideEffects, engines, bin, files
  * and (optionally) the real tarball contents via `npm pack --dry-run`.
  */
-import { join } from 'node:path';
-import { readJsonIfExists, exists, readTextIfExists } from '../util/fs.js';
+import { join, dirname } from 'node:path';
+import { readJsonIfExists, exists } from '../util/fs.js';
+import { resolvePackage } from '../config.js';
 import { run } from '../util/proc.js';
 
 function exportsSummary(pkg) {
@@ -23,6 +24,10 @@ function exportsSummary(pkg) {
           walk(value, `${path}${key}`);
           continue;
         }
+        if (key === 'default') {
+          conditions.add('default');
+          continue;
+        }
         if (typeof value === 'string') conditions.add(key);
         else walk(value, `${path}${key}/`);
       }
@@ -32,8 +37,10 @@ function exportsSummary(pkg) {
   return { present: true, conditions: [...conditions], subpaths, main: pkg.main || null };
 }
 
-function packDryRun(cwd) {
-  const npm = run('npm', ['pack', '--dry-run', '--json'], { cwd, timeout: 60000 });
+function packDryRun(cwd, packageDir) {
+  const args = ['pack', '--dry-run', '--json'];
+  if (packageDir && packageDir !== cwd) args.push(packageDir);
+  const npm = run('npm', args, { cwd, timeout: 60000 });
   if (!npm.ok) return { ok: false, error: npm.stderr.trim().slice(0, 200) || 'npm pack failed' };
   try {
     const json = JSON.parse(npm.stdout);
@@ -53,7 +60,8 @@ function packDryRun(cwd) {
 }
 
 export function npmSurfaceCommand({ cwd, options = {} }) {
-  const pkg = readJsonIfExists(join(cwd, 'package.json'));
+  const resolved = resolvePackage(cwd);
+  const pkg = resolved.pkg;
   const lines = [];
   lines.push('# rdk npm-surface');
   lines.push('');
@@ -116,18 +124,19 @@ export function npmSurfaceCommand({ cwd, options = {} }) {
   lines.push('');
 
   if (options.pack !== false) {
-    const pack = packDryRun(cwd);
+    const pack = packDryRun(cwd, resolved.path ? dirname(resolved.path) : cwd);
     if (pack.ok) {
       report.tarball = { fileCount: pack.fileCount, unpackedSize: pack.unpackedSize, files: pack.files };
       lines.push('## Tarball (npm pack --dry-run)');
       lines.push('');
       lines.push(`${pack.fileCount} files, ${Math.round((pack.unpackedSize || 0) / 1024)} KB unpacked.`);
-      const suspicious = pack.files.filter((file) => /(^|\/)(\.env|\.git|\.npmrc|secrets?|id_rsa)/i.test(file));
+      const suspicious = pack.files.filter((file) => /(^|\/)(\.env|\.npmrc|secrets?|id_rsa)(\.|$)/i.test(file) || /(^|\/)\.git(\/|$)/i.test(file));
       if (suspicious.length > 0) {
         lines.push('');
         lines.push(`⚠️ suspicious entries: ${suspicious.join(', ')}`);
       }
-      const missing = ['llms.txt', 'llms-full.txt', 'AGENTS.md'].filter((name) => exists(join(cwd, name)) && !pack.files.includes(name));
+      const packageDir = resolved.path ? dirname(resolved.path) : cwd;
+      const missing = ['llms.txt', 'llms-full.txt', 'AGENTS.md'].filter((name) => exists(join(packageDir, name)) && !pack.files.includes(name));
       if (missing.length > 0) {
         lines.push('');
         lines.push(`⚠️ present in the repo but not in the tarball: ${missing.join(', ')}`);
@@ -166,5 +175,3 @@ export function npmSurfaceCommand({ cwd, options = {} }) {
   const output = options.format === 'json' ? `${JSON.stringify(report, null, 2)}\n` : `${lines.join('\n')}`;
   return { ok: report.publishability.every((item) => item.level !== 'error'), output, report, exitCode: report.publishability.some((item) => item.level === 'error') ? 2 : 0 };
 }
-
-export { readTextIfExists };

@@ -2,7 +2,7 @@
  * Audit orchestrator: collects facts (never invents them), runs every
  * applicable check, scores the result and returns a serialisable report.
  */
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { loadConfig } from '../config.js';
 import { readTextIfExists, exists, readJsonIfExists } from '../util/fs.js';
 import { gitInfo } from '../util/git.js';
@@ -74,7 +74,8 @@ export async function audit(cwd = process.cwd(), options = {}) {
     if (urls.length > 0) linkResults = await probeUrls(urls, { timeoutMs: options.linkTimeout || 6000 });
   }
 
-  const hasNpm = Boolean(config.artifacts.has_npm_package) || Boolean(pkg);
+  const publishable = loaded.publishable || { pkg, isPrivate: Boolean(pkg && pkg.private) };
+  const hasNpm = Boolean(config.artifacts.has_npm_package) || Boolean(publishable.pkg && !publishable.isPrivate);
   const hasSite = Boolean(config.artifacts.has_docs_site) || Boolean(config.links.homepage || config.links.docs);
 
   const ctx = {
@@ -83,7 +84,8 @@ export async function audit(cwd = process.cwd(), options = {}) {
     config,
     configPath,
     configExists: loaded.exists,
-    pkg,
+    pkg: publishable.pkg,
+    publishable,
     git,
     readme,
     github,
@@ -163,6 +165,7 @@ export async function audit(cwd = process.cwd(), options = {}) {
       github_source: github.available ? 'live (gh api)' : github.reason,
       links_checked: linkResults.length,
       has_npm_package: hasNpm,
+      npm_package_path: publishable.pkg ? relative(cwd, publishable.path) : null,
       has_docs_site: hasSite,
     },
     score,

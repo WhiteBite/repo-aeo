@@ -4,7 +4,7 @@
  */
 import { check, finding } from './_shared.js';
 import { exists, readJsonIfExists, readTextIfExists } from '../../util/fs.js';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 
 function repositoryUrl(pkg) {
   if (!pkg) return null;
@@ -35,7 +35,15 @@ function exportsConditions(pkg) {
     }
     if (node && typeof node === 'object') {
       for (const [key, value] of Object.entries(node)) {
-        if (key === 'default' || key.startsWith('.')) continue;
+        if (key.startsWith('.')) {
+          // subpath export: descend to find its conditions
+          walk(value);
+          continue;
+        }
+        if (key === 'default') {
+          conditions.add('default');
+          continue;
+        }
         if (typeof value === 'string') conditions.add(key);
         else walk(value);
       }
@@ -197,7 +205,8 @@ export const npmChecks = [
       if (!files && !hasNpmignore) {
         return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No "files" array and no .npmignore — the tarball is guesswork', why: this.why, fix: 'Add an explicit "files" array.', effort: 'S', autoFixable: true, patchId: 'package.files', weight: this.weight });
       }
-      const wanted = ['llms.txt', 'llms-full.txt', 'AGENTS.md'].filter((name) => exists(join(ctx.cwd, name)));
+      const packageDir = ctx.publishable && ctx.publishable.path ? dirname(ctx.publishable.path) : ctx.cwd;
+      const wanted = ['llms.txt', 'llms-full.txt', 'AGENTS.md'].filter((name) => exists(join(packageDir, name)));
       if (files && wanted.length > 0) {
         const missing = wanted.filter((name) => !files.some((entry) => String(entry).replace(/^\.\//, '') === name));
         if (missing.length > 0) {

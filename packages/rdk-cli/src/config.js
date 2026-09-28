@@ -5,6 +5,7 @@
 import { join } from 'node:path';
 import { parse, YamlError } from './yaml.js';
 import { exists, readTextIfExists, readJsonIfExists } from './util/fs.js';
+import { readdirSync } from 'node:fs';
 import { gitInfo } from './util/git.js';
 
 export const CONFIG_RELATIVE_PATH = '.discoverability/project.yml';
@@ -103,7 +104,8 @@ export function loadConfig(cwd = process.cwd()) {
     config.links.issues = `https://github.com/${git.owner}/${git.repo}/issues`;
   }
 
-  return { config, configPath, exists: exists(configPath), warnings, pkg, git };
+  const publishable = resolvePackage(cwd);
+  return { config, configPath, exists: exists(configPath), warnings, pkg, publishable, git };
 }
 
 /** Deep clone for plain objects and arrays. */
@@ -134,6 +136,45 @@ export function mergeDeep(base, override) {
     }
   }
   return out;
+}
+
+/**
+ * Resolves the package that is actually published.
+ * A private root package.json (typical monorepo root) is skipped in favour of
+ * the first non-private workspace package, so the npm axis measures the thing
+ * users install rather than the repository shell.
+ */
+export function resolvePackage(cwd = process.cwd()) {
+  const rootPath = join(cwd, 'package.json');
+  const root = exists(rootPath) ? readJsonIfExists(rootPath) : null;
+  if (root && !root.private) return { pkg: root, path: rootPath, isPrivate: false, source: 'root' };
+
+  const workspaces = root && Array.isArray(root.workspaces) ? root.workspaces.filter((w) => typeof w === 'string') : [];
+  for (const pattern of workspaces) {
+    if (pattern.includes('*')) {
+      const base = pattern.split('*')[0].replace(/\/$/, '');
+      const dir = join(cwd, base);
+      let entries = [];
+      try {
+        entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
+      } catch {
+        entries = [];
+      }
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        const candidate = join(dir, entry.name, 'package.json');
+        if (!exists(candidate)) continue;
+        const json = readJsonIfExists(candidate);
+        if (json && !json.private) return { pkg: json, path: candidate, isPrivate: false, source: 'workspace' };
+      }
+    } else {
+      const candidate = join(cwd, pattern, 'package.json');
+      if (!exists(candidate)) continue;
+      const json = readJsonIfExists(candidate);
+      if (json && !json.private) return { pkg: json, path: candidate, isPrivate: false, source: 'workspace' };
+    }
+  }
+  return { pkg: root, path: exists(rootPath) ? rootPath : null, isPrivate: Boolean(root && root.private), source: 'root' };
 }
 
 export function isKnownCategory(category) {
@@ -197,18 +238,31 @@ function uniqStrings(list) {
   return [...new Set(list.filter((item) => typeof item === 'string' && item.trim() !== ''))];
 }
 
+const TOPIC_STOPWORDS = new Set([
+  'todo', 'placeholder', 'the', 'and', 'for', 'with', 'from', 'this', 'that', 'your', 'you',
+  'are', 'was', 'not', 'but', 'all', 'can', 'has', 'have', 'how', 'what', 'who', 'why',
+  'use', 'using', 'used', 'one', 'sentence', 'describing', 'goes', 'here', 'line',
+]);
+
+/** True when a string is an unfilled placeholder rather than real content. */
+function isPlaceholder(text) {
+  return /\b(todo|tbd|placeholder|fixme|xxx|fill in)\b/i.test(String(text || ''));
+}
+
 /** Derives a starting topic set from package name, keywords and category. */
 export function suggestTopics(project, pkg) {
   const base = new Set(['open-source', 'developer-tools']);
   const category = String(project.category || '').toLowerCase();
-  if (category) base.add(category);
+  if (category && !TOPIC_STOPWORDS.has(category)) base.add(category);
   const name = String((pkg && pkg.name) || project.name || '').toLowerCase();
   for (const token of name.split(/[/@_-]+/)) {
-    if (token.length >= 3 && !['com', 'org', 'js', 'node'].includes(token)) base.add(token);
+    if (token.length >= 3 && !['com', 'org', 'js', 'node'].includes(token) && !TOPIC_STOPWORDS.has(token)) base.add(token);
   }
-  for (const keyword of [...((pkg && pkg.keywords) || []), ...((project.description || '').toLowerCase().match(/[a-z][a-z-]{4,}/g) || [])]) {
+  const description = isPlaceholder(project.description || project.one_liner) ? '' : String(project.description || '');
+  const fromDescription = description.toLowerCase().match(/[a-z][a-z-]{4,}/g) || [];
+  for (const keyword of [...((pkg && pkg.keywords) || []), ...fromDescription]) {
     const token = String(keyword).toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-|-$/g, '');
-    if (token.length >= 4 && base.size < 12) base.add(token);
+    if (token.length >= 4 && !TOPIC_STOPWORDS.has(token) && base.size < 12) base.add(token);
   }
   return [...base].slice(0, 12);
 }

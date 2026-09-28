@@ -1,6 +1,6 @@
 /** `rdk audit` — collect facts, run checks, render the report. */
 import { writeFileSync, mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { audit } from '../audit/index.js';
 import { renderMarkdownReport } from '../report/markdown.js';
 import { renderGithubComment } from '../report/githubComment.js';
@@ -26,7 +26,7 @@ export async function auditCommand({ cwd, options = {} }) {
   }
 
   if (options.out) {
-    const path = join(cwd, options.out);
+    const path = isAbsolute(options.out) ? options.out : resolve(cwd, options.out);
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, output, 'utf8');
   }

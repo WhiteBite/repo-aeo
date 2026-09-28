@@ -9,6 +9,12 @@ function yamlList(items, indent = '  ') {
   return items.map((item) => `${indent}- ${JSON.stringify(String(item))}`).join('\n');
 }
 
+/** Renders `key:` (parses back as null) for empty values, `key: "value"` otherwise. */
+function yamlScalar(value) {
+  if (value === null || value === undefined || value === '') return '';
+  return ` ${JSON.stringify(String(value))}`;
+}
+
 /** Renders `key: []` for empty lists and `key:\n  - a\n  - b` otherwise. */
 function yamlBlock(key, items, indent = '') {
   if (!Array.isArray(items) || items.length === 0) return `${indent}${key}: []`;
@@ -27,6 +33,35 @@ function commandFor(pkg, candidates, fallback) {
   return fallback;
 }
 
+/** Markers that separate generated content from hand-written content. */
+export const GENERATED_START = '<!-- rdk:generated:start -->';
+export const GENERATED_END = '<!-- rdk:generated:end -->';
+
+export const HANDWRITTEN_NOTE = '<!-- Everything below the end marker is preserved by `rdk fix`. Put hand-written context here; the block above is regenerated from .discoverability/project.yml. -->';
+
+/**
+ * Merges freshly generated content into an existing file:
+ *   - no file            -> generated content wrapped in markers + note
+ *   - file with markers  -> only the marked region is replaced
+ *   - file without markers that differs from the generated content
+ *                        -> treated as hand-edited and left untouched (the
+ *                           caller reports it), so `rdk fix` never destroys
+ *                           manual work
+ */
+export function mergeGenerated(existing, generated) {
+  const body = String(generated).trim();
+  if (existing === null || existing === undefined) {
+    return `${GENERATED_START}\n${body}\n${GENERATED_END}\n\n## Hand-written notes\n\n${HANDWRITTEN_NOTE}\n`;
+  }
+  const text = String(existing);
+  if (text.includes(GENERATED_START) && text.includes(GENERATED_END)) {
+    const head = text.slice(0, text.indexOf(GENERATED_START));
+    const tail = text.slice(text.indexOf(GENERATED_END) + GENERATED_END.length);
+    return `${head}${GENERATED_START}\n${body}\n${GENERATED_END}${tail}`;
+  }
+  return null; // hand-edited legacy file: caller must not overwrite
+}
+
 export function renderProjectYml(config) {
   const project = config.project || {};
   const keywords = config.keywords || {};
@@ -42,10 +77,10 @@ export function renderProjectYml(config) {
 # Docs: https://github.com/WhiteBite/signal-forge/blob/main/docs/configuration.md
 
 project:
-  name: ${JSON.stringify(project.name || '')}
-  one_liner: ${JSON.stringify(project.one_liner || '')}   # 1 sentence, shown as the GitHub description
-  description: ${JSON.stringify(project.description || '')}
-  category: ${JSON.stringify(project.category || 'library')}   # library | app | template | research | tool | dataset | mcp-server
+  name:${yamlScalar(project.name)}
+  one_liner:${yamlScalar(project.one_liner)}   # 1 sentence, shown as the GitHub description
+  description:${yamlScalar(project.description)}
+  category:${yamlScalar(project.category || 'library')}   # library | app | template | research | tool | dataset | mcp-server
 
 ${yamlBlock('audiences', config.audiences)}
 
@@ -56,16 +91,16 @@ ${yamlBlock('github_topics', keywords.github_topics, '  ')}   # 8-20 terms, lowe
 ${yamlBlock('npm_keywords', keywords.npm_keywords, '  ')}   # 5-15 terms for package.json keywords
 
 links:
-  homepage: ${JSON.stringify(links.homepage || '')}
-  docs: ${JSON.stringify(links.docs || '')}
-  demo: ${JSON.stringify(links.demo || '')}
-  issues: ${JSON.stringify(links.issues || '')}
+  homepage:${yamlScalar(links.homepage)}
+  docs:${yamlScalar(links.docs)}
+  demo:${yamlScalar(links.demo)}
+  issues:${yamlScalar(links.issues)}
 
 quickstart:
 ${yamlBlock('prerequisites', quickstart.prerequisites, '  ')}
-  install: ${JSON.stringify(quickstart.install || '')}
-  run: ${JSON.stringify(quickstart.run || '')}
-  test: ${JSON.stringify(quickstart.test || '')}
+  install:${yamlScalar(quickstart.install)}
+  run:${yamlScalar(quickstart.run)}
+  test:${yamlScalar(quickstart.test)}
 
 artifacts:
   has_npm_package: ${artifacts.has_npm_package ? 'true' : 'false'}
@@ -245,7 +280,8 @@ export function renderLlmsTxt(config, pkg, readmeText) {
   if (docLinks.length === 0) {
     lines.push('- [README.md](./README.md): installation, usage and examples');
   } else {
-    for (const [label, url] of docLinks) lines.push(`- [${label}](${url}): ${label.toLowerCase()} for ${name}`);
+    const descriptions = { Documentation: 'setup, configuration and scoring reference', Homepage: 'project landing page', Demo: 'before/after example repository', Issues: 'roadmap and known gaps' };
+    for (const [label, url] of docLinks) lines.push(`- [${label}](${url}): ${descriptions[label] || label}`);
     lines.push('- [README.md](./README.md): install, run and test instructions');
   }
   lines.push('');

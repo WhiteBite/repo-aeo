@@ -29,7 +29,13 @@
     "llms-txt",
     "agents-md",
     "repo-metadata",
-    "developer-tools"
+    "developer-tools",
+    "cli",
+    "repo-audit",
+    "github-topics",
+    "npm-metadata",
+    "geo",
+    "aeo"
   ],
   "repository": {
     "type": "git",

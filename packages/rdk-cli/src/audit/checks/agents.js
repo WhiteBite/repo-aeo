@@ -50,12 +50,12 @@ export const agentsChecks = [
     run(ctx) {
       const text = readTextIfExists(join(ctx.cwd, 'AGENTS.md'));
       if (text === null) {
-        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'AGENTS.md is missing', why: this.why, fix: 'Run `rdk init`.', effort: 'S', autoFixable: true, patchId: 'agents.stub', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'AGENTS.md is missing, so agents have no verified commands', why: this.why, fix: 'Run `rdk init`.', effort: 'S', autoFixable: true, patchId: 'agents.stub', weight: this.weight });
       }
       const lower = text.toLowerCase();
       const missing = ['test', 'lint', 'build'].filter((word) => !lower.includes(word));
       if (missing.length === 3) {
-        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'AGENTS.md documents no test/lint/build commands', why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'agents.stub', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'AGENTS.md does not document test/lint/build commands', why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'agents.stub', weight: this.weight });
       }
       if (missing.length > 0) {
         return finding({ id: this.id, axis: this.axis, severity: 'warn', title: `AGENTS.md does not mention: ${missing.join(', ')}`, why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'agents.stub', weight: this.weight });
