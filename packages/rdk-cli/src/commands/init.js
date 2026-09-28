@@ -24,14 +24,16 @@ const INIT_PATCHES = [
 ];
 
 export function initCommand({ cwd, options = {} }) {
+  const loaded = loadConfig(cwd);
   const seed = buildSeedConfig(cwd);
   const ctx = {
     cwd,
     options,
     config: seed,
-    configExists: exists(join(cwd, '.discoverability', 'project.yml')),
-    pkg: loadConfig(cwd).pkg,
-    git: loadConfig(cwd).git,
+    configExists: loaded.exists,
+    pkg: loaded.publishable.pkg,
+    publishable: loaded.publishable,
+    git: loaded.git,
   };
 
   const planned = planPatches(ctx, { only: INIT_PATCHES });

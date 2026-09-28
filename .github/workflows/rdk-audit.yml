@@ -1,0 +1,191 @@
+name: rdk-audit
+
+# Discoverability audit: runs on every pull request, on demand, and weekly.
+# Default behaviour is audit-only — it never writes to the repository unless
+# .discoverability/project.yml sets safety.allow_autofix: true.
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      min_score:
+        description: 'Fail the run when the Discoverability Score is below this value'
+        required: false
+        default: '0'
+  schedule:
+    - cron: '17 6 * * 1'   # weekly, Monday 06:17 UTC
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: rdk-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Discoverability audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Resolve the rdk CLI
+        id: cli
+        run: |
+          # Prefer the published package, fall back to the in-repo copy so the
+          # workflow also works before the first release.
+          if npx --yes @repo-aeo/rdk-cli@latest --version >/dev/null 2>&1; then
+            echo "command=npx --yes @repo-aeo/rdk-cli@latest" >> "$GITHUB_OUTPUT"
+          else
+            echo "command=node packages/rdk-cli/bin/rdk.js" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run discoverability audit
+        id: audit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          MIN_SCORE="${{ github.event.inputs.min_score || 0 }}"
+          ${{ steps.cli.outputs.command }} audit --format github-comment --online --out rdk-comment.md
+          ${{ steps.cli.outputs.command }} audit --format json --online --out rdk-report.json --min-score "$MIN_SCORE"
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Publish PR comment
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- rdk-discoverability-audit -->';
+            const path = 'rdk-comment.md';
+            if (!fs.existsSync(path)) {
+              core.warning('rdk-comment.md was not produced by the audit step');
+              return;
+            }
+            let body = fs.readFileSync(path, 'utf8');
+            if (!body.includes(marker)) body = `${marker}\n${body}`;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find((comment) => comment.body && comment.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Fail when the score is below the threshold
+        if: steps.audit.outputs.exit_code == '2'
+        run: |
+          echo "::error::Discoverability score is below the configured minimum."
+          node -e "const r=require('./rdk-report.json');console.log('score:',r.score.total,'grade:',r.score.grade)"
+          exit 1
+
+      - name: Upload the JSON report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rdk-audit-report
+          path: |
+            rdk-report.json
+            rdk-comment.md
+          if-no-files-found: warn
+
+  guard:
+    name: Autofix switch
+    needs: audit
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check whether autofix is allowed and needed
+        id: check
+        run: |
+          # Autofix requires BOTH:
+          #   1. safety.allow_autofix: true in .discoverability/project.yml
+          #   2. at least one autofixable finding
+          if node packages/rdk-cli/bin/rdk.js audit --format json | node -e "
+            let raw='';process.stdin.on('data',(c)=>raw+=c).on('end',()=>{
+              const r=JSON.parse(raw);
+              process.stdout.write(String(Boolean(r.summary.autofixable)));
+            });" | grep -q true; then
+            if grep -qE '^[[:space:]]*allow_autofix:[[:space:]]*true' .discoverability/project.yml 2>/dev/null; then
+              echo "enabled=true" >> "$GITHUB_OUTPUT"
+              echo "Autofix is enabled and there is work to do."
+            else
+              echo "enabled=false" >> "$GITHUB_OUTPUT"
+              echo "Autofixable findings exist, but safety.allow_autofix is not true — skipping."
+            fi
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Nothing to autofix."
+          fi
+
+  autofix:
+    name: Autofix pull request
+    needs: [audit, guard]
+    if: needs.guard.outputs.enabled == 'true' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Apply safe autofixes on a dedicated branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          BRANCH="rdk/autofix-$(date -u +%Y%m%d)"
+          git config user.name "rdk-bot"
+          git config user.email "rdk-bot@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          node packages/rdk-cli/bin/rdk.js fix --apply
+          if git diff --quiet; then
+            echo "No changes were produced by rdk fix."
+            exit 0
+          fi
+          git add -A
+          git commit -m "chore(rdk): apply safe discoverability autofixes"
+          git push --force origin "HEAD:refs/heads/$BRANCH"
+          gh pr create --title "chore(rdk): safe discoverability autofixes" \
+            --body "Automated safe autofixes (formatting, missing sections, stub files). Review before merging: \`rdk fix\` never publishes, tags or force-pushes." \
+            --base "${{ github.event.repository.default_branch }}" \
+            --head "$BRANCH" || echo "A pull request may already exist for this branch."

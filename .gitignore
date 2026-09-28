@@ -15,3 +15,4 @@ rdk-report.md
 .scratch/
 *.log
 .DS_Store
+.env

@@ -15,7 +15,10 @@
   "files": [
     "bin",
     "src",
-    "README.md"
+    "README.md",
+    "llms.txt",
+    "llms-full.txt",
+    "AGENTS.md"
   ],
   "sideEffects": false,
   "engines": {
@@ -33,7 +36,8 @@
     "agents-md",
     "npm-metadata",
     "geo",
-    "aeo"
+    "aeo",
+    "developer-tools"
   ],
   "repository": {
     "type": "git",

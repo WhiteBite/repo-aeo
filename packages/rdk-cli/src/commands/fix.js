@@ -11,7 +11,8 @@ export function fixCommand({ cwd, options = {} }) {
     options,
     config: loaded.config,
     configExists: loaded.exists,
-    pkg: loaded.pkg,
+    pkg: loaded.publishable.pkg,
+    publishable: loaded.publishable,
     git: loaded.git,
   };
 

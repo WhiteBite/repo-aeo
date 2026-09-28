@@ -25,6 +25,7 @@ import {
   renderLicense,
   renderSecurityMd,
   renderContributingMd,
+  mergeGenerated,
 } from '../generate/index.js';
 
 const GITIGNORE_DEFAULTS = ['node_modules/', 'dist/', 'build/', '*.log', '.DS_Store', '.env'];
@@ -66,9 +67,10 @@ function replaceYamlList(text, key, values) {
   return { text: lines.join('\n'), changed: true };
 }
 
-function readPackageJson(cwd) {
-  const path = join(cwd, 'package.json');
-  if (!exists(path)) return null;
+/** Reads the package that would actually be published (root or workspace). */
+function readPackageJson(ctx) {
+  const path = (ctx.publishable && ctx.publishable.path) || join(ctx.cwd, 'package.json');
+  if (!path || !exists(path)) return null;
   const text = readTextIfExists(path);
   let json;
   try {
@@ -90,6 +92,12 @@ function readmeBase(ctx) {
   // `readme.generate` will produce in the same run, so patches stay ordered.
   const before = onDisk ? readTextIfExists(path) : renderReadme(ctx.config, ctx.pkg);
   return { path, onDisk, before };
+}
+
+/** Returns the body of the section that should hold examples. */
+function exampleSectionBody(doc) {
+  const key = ['examples', 'usage', 'example', 'quickstart', 'getting started'].find((candidate) => doc.sections.has(candidate));
+  return key ? doc.sections.get(key).body : '';
 }
 
 const REQUIRED_README_SECTIONS = [
@@ -251,14 +259,19 @@ export const PATCHES = [
       // config so llms-full.txt is complete even in the same run that
       // scaffolds the README (patches are applied in registry order).
       const readme = exists(readmePath) ? readTextIfExists(readmePath) : renderReadme(ctx.config, ctx.pkg);
-      const beforeLlms = exists(llmsPath) ? readTextIfExists(llmsPath) : null;
-      const afterLlms = renderLlmsTxt(ctx.config, ctx.pkg, readme);
-      if (beforeLlms !== afterLlms) out.push(mutation(llmsPath, beforeLlms, afterLlms));
 
-      const fullPath = join(ctx.cwd, 'llms-full.txt');
-      const beforeFull = exists(fullPath) ? readTextIfExists(fullPath) : null;
-      const afterFull = renderLlmsFullTxt(ctx.config, ctx.pkg, readme);
-      if (beforeFull !== afterFull) out.push(mutation(fullPath, beforeFull, afterFull));
+      const merge = (path, generated) => {
+        const before = exists(path) ? readTextIfExists(path) : null;
+        const after = mergeGenerated(before, generated);
+        if (after === null) return null; // hand-edited, no markers: leave it alone
+        if (after === before) return null; // already up to date
+        return mutation(path, before, after);
+      };
+
+      const llmsChange = merge(llmsPath, renderLlmsTxt(ctx.config, ctx.pkg, readme));
+      if (llmsChange) out.push(llmsChange);
+      const fullChange = merge(join(ctx.cwd, 'llms-full.txt'), renderLlmsFullTxt(ctx.config, ctx.pkg, readme));
+      if (fullChange) out.push(fullChange);
       return out;
     },
   },
@@ -269,7 +282,7 @@ export const PATCHES = [
     description: 'Fills description, keywords, repository, homepage and bugs when missing.',
     risk: 'safe',
     applies(ctx) {
-      const pkg = readPackageJson(ctx.cwd);
+      const pkg = readPackageJson(ctx);
       if (!pkg || pkg.parseError) return false;
       const repository = ctx.config.links && ctx.config.links.issues ? String(ctx.config.links.issues).replace(/\/issues\/?$/, '') : null;
       return Boolean(
@@ -281,7 +294,7 @@ export const PATCHES = [
       );
     },
     mutations(ctx) {
-      const pkg = readPackageJson(ctx.cwd);
+      const pkg = readPackageJson(ctx);
       const json = { ...pkg.json };
       const repository = ctx.config.links && ctx.config.links.issues ? String(ctx.config.links.issues).replace(/\/issues\/?$/, '') : null;
       if (!json.description) json.description = ctx.config.project.one_liner || ctx.config.project.description || json.description;
@@ -301,14 +314,14 @@ export const PATCHES = [
     description: 'Merges keywords.npm_keywords into package.json without dropping existing keywords.',
     risk: 'safe',
     applies(ctx) {
-      const pkg = readPackageJson(ctx.cwd);
+      const pkg = readPackageJson(ctx);
       if (!pkg || pkg.parseError) return false;
       const existing = Array.isArray(pkg.json.keywords) ? pkg.json.keywords : [];
       const wanted = (ctx.config.keywords && ctx.config.keywords.npm_keywords) || [];
       return wanted.some((keyword) => !existing.includes(keyword));
     },
     mutations(ctx) {
-      const pkg = readPackageJson(ctx.cwd);
+      const pkg = readPackageJson(ctx);
       const json = { ...pkg.json };
       const existing = Array.isArray(json.keywords) ? json.keywords : [];
       json.keywords = uniq([...existing, ...((ctx.config.keywords && ctx.config.keywords.npm_keywords) || [])]);
@@ -322,14 +335,14 @@ export const PATCHES = [
     description: 'Adds llms.txt, llms-full.txt and AGENTS.md to the files array.',
     risk: 'safe',
     applies(ctx) {
-      const pkg = readPackageJson(ctx.cwd);
+      const pkg = readPackageJson(ctx);
       if (!pkg || pkg.parseError) return false;
       if (!Array.isArray(pkg.json.files)) return false;
       const wanted = ['llms.txt', 'llms-full.txt', 'AGENTS.md'].filter((name) => exists(join(ctx.cwd, name)));
       return wanted.some((name) => !pkg.json.files.includes(name));
     },
     mutations(ctx) {
-      const pkg = readPackageJson(ctx.cwd);
+      const pkg = readPackageJson(ctx);
       const json = { ...pkg.json };
       const wanted = ['llms.txt', 'llms-full.txt', 'AGENTS.md'].filter((name) => exists(join(ctx.cwd, name)));
       const files = Array.isArray(json.files) ? [...json.files] : [];
@@ -347,12 +360,12 @@ export const PATCHES = [
     description: 'Adds a conservative engines.node range when missing.',
     risk: 'safe',
     applies(ctx) {
-      const pkg = readPackageJson(ctx.cwd);
+      const pkg = readPackageJson(ctx);
       if (!pkg || pkg.parseError) return false;
       return !pkg.json.engines || !pkg.json.engines.node;
     },
     mutations(ctx) {
-      const pkg = readPackageJson(ctx.cwd);
+      const pkg = readPackageJson(ctx);
       const json = { ...pkg.json };
       json.engines = { ...(json.engines || {}), node: json.engines && json.engines.node ? json.engines.node : '>=18' };
       return [mutation(pkg.path, pkg.text, serializeJson(json))];
@@ -410,8 +423,7 @@ export const PATCHES = [
     risk: 'safe',
     applies(ctx) {
       const doc = parseMarkdown(readmeBase(ctx).before);
-      const sectionKey = ['examples', 'usage', 'example', 'quickstart', 'getting started'].find((key) => doc.sections.has(key));
-      const body = sectionKey ? doc.sections.get(sectionKey).body : '';
+      const body = exampleSectionBody(doc);
       const blocks = (body.match(/^(?:```|~~~)/gm) || []).length / 2;
       return blocks < 2;
     },
@@ -429,7 +441,7 @@ export const PATCHES = [
         '',
       ].join('\n');
       const doc = parseMarkdown(before);
-      const sectionKey = ['examples', 'usage', 'example', 'quickstart', 'getting started'].find((key) => doc.sections.has(key));
+      const sectionKey = ['examples', 'usage', 'example'].find((key) => doc.sections.has(key));
       let after;
       if (sectionKey) {
         // insert the stub right after the section heading
@@ -438,6 +450,7 @@ export const PATCHES = [
         lines.splice(heading.line, 0, ...stub.split('\n'));
         after = lines.join('\n');
       } else {
+        // no examples section: append one instead of polluting the quickstart
         after = `${before.replace(/\s*$/, '')}\n\n## Examples${stub}`;
       }
       return [mutation(path, before, after)];
