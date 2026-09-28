@@ -13,13 +13,16 @@
   ],
   "scripts": {
     "rdk": "node packages/rdk-cli/bin/rdk.js",
+    "mcp": "node packages/repo-aeo-mcp/bin/repo-aeo-mcp.js serve",
     "audit": "node packages/rdk-cli/bin/rdk.js audit",
     "audit:json": "node packages/rdk-cli/bin/rdk.js audit --format json",
     "fix:dry": "node packages/rdk-cli/bin/rdk.js fix --dry-run",
     "fix": "node packages/rdk-cli/bin/rdk.js fix --apply",
     "npm-surface": "node packages/rdk-cli/bin/rdk.js npm-surface",
     "github-sync": "node packages/rdk-cli/bin/rdk.js github-sync --dry-run",
-    "test": "node --test packages/rdk-cli/test/"
+    "test": "node --test \"packages/*/test/*.test.js\"",
+    "test:cli": "node --test \"packages/rdk-cli/test/*.test.js\"",
+    "test:mcp": "node --test \"packages/repo-aeo-mcp/test/*.test.js\""
   },
   "keywords": [
     "discoverability",
