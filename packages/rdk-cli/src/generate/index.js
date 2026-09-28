@@ -292,7 +292,9 @@ export function renderLlmsTxt(config, pkg, readmeText) {
   if (quickstart.run) lines.push(`- Run: \`${quickstart.run}\``);
   if (quickstart.test) lines.push(`- Test: \`${quickstart.test}\``);
   if (Array.isArray(config.use_cases) && config.use_cases.length > 0) {
-    lines.push(`- Use cases: ${config.use_cases.slice(0, 5).join('; ')}`);
+    // No slice here: silently dropping a configured use case from an
+    // AI-facing index is exactly the kind of drift this tool exists to prevent.
+    lines.push(`- Use cases: ${config.use_cases.join('; ')}`);
   }
   lines.push('');
   lines.push('## Optional');

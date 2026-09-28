@@ -20,6 +20,13 @@ Three layers, because no single artifact makes discoverability "just happen".
         │                       │                          │
         └──────────────► packages/rdk-cli ◄────────────────┘
                           (the only engine)
+                                        │
+                                        ▼
+                          ┌────────────────────────┐
+                          │ (4) MCP server         │
+                          │ packages/repo-aeo-mcp  │
+                          │ 8 tools, stdio, Docker │
+                          └────────────────────────┘
 ```
 
 ## (1) Repo Kit
@@ -59,11 +66,23 @@ there is at least one autofixable finding. The `autofix` job then creates
 `action/action.yml` is a reusable composite action with the same steps for
 repositories that prefer a single `uses:` line.
 
-## Optional (v0.2): MCP server
+## (4) MCP server
 
-See [`mcp-plan.md`](./mcp-plan.md). It exists for deterministic measurements and
-live integrations (GitHub API, website fetch/validation), is read-only by
-default, and caps the tool count at 8.
+`packages/repo-aeo-mcp` exposes the same engine to AI agents and monitoring
+jobs over MCP stdio. It adds two things the CLI cannot do:
+
+- **Trend history** — every call is appended to
+  `.discoverability/cache/metrics.json`, so the server can answer "your npm
+  quality score went 0.62 → 0.81 over the last month" instead of a bare number.
+- **Live integrations** — `gh` for GitHub visibility signals, HTTP for
+  `/llms.txt` checks, npms.io for the published score.
+
+Design constraints: zero runtime dependencies, 8 tools maximum, names in
+`[service]_[action]_[object]`, every tool annotated with MCP hints, and exactly
+one write tool (`github_sync_metadata`) which reuses the CLI's guarded
+implementation, requires an ack string plus a reason, and **previews by
+default** (`apply: true` is opt-in, mirroring `rdk fix`). See
+[`mcp-plan.md`](./mcp-plan.md) for the tool table and safety model.
 
 ## Data flow invariants
 
@@ -73,5 +92,6 @@ default, and caps the tool count at 8.
    so nothing is invented.
 3. Patches are idempotent: `rdk fix` twice must produce no second diff.
 4. The audit never writes. `fix` writes only with `--apply`. `github-sync`
-   writes only with `--apply --ack <ACK> --reason "<why>"`.
+   writes only with `--apply --ack <ACK> --reason "<why>"`. The MCP write tool
+   keeps the same guard and adds a preview step before it.
 5. Publish, tag and release are never performed by any layer.

@@ -30,3 +30,23 @@ MCP tools). These checks are advisory: they are not part of the numeric score.
   string plus a reason, and both are logged.
 - Keep the tool count small in v1 (≤ 8) — discoverability beats coverage.
 - Register the server in public MCP directories once it is stable.
+
+## Dogfooding: this repository against the checklist
+
+RDK ships its own server, `packages/repo-aeo-mcp`, so the checklist above is
+applied to it directly:
+
+| Requirement | How `repo-aeo-mcp` meets it |
+| --- | --- |
+| kebab-case name containing `mcp` | package and bin are both `repo-aeo-mcp` |
+| `[service]_[action]_[object]`, snake_case | 8 tools, e.g. `github_audit_visibility_signals` |
+| 1–2 sentence descriptions, params in the schema | descriptions state the outcome; `limit`, `severity`, `cwd`, `apply` live in `inputSchema` |
+| Dockerfile | `packages/repo-aeo-mcp/Dockerfile` (`node:22-alpine`, stdio only) |
+| No dependencies | zero runtime dependencies; the engine is a workspace link to `@repo-aeo/rdk-cli` |
+| Read-only by default, write needs ack + reason | 7 tools annotated `readOnlyHint: true`; `github_sync_metadata` requires `I_ACK_RDK_GITHUB_WRITE` plus a reason and previews before it writes |
+| ≤ 8 tools in v1 | exactly 8 |
+
+An agent auditing this repository should read the same table as evidence, not as
+a claim: `node packages/repo-aeo-mcp/bin/repo-aeo-mcp.js tools` lists the names
+and `npm run test:mcp` asserts the contract (naming, annotations, schema, write
+guard, JSON-RPC transport).

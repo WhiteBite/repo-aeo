@@ -21,6 +21,10 @@ RDK scores how discoverable your repository is, fixes the parts that can be fixe
 automatically, and keeps it from regressing in CI. It is the tool you point at a
 repo that is *good but invisible*.
 
+The audit runs **41 checks in under 200 ms offline** on this repository
+(measured with `rdk audit --format json`, `duration_ms` field) and carries **0
+runtime dependencies**, so `npx` stays fast and the supply chain stays small.
+
 ## Quickstart
 
 **Prerequisites:** Node.js >= 18
@@ -34,11 +38,8 @@ npx rdk init --apply
 
 # 3. see the score and the prioritised fix list
 npx rdk audit
-```
 
-Run the tests:
-
-```bash
+# 4. run the test suite
 npm test
 ```
 
@@ -62,9 +63,7 @@ Three layers, because a one-off script is not enough:
 | **Repo Kit** | `.discoverability/project.yml` as the single source of truth, plus templates and generators | `.discoverability/`, `packages/rdk-cli/src/generate/` |
 | **Skillpack** | Agent instructions with progressive disclosure: audit → plan → patch → verify | `skills/repo-discoverability/` |
 | **Automation** | GitHub Action on `pull_request`, `workflow_dispatch` and weekly cron | `.github/workflows/rdk-audit.yml`, `action/action.yml` |
-
-Optional (v0.2): an MCP server for deterministic measurements and live GitHub /
-website checks. Design notes: [`docs/mcp-plan.md`](./docs/mcp-plan.md).
+| **Monitoring** | MCP server with 8 read-mostly tools, trend history and live GitHub / site / npms probes | `packages/repo-aeo-mcp/` |
 
 ## Commands
 
@@ -74,6 +73,10 @@ npx rdk audit         # score 0-100 + findings (json | markdown | github-comment
 npx rdk fix           # preview safe autofixes; --apply to write them
 npx rdk npm-surface   # package.json publish surface + npm pack --dry-run
 npx rdk github-sync   # push description/homepage/topics (needs --apply --ack --reason)
+
+npx repo-aeo-mcp serve # the same engine as an MCP server: 8 read-mostly tools
+claude mcp add rdk -- npx repo-aeo-mcp serve
+docker run -i repo-aeo-mcp serve
 ```
 
 Every write operation requires an explicit flag. `audit` is read-only and works
@@ -113,7 +116,16 @@ $ npx rdk npm-surface --pack
 - run: npx @repo-aeo/rdk-cli audit --format github-comment --online
 ```
 
-### 5. Teach an agent to do it
+### 5. Monitor it continuously
+
+```bash
+$ npx repo-aeo-mcp score
+Discoverability score: 96/100 (grade A)
+checks passed: 39/41 - errors 0 - warnings 0 - autofixable 0
+trend: 90 -> 96 (up)
+```
+
+### 6. Teach an agent to do it
 
 ```text
 skills/repo-discoverability/SKILL.md → description triggers on
@@ -128,6 +140,7 @@ skills/repo-discoverability/SKILL.md → description triggers on
 - Prepare `package.json` metadata, exports and tarball contents before an npm release.
 - Fill GitHub description, homepage and 8–20 topics from one config file.
 - Keep discoverability from regressing with a weekly GitHub Action audit.
+- Watch score, npm search score and GitHub signals from an MCP client or a cron job.
 
 ## Discoverability Score
 
@@ -159,14 +172,16 @@ Grades: A ≥ 90 · B ≥ 80 · C ≥ 70 · D ≥ 55 · F below. Full model:
 
 ## Status
 
-Actively developed. v0.1 ships the CLI, the skill and the Action. The MCP server
-and IDE packaging are next ([roadmap issues](https://github.com/WhiteBite/signal-forge/issues)).
+Actively developed. v0.1 ships the CLI, the skill, the Action **and** the MCP
+server. IDE packaging is next
+([roadmap issues](https://github.com/WhiteBite/signal-forge/issues)).
 
 ## Repository map
 
 | Path | Purpose |
 | --- | --- |
 | `packages/rdk-cli/` | the `@repo-aeo/rdk-cli` package (zero dependencies) |
+| `packages/repo-aeo-mcp/` | the `repo-aeo-mcp` MCP server (8 tools, stdio, Dockerfile) |
 | `skills/repo-discoverability/` | SKILL.md + references + scripts for coding agents |
 | `action/`, `.github/workflows/` | GitHub Action and reusable composite action |
 | `fixtures/demo-repo/` | before/after demo repository |

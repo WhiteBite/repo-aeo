@@ -7,7 +7,7 @@
 project:
   name: "repo-aeo"
   one_liner: "Make any repository, npm package and docs site findable and recommendable to humans, AI agents and search engines."
-  description: "Repo Discoverability Kit (RDK): a CLI, an agent skill and a GitHub Action that audit and fix the metadata deciding whether an AI agent, a search engine or a human can find, understand and recommend your repository."
+  description: "Repo Discoverability Kit (RDK): a CLI, an agent skill, a GitHub Action and an MCP server that audit and fix the metadata deciding whether an AI agent, a search engine or a human can find, understand and recommend your repository."
   category: "tool"   # library | app | template | research | tool | dataset | mcp-server
 
 audiences:
@@ -22,6 +22,7 @@ use_cases:
   - "Prepare package.json metadata, exports and tarball contents before an npm release"
   - "Fill GitHub description, homepage and 8-20 topics from one config file"
   - "Keep discoverability from regressing with a weekly GitHub Action audit"
+  - "Watch the discoverability score, the npm search score and GitHub visibility signals from an MCP client or a cron job"
 
 keywords:
   github_topics:
@@ -37,6 +38,8 @@ keywords:
     - "cli"
     - "open-source"
     - "documentation-tools"
+    - "mcp"
+    - "mcp-server"
   npm_keywords:
     - "cli"
     - "discoverability"
@@ -71,6 +74,7 @@ differentiators:
   - "Ships as a CLI, an agent skill and a GitHub Action, so the same audit runs locally and in CI"
   - "Audit-only by default: writes require an explicit flag, and publish/tag/force-push are out of scope"
   - "Deterministic, zero-dependency generators: no LLM in the loop, so no invented facts"
+  - "The MCP server adds trend history and live GitHub/site/npm probes, and its single write tool previews before it writes"
 
 safety:
   allow_autofix: false
