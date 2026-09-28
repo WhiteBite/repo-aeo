@@ -1,0 +1,9 @@
+{
+  "name": "demo-widget",
+  "version": "0.0.1",
+  "main": "index.js",
+  "homepage": "https://example.com/demo-widget",
+  "scripts": {
+    "start": "node index.js"
+  }
+}

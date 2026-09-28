@@ -1,0 +1,50 @@
+{
+  "name": "@repo-aeo/rdk-cli",
+  "version": "0.1.0",
+  "description": "Audit and improve repository discoverability: GitHub metadata and topics, README structure, AGENTS.md, npm package surface, llms.txt and structured data.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "rdk": "bin/rdk.js"
+  },
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test test/"
+  },
+  "keywords": [
+    "cli",
+    "discoverability",
+    "repo-audit",
+    "github-topics",
+    "llms-txt",
+    "agents-md",
+    "npm-metadata",
+    "geo",
+    "aeo"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WhiteBite/signal-forge.git",
+    "directory": "packages/rdk-cli"
+  },
+  "homepage": "https://github.com/WhiteBite/signal-forge/tree/main/packages/rdk-cli#readme",
+  "bugs": {
+    "url": "https://github.com/WhiteBite/signal-forge/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
