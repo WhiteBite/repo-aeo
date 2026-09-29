@@ -170,6 +170,96 @@ Grades: A ≥ 90 · B ≥ 80 · C ≥ 70 · D ≥ 55 · F below. Full model:
 - **Deterministic generators.** Zero runtime dependencies, no LLM in the loop:
   every generated line is traceable to the config or to a file in the repo.
 
+## How RDK compares
+
+Most tools in this space anchor to a **served website** (llms.txt validators,
+GEO graders, Lighthouse), a **published package** (npms.io) or a **docs build**
+(framework generators). RDK anchors to the **git working tree**: it audits and
+repairs the repository itself, before anything is served or published.
+
+### Direct comparables: repo-local artifact graders and generators
+
+| Tool | Unit of analysis | Scores | Generates | Validates | Writes to GitHub | Agent interface | CI |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **RDK (this repo)** | git working tree | 0-100 rubric, 6 axes | llms.txt, llms-full.txt, AGENTS.md, JSON-LD, CITATION.cff, templates | freshness, structure, link probes (`--online`) | guarded sync (ack + reason + preview) | MCP server + agent skill | composite Action |
+| [repo-health-radar](https://github.com/xxrraa/repo-health-radar) | git working tree | 0-100 + letter grade, 6 human-maintainer axes | - | 35 checks (docs, CI, release readiness, activity) | - | - | composite Action |
+| [GitHub community profile](https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/about-community-profiles-for-public-repositories) | repo, hosted checklist | checklist | - | presence + supported location of trust files | - | - | built into github.com |
+| [standard-readme](https://github.com/RichardLitt/standard-readme) + [remark preset](https://github.com/RichardLitt/standard-readme-preset) | README.md | pass/fail lint | scaffold only | section spec for human readers | - | - | remark CLI |
+| [readme-score](https://github.com/clayallsopp/readme-score), [ReadmeAI](https://github.com/eli64s/readme-ai), README templates | README.md | richness proxies (code blocks, images) | LLM-written README | - | - | - | - |
+| [cffinit](https://github.com/citation-file-format/cff-initializer-javascript) / [cffconvert](https://github.com/citation-file-format/cffconvert) | CITATION.cff | - | CFF via a human form / format conversions | version-pinned JSON schemas | - | - | [reject-only gate](https://github.com/citation-file-format/cffconvert-github-action) |
+| [codemeta-generator](https://github.com/codemeta/codemeta-generator) | a GitHub repo page | - | CodeMeta JSON-LD | JSON-LD context | - | - | - |
+| [npms.io](https://npms.io/about) | published package | quality/maintenance/popularity | - | - | - | - | - |
+| [Repomix](https://github.com/yamadashy/repomix) / [ai-digest](https://github.com/khromov/ai-digest) | repo content | - | one packed context file | secret scan before output | - | CLI/MCP consumption | - |
+
+### Adjacent territory: sites, indexes and agent context
+
+| Tool | Unit of analysis | Scores | Generates | Validates | Writes to GitHub | Agent interface | CI |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| [Lighthouse Agentic Browsing](https://developer.chrome.com/docs/lighthouse/agentic-browsing/llms-txt) | served site | pass/fail audits | - | llms.txt presence, H1, links | - | - | via Lighthouse CI |
+| [llms-txt-hub](https://github.com/thedaviddias/llms-txt-hub) / [llms-txt-check](https://github.com/portdeveloper/llms-txt-check) | served site | - | - | presence at visit time; file claims vs what the site serves | - | browser extension | - |
+| Framework generators ([Starlight](https://github.com/delucis/starlight-llms-txt), [mkdocs](https://github.com/pawamoy/mkdocs-llmstxt), Docusaurus, Mintlify) / [firecrawl](https://github.com/firecrawl/llmstxt-generator) | docs build or crawl | - | llms.txt (+ full) at build time | - | - | - | docs pipeline |
+| [agentmarkup](https://github.com/agentmarkup/agentmarkup) | site build | - | llms.txt, JSON-LD, markdown mirrors | yes, at build | - | - | build step |
+| [geo-score](https://github.com/jianruntech/geo-score) and GEO skill packs / [Searchstack](https://github.com/alexpospekhov/searchstack-aeo) | served site / external AI engines | 0-100 rubric | - | crawlability, markup, citations; brand visibility in AI answers | - | skill pack | cron |
+| [DeepWiki](https://deepwiki.com) and [open-source](https://github.com/AsyncFuncAI/deepwiki-open) [clones](https://github.com/AIDotNet/OpenDeepWiki) | public repo, hosted | - | auto-wiki and diagrams | - | - | remote MCP | - |
+| [Context7](https://github.com/upstash/context7) / [mcpdoc](https://github.com/langchain-ai/mcpdoc) | third-party docs | - | - | - | - | MCP consumption of llms.txt | - |
+| [OpenSSF Scorecard](https://github.com/ossf/scorecard), Socket, Snyk | repo / dependencies, security | 0-10 risk-weighted aggregate | - | supply-chain risk | results only | Socket MCP | scorecard-action |
+| [CHAOSS](https://github.com/chaoss/metrics) / [libraries.io](https://github.com/librariesio/libraries.io) | community events / package index | metric catalog, no composite | dashboards | - | - | - | self-hosted platform |
+
+Orthogonal by design: Scorecard grades how safe a repo is to consume,
+community standards grade human onboarding, packers serialize content,
+DeepWiki hosts a generated wiki and CHAOSS measures community behaviour over
+time. None of them repairs the repository; RDK does not replace any of them.
+
+### Where RDK is deliberately narrower
+
+- **No codebase packing.** Repomix and ai-digest ship the repo as one context
+  file; RDK points agents at the right files (llms.txt, AGENTS.md) instead of
+  serializing content.
+- **No CFF schema validation.** RDK generates a CITATION.cff stub; validating
+  it against the versioned schema is cffconvert's job, and the community's
+  fix story there is reject-in-CI, never rewrite.
+- **One root llms.txt pair.** No per-path or per-section corpora like Ray's
+  sectioned `llms-full.txt` files or Cloudflare's per-product variants.
+- **Repo-local llms.txt checks.** "Does the served site match the file" is
+  only an MCP tool and an `--online` probe, not a full served-vs-file diff
+  like llms-txt-check.
+- **npms.io is fetched, not computed.** If npms.io goes away, the npm axis
+  falls back to registry metadata only.
+- **The ack string is a reusable constant.** A determined model can type it;
+  single-use, argument-bound tokens (as in mature write-gated MCP servers)
+  close that loop tighter. Preview-by-default and the reason audit log are
+  the compensating controls here.
+- **The rubric is heuristic, not observational.** A 96/100 means the repo
+  satisfies the checks, not that it outranks anything in a population-wide
+  model like npms.io's.
+- **No activity or adoption axis.** repo-health-radar and CHAOSS grade
+  maintainer responsiveness, release cadence and contributor diversity from
+  event history; RDK scores artifacts only, so a well-documented dead repo
+  scores high here.
+- **No visibility-in-engines measurement.** Searchstack probes Google, AI
+  Overviews and chat assistants about your brand; RDK can only make the repo
+  legible, never observe how engines actually rank it.
+- **Location-awareness of trust files is GitHub's job.** The community
+  profile accepts CODE_OF_CONDUCT in `.github/`, root or `docs/`; RDK's checks
+  look at fixed paths.
+
+### Where RDK leads
+
+- The only tool above whose unit of analysis is the working tree: everything
+  is fixable before the first deploy or publish. The nearest twin,
+  repo-health-radar, shares the shape (zero-dep CLI, composite action,
+  min-score gate) but grades human-maintainer axes and ships no autofixes,
+  MCP server or agent artifacts.
+- README primitives are scored for agent consumption (install-command
+  detectability, quickstart placement, parseable structure); the numeric
+  README graders that exist reward human presentation instead.
+- Cross-source coherence (config vs package.json vs GitHub vs README) has no
+  analog; topic managers are write-only wrappers.
+- Double-run idempotency (`rdk fix` twice produces no diff) is a tested gate,
+  where codemod ecosystems treat it as folklore.
+- A write-guarded MCP tool with reason logging and tool annotations on every
+  tool, in a zero-runtime-dependency package that audits fully offline.
+
 ## Status
 
 Actively developed. v0.1 ships the CLI, the skill, the Action **and** the MCP
