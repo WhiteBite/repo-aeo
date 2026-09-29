@@ -151,7 +151,7 @@ export const readmeChecks = [
       if (h1 === 0) {
         return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'README has no H1 title', why: this.why, fix: 'Start the README with "# Project name".', effort: 'S', weight: this.weight });
       }
-      if (h2 < 3) {
+      if (h2 < 4) {
         return finding({ id: this.id, axis: this.axis, severity: 'warn', title: `README has only ${h2} H2 sections (target >= 4)`, why: this.why, fix: this.fix, effort: 'S', weight: this.weight });
       }
       return null;

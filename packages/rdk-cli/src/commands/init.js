@@ -36,7 +36,10 @@ export function initCommand({ cwd, options = {} }) {
     git: loaded.git,
   };
 
-  const planned = planPatches(ctx, { only: INIT_PATCHES });
+  const requested = options.only ? String(options.only).split(',').map((s) => s.trim()).filter(Boolean) : null;
+  const only = requested ? INIT_PATCHES.filter((id) => requested.includes(id)) : INIT_PATCHES;
+  const skip = options.skip ? String(options.skip).split(',').map((s) => s.trim()).filter(Boolean) : [];
+  const planned = planPatches(ctx, { only, skip });
   const lines = [];
   lines.push('# rdk init');
   lines.push('');
