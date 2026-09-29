@@ -91,7 +91,6 @@ export function loadConfig(cwd = process.cwd()) {
     config.project.description = config.project.description || pkg.description || null;
     config.links.homepage = config.links.homepage || pkg.homepage || null;
     config.links.issues = config.links.issues || (typeof pkg.bugs === 'string' ? pkg.bugs : pkg.bugs && pkg.bugs.url) || null;
-    config.links.docs = config.links.docs || (typeof pkg.repository === 'string' ? pkg.repository : pkg.repository && pkg.repository.url) || null;
     if (config.artifacts.has_npm_package === false && pkg.name) {
       config.artifacts.has_npm_package = true;
     }
@@ -100,7 +99,7 @@ export function loadConfig(cwd = process.cwd()) {
     }
   }
 
-  if (git.owner && git.repo && !config.links.issues) {
+  if (git.host === 'github.com' && git.owner && git.repo && !config.links.issues) {
     config.links.issues = `https://github.com/${git.owner}/${git.repo}/issues`;
   }
 
@@ -213,7 +212,7 @@ export function buildSeedConfig(cwd = process.cwd()) {
     keywords.github_topics = suggestTopics(project, pkg);
   }
   const links = { ...config.links };
-  if (git.owner && git.repo && !links.issues) links.issues = `https://github.com/${git.owner}/${git.repo}/issues`;
+  if (git.host === 'github.com' && git.owner && git.repo && !links.issues) links.issues = `https://github.com/${git.owner}/${git.repo}/issues`;
   const quickstart = { ...config.quickstart };
   const scripts = (pkg && pkg.scripts) || {};
   if (!quickstart.install && pkg && pkg.name) quickstart.install = `npm install ${pkg.name}`;

@@ -4,15 +4,16 @@ import { run } from './proc.js';
 export function gitInfo(cwd = process.cwd()) {
   const inside = run('git', ['rev-parse', '--is-inside-work-tree'], { cwd });
   if (!inside.ok || inside.stdout.trim() !== 'true') {
-    return { isRepo: false, remote: null, owner: null, repo: null, branch: null, hasGh: hasGhCli() };
+    return { isRepo: false, remote: null, host: null, owner: null, repo: null, branch: null, hasGh: hasGhCli() };
   }
   const remote = run('git', ['remote', 'get-url', 'origin'], { cwd });
   const branch = run('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd });
   const url = remote.ok ? remote.stdout.trim() : null;
-  const { owner, repo } = parseRemote(url);
+  const { host, owner, repo } = parseRemote(url);
   return {
     isRepo: true,
     remote: url,
+    host,
     owner,
     repo,
     branch: branch.ok ? branch.stdout.trim() : null,

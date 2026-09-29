@@ -26,6 +26,7 @@ import {
   renderSecurityMd,
   renderContributingMd,
   mergeGenerated,
+  repositoryUrl,
 } from '../generate/index.js';
 
 const GITIGNORE_DEFAULTS = ['node_modules/', 'dist/', 'build/', '*.log', '.DS_Store', '.env'];
@@ -284,7 +285,7 @@ export const PATCHES = [
     applies(ctx) {
       const pkg = readPackageJson(ctx);
       if (!pkg || pkg.parseError) return false;
-      const repository = ctx.config.links && ctx.config.links.issues ? String(ctx.config.links.issues).replace(/\/issues\/?$/, '') : null;
+      const repository = repositoryUrl(ctx.config, ctx.pkg);
       return Boolean(
         (!pkg.json.description && (ctx.config.project.one_liner || ctx.config.project.description))
         || (!Array.isArray(pkg.json.keywords) && (ctx.config.keywords.npm_keywords || []).length > 0)
@@ -296,7 +297,7 @@ export const PATCHES = [
     mutations(ctx) {
       const pkg = readPackageJson(ctx);
       const json = { ...pkg.json };
-      const repository = ctx.config.links && ctx.config.links.issues ? String(ctx.config.links.issues).replace(/\/issues\/?$/, '') : null;
+      const repository = repositoryUrl(ctx.config, ctx.pkg);
       if (!json.description) json.description = ctx.config.project.one_liner || ctx.config.project.description || json.description;
       if (!Array.isArray(json.keywords) && (ctx.config.keywords.npm_keywords || []).length > 0) {
         json.keywords = uniq([...(ctx.config.keywords.npm_keywords || [])]);
@@ -469,7 +470,7 @@ export const PATCHES = [
     mutations(ctx) {
       const path = join(ctx.cwd, 'CITATION.cff');
       const before = exists(path) ? readTextIfExists(path) : null;
-      return [mutation(path, before, renderCitationCff(ctx.config))];
+      return [mutation(path, before, renderCitationCff(ctx.config, ctx.pkg))];
     },
   },
 
@@ -511,8 +512,6 @@ export const PATCHES = [
 
   {
     id: 'github.templates',
-    title: 'Create issue and PR templates',
-    description: 'Adds .giths',
     title: 'Create issue and PR templates',
     description: 'Adds .github/ISSUE_TEMPLATE/*.md and PULL_REQUEST_TEMPLATE.md.',
     risk: 'safe',
