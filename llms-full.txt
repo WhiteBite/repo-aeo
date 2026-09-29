@@ -1,3 +1,14 @@
+<!-- rdk:generated:start -->
+# repo-aeo — full documentation
+
+> Make any repository, npm package and docs site findable and recommendable to humans, AI agents and search engines.
+
+This is the concatenated documentation intended for LLM grounding. Regenerate with `rdk fix`.
+
+---
+
+# README
+
 # repo-aeo — Repo Discoverability Kit (RDK)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
@@ -180,3 +191,8 @@ server. IDE packaging is next
 ## License
 
 MIT — see [LICENSE](./LICENSE). Citation metadata: [CITATION.cff](./CITATION.cff).
+<!-- rdk:generated:end -->
+
+## Hand-written notes
+
+<!-- Everything below the end marker is preserved by `rdk fix`. Put hand-written context here; the block above is regenerated from .discoverability/project.yml. -->

@@ -1,0 +1,81 @@
+# .discoverability/project.yml
+# Single source of truth for this repository's discoverability metadata.
+# Consumed by: rdk audit / rdk fix / rdk github-sync / rdk npm-surface,
+# the repo-discoverability skill, and the rdk-audit GitHub Action.
+# Docs: https://github.com/WhiteBite/signal-forge/blob/main/docs/configuration.md
+
+project:
+  name: "repo-aeo"
+  one_liner: "Make any repository, npm package and docs site findable and recommendable to humans, AI agents and search engines."
+  description: "Repo Discoverability Kit (RDK): a CLI, an agent skill, a GitHub Action and an MCP server that audit and fix the metadata deciding whether an AI agent, a search engine or a human can find, understand and recommend your repository."
+  category: "tool"   # library | app | template | research | tool | dataset | mcp-server
+
+audiences:
+  - "Maintainers publishing an npm package for the first time"
+  - "Teams whose library is good but invisible in AI answers and npm search"
+  - "Agent-tooling authors who want their repo to be usable by coding agents out of the box"
+  - "Researchers and OSS projects that need citation and discovery metadata"
+
+use_cases:
+  - "Score a repository's discoverability and get a prioritised fix list"
+  - "Generate and maintain AGENTS.md, llms.txt and llms-full.txt for a repo"
+  - "Prepare package.json metadata, exports and tarball contents before an npm release"
+  - "Fill GitHub description, homepage and 8-20 topics from one config file"
+  - "Keep discoverability from regressing with a weekly GitHub Action audit"
+  - "Watch the discoverability score, the npm search score and GitHub visibility signals from an MCP client or a cron job"
+
+keywords:
+  github_topics:
+    - "discoverability"
+    - "generative-engine-optimization"
+    - "answer-engine-optimization"
+    - "agent-skills"
+    - "agents-md"
+    - "llms-txt"
+    - "github-topics"
+    - "npm-metadata"
+    - "developer-tools"
+    - "cli"
+    - "open-source"
+    - "documentation-tools"
+    - "mcp"
+    - "mcp-server"
+  npm_keywords:
+    - "cli"
+    - "discoverability"
+    - "repo-audit"
+    - "github-topics"
+    - "llms-txt"
+    - "agents-md"
+    - "npm-metadata"
+    - "geo"
+    - "aeo"
+    - "developer-tools"
+
+links:
+  homepage: "https://github.com/WhiteBite/signal-forge#readme"
+  docs: "https://github.com/WhiteBite/signal-forge/tree/main/docs"
+  demo: "https://github.com/WhiteBite/signal-forge/tree/main/fixtures/demo-repo"
+  issues: "https://github.com/WhiteBite/signal-forge/issues"
+
+quickstart:
+  prerequisites:
+    - "Node.js >= 18"
+  install: "npm install --save-dev @repo-aeo/rdk-cli"
+  run: "npx rdk audit"
+  test: "npm test"
+
+artifacts:
+  has_npm_package: true
+  has_docs_site: false
+
+differentiators:
+  - "One config file (.discoverability/project.yml) drives README, AGENTS.md, llms.txt, npm metadata and GitHub topics"
+  - "Ships as a CLI, an agent skill and a GitHub Action, so the same audit runs locally and in CI"
+  - "Audit-only by default: writes require an explicit flag, and publish/tag/force-push are out of scope"
+  - "Deterministic, zero-dependency generators: no LLM in the loop, so no invented facts"
+  - "The MCP server adds trend history and live GitHub/site/npm probes, and its single write tool previews before it writes"
+
+safety:
+  allow_autofix: false
+  require_ack_for_publish: true

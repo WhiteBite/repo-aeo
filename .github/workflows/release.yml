@@ -1,0 +1,118 @@
+name: release
+
+# Publishes the two packages to npm, in dependency order:
+#   @repo-aeo/rdk-cli  (the engine, zero dependencies)
+#   repo-aeo-mcp       (depends on the published rdk-cli)
+#
+# Deliberately manual: `workflow_dispatch` only, protected by the `npm`
+# environment so a human has to approve every publish. Nothing here runs on a
+# tag or on a push, because publishing is never implicit in this project.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run everything except `npm publish` (recommended first)'
+        type: boolean
+        default: true
+      run_tests:
+        description: 'Run the test suite before publishing'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify before publishing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Test suite
+        if: ${{ inputs.run_tests }}
+        run: npm test
+
+      - name: Discoverability audit (offline, read-only)
+        run: node packages/rdk-cli/bin/rdk.js audit
+
+      - name: Show what would be published
+        run: |
+          npm run npm-surface
+          echo "--- rdk-cli tarball:"
+          npm pack --dry-run --workspace packages/rdk-cli
+          echo "--- repo-aeo-mcp tarball:"
+          npm pack --dry-run --workspace packages/repo-aeo-mcp
+
+  publish:
+    name: Publish to npm
+    needs: verify
+    # The `npm` environment holds the approval rule and the NPM_TOKEN secret,
+    # so a reviewer must approve the job before anything is published.
+    environment: npm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Publish the engine first
+        working-directory: packages/rdk-cli
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            npm publish --dry-run --access public
+          else
+            npm publish --access public --provenance
+          fi
+
+      # repo-aeo-mcp declares a dependency on the published version of the
+      # engine, so it must go second: a consumer installing it immediately
+      # resolves a real @repo-aeo/rdk-cli tarball.
+      - name: Publish the MCP server
+        working-directory: packages/repo-aeo-mcp
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            npm publish --dry-run --access public
+          else
+            npm publish --access public --provenance
+          fi
+
+      - name: Summary
+        run: |
+          {
+            echo "### npm publish (${{ inputs.dry_run == true && 'dry run' || 'live' }})";
+            echo "";
+            echo "| Package | Version |";
+            echo "| --- | --- |";
+            node -e "for (const p of ['packages/rdk-cli','packages/repo-aeo-mcp']) { const j = require('./' + p + '/package.json'); console.log('| ' + j.name + ' | ' + j.version + ' |'); }";
+            echo "";
+            echo "GitHub description/homepage/topics are **not** touched by this workflow.";
+            echo "Run \`rdk github-sync --apply --ack I_ACK_RDK_GITHUB_WRITE --reason \"<why>\"\` separately.";
+          } >> "$GITHUB_STEP_SUMMARY"

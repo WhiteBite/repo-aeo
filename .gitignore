@@ -1,0 +1,18 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+build/
+*.tsbuildinfo
+
+# rdk runtime artifacts (never committed)
+.discoverability/cache/
+rdk-report.json
+rdk-report.md
+
+# local scratch
+.scratch/
+*.log
+.DS_Store
+.env

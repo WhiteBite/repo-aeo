@@ -1,0 +1,23 @@
+# @repo-aeo/rdk-cli
+
+> Audit and improve repository discoverability: GitHub metadata and topics, README structure, AGENTS.md, the npm publish surface, llms.txt and structured data.
+
+Zero runtime dependencies, Node >= 18, read-only by default. Part of the Repo
+Discoverability Kit (RDK) monorepo: https://github.com/WhiteBite/signal-forge
+
+## Docs
+
+- [README.md](./README.md): install, commands, output formats, safety model.
+- [Repository README](https://github.com/WhiteBite/signal-forge#readme): the product, the three layers and the score model.
+- [docs/scoring.md](https://github.com/WhiteBite/signal-forge/blob/main/docs/scoring.md): how the 0–100 Discoverability Score is computed.
+- [docs/configuration.md](https://github.com/WhiteBite/signal-forge/blob/main/docs/configuration.md): `.discoverability/project.yml` reference.
+- [Agent skill](https://github.com/WhiteBite/signal-forge/tree/main/skills/repo-discoverability): SKILL.md for Codex/Cursor/OpenCode/Claude Code.
+
+## Key facts
+
+- Install: `npm install --save-dev @repo-aeo/rdk-cli`
+- Run: `npx rdk audit`
+- Test: `npm test`
+- Commands: `init`, `audit`, `fix`, `npm-surface`, `github-sync`.
+- Programmatic API: `import { audit, planPatches, renderGithubComment } from '@repo-aeo/rdk-cli'`.
+- Safety: audit-only by default; `fix`/`init` need `--apply`; `github-sync` needs `--apply --ack <ACK> --reason "<why>"`; publish/tag/release are never performed.
