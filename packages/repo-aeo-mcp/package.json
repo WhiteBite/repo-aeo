@@ -47,12 +47,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/WhiteBite/signal-forge.git",
+    "url": "git+https://github.com/WhiteBite/repo-aeo.git",
     "directory": "packages/repo-aeo-mcp"
   },
-  "homepage": "https://github.com/WhiteBite/signal-forge/tree/main/packages/repo-aeo-mcp#readme",
+  "homepage": "https://github.com/WhiteBite/repo-aeo/tree/main/packages/repo-aeo-mcp#readme",
   "bugs": {
-    "url": "https://github.com/WhiteBite/signal-forge/issues"
+    "url": "https://github.com/WhiteBite/repo-aeo/issues"
   },
   "publishConfig": {
     "access": "public"

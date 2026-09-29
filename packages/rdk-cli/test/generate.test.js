@@ -2,10 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { execSync } from 'node:child_process';
 import {
   GENERATED_START,
   GENERATED_END,
   mergeGenerated,
+  renderCodeowners,
   renderProjectYml,
   renderReadme,
 } from '../src/generate/index.js';
@@ -81,4 +83,29 @@ test('generated README links only to URLs that exist in the config', () => {
   const readme = renderReadme({ project: { name: 'links-check', one_liner: 'Check the links' }, links: {} });
   const urls = [...readme.matchAll(/\]\((https?:\/\/[^)]+)\)/g)].map((m) => m[1]);
   assert.deepEqual(urls, []);
+});
+
+test('generated CODEOWNERS names the audited repository owner, not ours', () => {
+  // Regression: renderCodeowners() used to hard-code `* @WhiteBite`, which
+  // silently assigned a stranger's repository to us.
+  const dir = makeRepo();
+  try {
+    execSync('git init -q . && git remote add origin git@github.com:someone-else/their-tool.git', { cwd: dir });
+    const codeowners = renderCodeowners(dir);
+    assert.match(codeowners, /\* @someone-else$/m);
+    assert.ok(!codeowners.includes('WhiteBite'), 'a foreign repo must not inherit our owner');
+  } finally {
+    removeRepo(dir);
+  }
+
+  // Without a remote the documented fallback still applies.
+  assert.match(renderCodeowners('/tmp'), /\* @WhiteBite$/m);
+});
+
+test('generated project.yml points at the tool documentation, not at the audited repo', () => {
+  const yml = renderProjectYml({ project: { name: 'docs-link', one_liner: 'Check the docs link' } });
+  const docsLine = yml.split('\n').find((line) => line.startsWith('# Docs:'));
+  assert.ok(docsLine, 'the generated config must carry a docs link');
+  assert.ok(docsLine.includes('/blob/main/docs/configuration.md'), docsLine);
+  assert.ok(!docsLine.includes('someone-else'), 'the docs link belongs to the tool, not to the audited repo');
 });

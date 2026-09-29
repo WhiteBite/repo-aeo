@@ -27,24 +27,24 @@ export async function githubSyncCommand({ cwd, options = {}, config }) {
 
   const repo = resolveRepo(cwd, options);
   if (!repo) {
-    return { ok: false, output: `${lines.join('\n')}\nCannot resolve a GitHub repository (no --repo and no origin remote).\n`, exitCode: 1 };
+    return { ok: false, error: 'cannot resolve a GitHub repository (no --repo and no origin remote)', output: `${lines.join('\n')}\nCannot resolve a GitHub repository (no --repo and no origin remote).\n`, exitCode: 1 };
   }
 
   const ghAvailable = gh(['--version'], { cwd }).ok;
   if (!ghAvailable) {
-    return { ok: false, output: `${lines.join('\n')}\nThe GitHub CLI (gh) is required for github-sync. Install it from https://cli.github.com and run \`gh auth login\`.\n`, exitCode: 1 };
+    return { ok: false, error: 'the GitHub CLI (gh) is not installed - install it from https://cli.github.com and run `gh auth login`', output: `${lines.join('\n')}\nThe GitHub CLI (gh) is required for github-sync. Install it from https://cli.github.com and run \`gh auth login\`.\n`, exitCode: 1 };
   }
 
   const view = gh(['repo', 'view', repo, '--json', 'description,homepageUrl,repositoryTopics'], { cwd });
   if (!view.ok) {
-    return { ok: false, output: `${lines.join('\n')}\nCould not read ${repo}: ${view.stderr.trim().slice(0, 200)}\n`, exitCode: 1 };
+    return { ok: false, error: `could not read ${repo}: ${view.stderr.trim().slice(0, 200)}`, output: `${lines.join('\n')}\nCould not read ${repo}: ${view.stderr.trim().slice(0, 200)}\n`, exitCode: 1 };
   }
 
   let live;
   try {
     live = JSON.parse(view.stdout);
   } catch {
-    return { ok: false, output: `${lines.join('\n')}\nCould not parse gh output for ${repo}.\n`, exitCode: 1 };
+    return { ok: false, error: `could not parse gh output for ${repo}`, output: `${lines.join('\n')}\nCould not parse gh output for ${repo}.\n`, exitCode: 1 };
   }
 
   const desiredTopics = uniq(((config.keywords && config.keywords.github_topics) || []).map(slugifyTopic).filter(Boolean));
@@ -83,11 +83,11 @@ export async function githubSyncCommand({ cwd, options = {}, config }) {
 
   if (String(options.ack || '') !== DEFAULT_ACK) {
     lines.push(`Refusing to write: pass --ack ${DEFAULT_ACK} to confirm an explicit repository write.`);
-    return { ok: false, output: `${lines.join('\n')}\n`, exitCode: 1, applied: [] };
+    return { ok: false, error: `refusing to write: pass --ack ${DEFAULT_ACK} to confirm an explicit repository write`, output: `${lines.join('\n')}\n`, exitCode: 1, applied: [] };
   }
   if (!options.reason) {
     lines.push('Refusing to write: pass --reason "<why this change is correct>" so the change is auditable.');
-    return { ok: false, output: `${lines.join('\n')}\n`, exitCode: 1, applied: [] };
+    return { ok: false, error: 'refusing to write: pass --reason "<why this change is correct>" so the change is auditable', output: `${lines.join('\n')}\n`, exitCode: 1, applied: [] };
   }
 
   const applied = [];
@@ -102,7 +102,7 @@ export async function githubSyncCommand({ cwd, options = {}, config }) {
     }
     if (!result.ok) {
       lines.push(`❌ failed to update ${change.field}: ${result.stderr.trim().slice(0, 200)}`);
-      return { ok: false, output: `${lines.join('\n')}\n`, exitCode: 1, applied };
+      return { ok: false, error: `failed to update ${change.field}: ${result.stderr.trim().slice(0, 200)}`, output: `${lines.join('\n')}\n`, exitCode: 1, applied };
     }
     applied.push(change.field);
     lines.push(`✅ updated ${change.field}`);

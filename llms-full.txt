@@ -174,7 +174,7 @@ Grades: A ≥ 90 · B ≥ 80 · C ≥ 70 · D ≥ 55 · F below. Full model:
 
 Actively developed. v0.1 ships the CLI, the skill, the Action **and** the MCP
 server. IDE packaging is next
-([roadmap issues](https://github.com/WhiteBite/signal-forge/issues)).
+([roadmap issues](https://github.com/WhiteBite/repo-aeo/issues)).
 
 ## Repository map
 

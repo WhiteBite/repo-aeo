@@ -16,11 +16,12 @@ import {
   resolvePackage,
   githubSyncCommand,
   DEFAULT_ACK,
+  TOOL_HOME,
 } from '@repo-aeo/rdk-cli';
 import { record, trend, series } from './history.js';
 
 const execFileAsync = promisify(execFile);
-const USER_AGENT = 'repo-aeo-mcp/0.1 (+https://github.com/WhiteBite/signal-forge)';
+const USER_AGENT = `repo-aeo-mcp/0.1 (+${TOOL_HOME})`;
 
 /** GET a URL as text, falling back to curl when fetch() cannot reach the network. */
 async function httpGet(url, { timeoutMs = 10000, maxBytes = 512 * 1024 } = {}) {
@@ -60,6 +61,19 @@ function resolveCwd(args, context = {}) {
   if (typeof args.cwd === 'string' && args.cwd !== '') return args.cwd;
   if (typeof context.cwd === 'string' && context.cwd !== '') return context.cwd;
   return process.cwd();
+}
+
+/**
+ * Extracts the actionable line from a `rdk github-sync` transcript, so a
+ * refusal that only explained itself in prose still yields a usable error.
+ */
+function firstReasonLine(output) {
+  if (typeof output !== 'string') return null;
+  const line = output
+    .split('\n')
+    .map((entry) => entry.trim())
+    .find((entry) => entry !== '' && !entry.startsWith('#') && !entry.startsWith('-') && !entry.startsWith('`'));
+  return line || null;
 }
 
 /** Resolves the npm package name from the arguments or the repository itself. */
@@ -560,6 +574,9 @@ export const TOOLS = [
       });
       const mutations = Array.isArray(result.applied) ? result.applied : [];
       record('github_sync', { applied: mutations, reason: args.reason, apply }, cwd);
+      // The command explains itself in `output`; surface the same text as
+      // `error` so an agent never receives a refusal it cannot act on.
+      const error = result.error || (result.ok === false ? firstReasonLine(result.output) : null);
       return {
         ok: result.ok !== false,
         applied: apply && mutations.length > 0,
@@ -568,6 +585,7 @@ export const TOOLS = [
         mutation_count: mutations.length,
         repo: args.repo || null,
         reason: args.reason,
+        error,
         output: result.output,
         history: series('github_sync', 5, cwd),
       };

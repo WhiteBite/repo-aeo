@@ -525,7 +525,7 @@ export const PATCHES = [
         ['.github/ISSUE_TEMPLATE/bug_report.md', renderIssueTemplate()],
         ['.github/ISSUE_TEMPLATE/feature_request.md', renderFeatureTemplate()],
         ['.github/PULL_REQUEST_TEMPLATE.md', renderPrTemplate()],
-        ['.github/CODEOWNERS', renderCodeowners()],
+        ['.github/CODEOWNERS', renderCodeowners(ctx.cwd)],
       ];
       for (const [relative, content] of specs) {
         const path = join(ctx.cwd, relative);

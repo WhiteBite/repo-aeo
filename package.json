@@ -42,10 +42,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/WhiteBite/signal-forge.git"
+    "url": "git+https://github.com/WhiteBite/repo-aeo.git"
   },
-  "homepage": "https://github.com/WhiteBite/signal-forge#readme",
+  "homepage": "https://github.com/WhiteBite/repo-aeo#readme",
   "bugs": {
-    "url": "https://github.com/WhiteBite/signal-forge/issues"
+    "url": "https://github.com/WhiteBite/repo-aeo/issues"
   }
 }

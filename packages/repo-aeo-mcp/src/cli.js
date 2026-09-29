@@ -3,10 +3,9 @@
  * Shares the exact same tool implementations as the MCP server, so a weekly
  * cron and an interactive agent can never disagree.
  */
-import { audit } from '@repo-aeo/rdk-cli';
 import { findTool, TOOLS } from './tools.js';
 import { serve } from './server.js';
-import { listMetrics, series, trend } from './history.js';
+import { listMetrics, series } from './history.js';
 
 const USAGE = `repo-aeo-mcp - continuous discoverability monitoring
 
@@ -97,20 +96,25 @@ export async function main(argv = process.argv.slice(2), io = {}) {
         return 0;
 
       case 'score': {
-        const report = await audit(flags.cwd, { online: Boolean(flags.online) });
-        const payload = {
-          score: report.score.total,
-          grade: report.score.grade,
+        // Delegate to the tool instead of calling audit() directly: the tool
+        // records the metric, so the trend line here means the same thing as
+        // the trend the MCP server reports. Duplicating the engine call is how
+        // the two surfaces would drift apart.
+        const payload = await call('repo_get_discoverability_score', { online: Boolean(flags.online) });
+        const flat = {
+          score: payload.score.total,
+          grade: payload.score.grade,
           axes: Object.fromEntries(
-            Object.entries(report.score.axes).map(([axis, data]) => [axis, data.applicable ? data.score : null]),
+            Object.entries(payload.score.axes).map(([axis, data]) => [axis, data.applicable ? data.score : null]),
           ),
-          errors: report.summary.errors,
-          warnings: report.summary.warnings,
-          autofixable: report.summary.autofixable,
-          checks: `${report.summary.passedChecks}/${report.summary.checks}`,
-          trend: trend('discoverability_score', flags.cwd),
+          errors: payload.summary.errors,
+          warnings: payload.summary.warnings,
+          autofixable: payload.summary.autofixable,
+          checks: `${payload.summary.passedChecks}/${payload.summary.checks}`,
+          history_points: payload.history_points,
+          trend: payload.trend,
         };
-        print(payload, {
+        print(flat, {
           json: flags.json,
           write,
           render: (value) => [

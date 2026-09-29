@@ -2,7 +2,7 @@
 # Single source of truth for this repository's discoverability metadata.
 # Consumed by: rdk audit / rdk fix / rdk github-sync / rdk npm-surface,
 # the repo-discoverability skill, and the rdk-audit GitHub Action.
-# Docs: https://github.com/WhiteBite/signal-forge/blob/main/docs/configuration.md
+# Docs: https://github.com/WhiteBite/repo-aeo/blob/main/docs/configuration.md
 
 project:
   name: "repo-aeo"
@@ -53,10 +53,10 @@ keywords:
     - "developer-tools"
 
 links:
-  homepage: "https://github.com/WhiteBite/signal-forge#readme"
-  docs: "https://github.com/WhiteBite/signal-forge/tree/main/docs"
-  demo: "https://github.com/WhiteBite/signal-forge/tree/main/fixtures/demo-repo"
-  issues: "https://github.com/WhiteBite/signal-forge/issues"
+  homepage: "https://github.com/WhiteBite/repo-aeo#readme"
+  docs: "https://github.com/WhiteBite/repo-aeo/tree/main/docs"
+  demo: "https://github.com/WhiteBite/repo-aeo/tree/main/fixtures/demo-repo"
+  issues: "https://github.com/WhiteBite/repo-aeo/issues"
 
 quickstart:
   prerequisites:

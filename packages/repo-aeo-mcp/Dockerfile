@@ -36,4 +36,4 @@ CMD ["serve"]
 LABEL org.opencontainers.image.title="repo-aeo-mcp" \
       org.opencontainers.image.description="MCP server for continuous repository discoverability monitoring" \
       org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.source="https://github.com/WhiteBite/signal-forge"
+      org.opencontainers.image.source="https://github.com/WhiteBite/repo-aeo"

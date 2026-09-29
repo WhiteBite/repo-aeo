@@ -9,7 +9,7 @@ authors:
   - family-names: "WhiteBite"
     name: "WhiteBite"
     # orcid / affiliation optional
-repository-code: "https://github.com/WhiteBite/signal-forge"
+repository-code: "https://github.com/WhiteBite/repo-aeo"
 abstract: "Repo Discoverability Kit (RDK): a CLI, an agent skill and a GitHub Action that audit and fix the metadata deciding whether an AI agent, a search engine or a human can find, understand and recommend your repository."
 keywords:
   - "cli"

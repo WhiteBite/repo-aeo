@@ -7,7 +7,7 @@
   "runtimePlatform": "Node.js",
   "license": "https://opensource.org/licenses/MIT",
   "keywords": "cli, discoverability, repo-audit, github-topics, llms-txt, agents-md, npm-metadata, geo, aeo, developer-tools",
-  "url": "https://github.com/WhiteBite/signal-forge#readme",
+  "url": "https://github.com/WhiteBite/repo-aeo#readme",
   "softwareVersion": "0.1.0",
-  "codeRepository": "https://github.com/WhiteBite/signal-forge"
+  "codeRepository": "https://github.com/WhiteBite/repo-aeo"
 }

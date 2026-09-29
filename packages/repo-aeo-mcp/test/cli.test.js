@@ -47,16 +47,35 @@ test('github-sync refuses without the acknowledgement and exits non-zero', async
   assert.match(output, /refusing to write/);
 });
 
-test('github-sync previews with an acknowledgement and exits 0', async () => {
+test('github-sync gets past the guard with an acknowledgement', async () => {
+  // Hermetic by design: whether the preview succeeds depends on `gh` being
+  // installed and authenticated, which CI does not guarantee. What must hold
+  // everywhere is that a valid ack is not rejected and that any failure carries
+  // a message a human or an agent can act on.
   const { code, output } = await run(['github-sync', '--ack', 'I_ACK_RDK_GITHUB_WRITE', '--reason', 'cli smoke test']);
-  assert.equal(code, 0, `expected 0, got ${code}: ${output.slice(0, 200)}`);
-  assert.match(output, /Dry run: \d+ mutation\(s\)/);
-  assert.match(output, /--apply/);
+  assert.ok(!/refusing to write: ack/i.test(output), `the ack guard must not reject a valid ack: ${output.slice(0, 200)}`);
+  assert.ok(!/undefined/.test(output), `a failure must never print an empty reason: ${output.slice(0, 200)}`);
+  if (code === 0) {
+    assert.match(output, /Dry run: \d+ mutation\(s\)/);
+    assert.match(output, /--apply/);
+  } else {
+    assert.match(output, /github-sync refused: \S/, 'the refusal must quote a reason');
+  }
 });
 
-test('history reports the recorded metrics', async () => {
-  await run(['score']);
-  const { code, output } = await run(['history']);
-  assert.equal(code, 0);
-  assert.match(output, /discoverability_score/);
+test('score records history, so its own trend line is not always empty', async () => {
+  // Regression: the CLI used to call audit() directly and never recorded the
+  // metric, which made `trend` a permanent "no history yet" and made the CLI
+  // disagree with the MCP server.
+  const first = await run(['score']);
+  assert.equal(first.code, 0);
+  const second = await run(['score']);
+  assert.equal(second.code, 0);
+  // Two consecutive audits of an unchanged repository must agree; the point is
+  // that a number is reported at all, not which number it is.
+  assert.match(second.output, /trend: (\d+) -> \1 \(flat\)/, `expected a real trend, got: ${second.output}`);
+
+  const history = await run(['history']);
+  assert.equal(history.code, 0);
+  assert.match(history.output, /discoverability_score: \d+ point\(s\)/);
 });

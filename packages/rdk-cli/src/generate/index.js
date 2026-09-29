@@ -3,6 +3,7 @@
  * .discoverability/project.yml plus facts read from the repository — the
  * generator never invents claims it cannot source from the config.
  */
+import { repoOwner, toolDocUrl } from '../util/repo.js';
 
 function yamlList(items, indent = '  ') {
   if (!Array.isArray(items) || items.length === 0) return `${indent}[]`;
@@ -74,7 +75,7 @@ export function renderProjectYml(config) {
 # Single source of truth for this repository's discoverability metadata.
 # Consumed by: rdk audit / rdk fix / rdk github-sync / rdk npm-surface,
 # the repo-discoverability skill, and the rdk-audit GitHub Action.
-# Docs: https://github.com/WhiteBite/signal-forge/blob/main/docs/configuration.md
+# Docs: ${toolDocUrl('docs/configuration.md')}
 
 project:
   name:${yamlScalar(project.name)}
@@ -445,9 +446,14 @@ export function renderPrTemplate() {
 `;
 }
 
-export function renderCodeowners() {
+/**
+ * CODEOWNERS for the audited repository: the owner comes from its origin
+ * remote, because `* @WhiteBite` in someone else's repository would silently
+ * assign their code to us.
+ */
+export function renderCodeowners(cwd = process.cwd()) {
   return `# Default owners for everything
-* @WhiteBite
+* @${repoOwner(cwd)}
 `;
 }
 

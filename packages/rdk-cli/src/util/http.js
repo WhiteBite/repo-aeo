@@ -3,12 +3,13 @@
  * offline by default so the skill works without network access.
  */
 import { execFile } from 'node:child_process';
+import { TOOL_HOME } from './repo.js';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
 const SKIP_EXTENSIONS = /\.(png|jpe?g|gif|webp|svg|ico|pdf|zip|tgz|mp4|woff2?)$/i;
-const USER_AGENT = 'rdk-link-check/0.1 (+https://github.com/WhiteBite/signal-forge)';
+const USER_AGENT = `rdk-link-check/0.1 (+${TOOL_HOME})`;
 
 export function isProbeable(url) {
   if (typeof url !== 'string' || url === '') return false;

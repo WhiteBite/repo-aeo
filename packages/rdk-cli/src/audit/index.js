@@ -6,6 +6,7 @@ import { join, relative } from 'node:path';
 import { loadConfig } from '../config.js';
 import { readTextIfExists, exists, readJsonIfExists } from '../util/fs.js';
 import { gitInfo } from '../util/git.js';
+import { repoWebUrl } from '../util/repo.js';
 import { run } from '../util/proc.js';
 import { probeUrls, isProbeable } from '../util/http.js';
 import { parseMarkdown } from './checks/_shared.js';
@@ -159,6 +160,9 @@ export async function audit(cwd = process.cwd(), options = {}) {
       category: config.project.category,
       version: pkg?.version || null,
       config_path: loaded.exists ? '.discoverability/project.yml' : null,
+      // Derived from the audited repository's remote, so report footers never
+      // point at the wrong project.
+      repo_url: repoWebUrl(cwd),
     },
     environment: {
       offline: !options.online,

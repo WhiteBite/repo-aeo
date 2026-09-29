@@ -40,10 +40,11 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
-      # Covers the YAML parser, the audit engine, the patches (including
-      # idempotency), the CLI end to end, the MCP tool registry and the
-      # JSON-RPC transport.
+      # The suite must not depend on credentials, but an authenticated `gh`
+      # lets the github-sync preview test exercise its success path too.
       - name: Run tests
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm test
 
   audit:

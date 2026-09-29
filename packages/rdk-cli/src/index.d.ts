@@ -75,6 +75,8 @@ export interface AuditReport {
   duration_ms: number;
   project: {
     name: string | null;
+    /** Web URL of the audited repository, derived from its origin remote. */
+    repo_url?: string;
     category: string;
     version: string | null;
     config_path: string | null;
@@ -127,6 +129,21 @@ export declare const COMMENT_MARKER: string;
 
 export declare const AXIS_WEIGHTS: Record<Axis, number>;
 export declare const AXIS_LABELS: Record<Axis, string>;
+/** Canonical home of this tool; used for report footers and user agents. */
+export declare const TOOL_HOME: string;
+
+/** Owner used when the audited repository has no origin remote to read. */
+export declare const DEFAULT_OWNER: string;
+
+/** Web URL of the audited repository, derived from its origin remote. */
+export declare function repoWebUrl(cwd?: string): string;
+
+/** Owner (user or organisation) of the audited repository. */
+export declare function repoOwner(cwd?: string): string;
+
+/** Documentation URL for a file in this tool's repository. */
+export declare function toolDocUrl(path?: string, ref?: string): string;
+
 export declare function grade(total: number): Grade;
 
 export declare function loadConfig(cwd?: string): {

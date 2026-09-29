@@ -9,10 +9,10 @@ This file follows the llms.txt convention: a short, LLM-friendly index of the pr
 
 ## Docs
 
-- [Documentation](https://github.com/WhiteBite/signal-forge/tree/main/docs): setup, configuration and scoring reference
-- [Homepage](https://github.com/WhiteBite/signal-forge#readme): project landing page
-- [Demo](https://github.com/WhiteBite/signal-forge/tree/main/fixtures/demo-repo): before/after example repository
-- [Issues](https://github.com/WhiteBite/signal-forge/issues): roadmap and known gaps
+- [Documentation](https://github.com/WhiteBite/repo-aeo/tree/main/docs): setup, configuration and scoring reference
+- [Homepage](https://github.com/WhiteBite/repo-aeo#readme): project landing page
+- [Demo](https://github.com/WhiteBite/repo-aeo/tree/main/fixtures/demo-repo): before/after example repository
+- [Issues](https://github.com/WhiteBite/repo-aeo/issues): roadmap and known gaps
 - [README.md](./README.md): install, run and test instructions
 
 ## Key facts
