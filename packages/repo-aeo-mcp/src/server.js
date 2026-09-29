@@ -79,7 +79,7 @@ export async function handleMessage(message, context = {}) {
       return jsonRpcResult(id, { resourceTemplates: [] });
 
     case 'tools/list':
-      return jsonRpcResult(id, { tools: toolDescriptors() });
+      return jsonRpcResult(id, { tools: toolDescriptors(context) });
 
     case 'tools/call': {
       const name = params && typeof params.name === 'string' ? params.name : null;
@@ -100,10 +100,15 @@ export async function handleMessage(message, context = {}) {
 }
 
 /** Starts the stdio loop. Returns a promise that resolves when stdin closes. */
-export async function serve({ cwd = process.cwd(), input = process.stdin, output = process.stdout } = {}) {
+export async function serve({
+  cwd = process.cwd(),
+  input = process.stdin,
+  output = process.stdout,
+  readOnly = false,
+} = {}) {
   const { createInterface } = await import('node:readline');
   const rl = createInterface({ input, crlfDelay: Infinity });
-  const context = { cwd };
+  const context = { cwd, readOnly: readOnly === true };
 
   for await (const line of rl) {
     const trimmed = line.trim();

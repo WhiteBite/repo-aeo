@@ -8,15 +8,18 @@
  */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   audit,
   loadConfig,
   resolvePackage,
   githubSyncCommand,
-  DEFAULT_ACK,
+  effectiveAck,
   TOOL_HOME,
+  generatedDrift,
+  GENERATED_START,
+  GENERATED_END,
 } from '@repo-aeo/rdk-cli';
 import { record, trend, series } from './history.js';
 
@@ -74,6 +77,12 @@ function firstReasonLine(output) {
     .map((entry) => entry.trim())
     .find((entry) => entry !== '' && !entry.startsWith('#') && !entry.startsWith('-') && !entry.startsWith('`'));
   return line || null;
+}
+
+/** First markdown H1 of a served llms.txt body; the BOM strip is for the curl path, which passes raw bytes through. */
+export function firstHeadingOf(text) {
+  const body = String(text).charCodeAt(0) === 0xfeff ? String(text).slice(1) : String(text);
+  return (/^#\s+(.+)$/m.exec(body) || [])[1] || null;
 }
 
 /** Resolves the npm package name from the arguments or the repository itself. */
@@ -304,7 +313,7 @@ export const TOOLS = [
   {
     name: 'llms_txt_check_freshness',
     description:
-      'Compare the modification time of llms.txt with the README and docs it summarises; a stale llms.txt actively misleads agents, so drift is reported as a finding.',
+      'Check whether llms.txt still matches its sources: marker-managed files are compared against the rendered output, hand-written files against source modification times; drift is reported because a stale llms.txt actively misleads agents.',
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     inputSchema: {
       type: 'object',
@@ -326,6 +335,26 @@ export const TOOLS = [
           return null;
         }
       };
+      const llmsText = readFileSync(llmsPath, 'utf8');
+      const managed = llmsText.includes(GENERATED_START) && llmsText.includes(GENERATED_END);
+      if (managed) {
+        const { config, publishable } = loadConfig(cwd);
+        const drifted = generatedDrift(cwd, config, publishable.pkg).includes('llms.txt');
+        return {
+          ok: true,
+          cwd,
+          managed: true,
+          llms_txt_modified: new Date(mtime(llmsPath)).toISOString(),
+          sources_checked: ['rendered output'],
+          newer_sources: drifted ? [{ path: 'rendered output', content_drift: true }] : [],
+          drift_hours: 0,
+          drift_minutes: 0,
+          fresh: !drifted,
+          recommendation: drifted
+            ? 'llms.txt no longer matches the rendered output - regenerate with `rdk fix`'
+            : 'llms.txt is up to date',
+        };
+      }
       const sources = [{ path: 'README.md', mtime: mtime(join(cwd, 'README.md')) }];
       const docsDir = join(cwd, 'docs');
       if (existsSync(docsDir)) {
@@ -401,7 +430,7 @@ export const TOOLS = [
           error: response.error || `HTTP ${response.status}`,
         };
       }
-      const firstHeading = (/^#\s+(.+)$/m.exec(response.text) || [])[1] || null;
+      const firstHeading = firstHeadingOf(response.text);
       return {
         ok: true,
         url,
@@ -538,7 +567,7 @@ export const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        ack: { type: 'string', description: `Must equal the configured acknowledgement string (default ${DEFAULT_ACK}).` },
+        ack: { type: 'string', description: 'Must equal the acknowledgement string configured for this repository (safety.ack in .discoverability/project.yml); when unset, the server-configured default documented in the package README applies.' },
         reason: { type: 'string', description: 'Why this repository write is correct; stored in the local history.' },
         repo: { type: 'string', description: 'owner/name; defaults to the origin remote of cwd.' },
         cwd: { type: 'string', description: 'Repository directory holding the config.' },
@@ -550,7 +579,11 @@ export const TOOLS = [
         apply: {
           type: 'boolean',
           default: false,
-          description: 'False (default) returns the planned mutations without touching GitHub. Set true only after reviewing the plan.',
+          description: 'False (default) returns the planned mutations without touching GitHub. Set true only after reviewing the plan; requires the plan_digest from the preview.',
+        },
+        plan_digest: {
+          type: 'string',
+          description: 'The plan_digest value from a preview response. Required when apply is true; the write is refused when it does not match the current plan.',
         },
       },
       required: ['ack', 'reason'],
@@ -558,18 +591,29 @@ export const TOOLS = [
     },
     async run(args, context = {}) {
       const cwd = resolveCwd(args, context);
-      if (String(args.ack || '') !== DEFAULT_ACK) {
-        return { ok: false, error: `refusing to write: ack must equal ${DEFAULT_ACK}` };
+      const { config } = loadConfig(cwd);
+      if (String(args.ack || '') !== effectiveAck(config)) {
+        return {
+          ok: false,
+          error:
+            'refusing to write: ack must equal the acknowledgement string configured for this repository (safety.ack in .discoverability/project.yml; the default is documented in the package README)',
+        };
       }
       if (typeof args.reason !== 'string' || args.reason.trim().length < 5) {
         return { ok: false, error: 'refusing to write: a non-trivial reason is required and is logged' };
       }
       // Preview first: an agent must opt in to the write, exactly like `rdk fix`.
       const apply = args.apply === true;
-      const { config } = loadConfig(cwd);
+      if (apply && typeof args.plan_digest !== 'string') {
+        return {
+          ok: false,
+          code: 'plan_digest_required',
+          error: 'refusing to write: apply requires the plan_digest from the preview response - run with apply: false first, then pass its plan_digest with the apply call',
+        };
+      }
       const result = await githubSyncCommand({
         cwd,
-        options: { apply, ack: args.ack, reason: args.reason, repo: args.repo, fields: args.fields },
+        options: { apply, ack: args.ack, reason: args.reason, repo: args.repo, fields: args.fields, plan_digest: args.plan_digest },
         config,
       });
       const mutations = Array.isArray(result.applied) ? result.applied : [];
@@ -583,8 +627,11 @@ export const TOOLS = [
         dry_run: !apply,
         mutations,
         mutation_count: mutations.length,
+        plan: Array.isArray(result.plan) ? result.plan : [],
+        plan_digest: typeof result.plan_digest === 'string' ? result.plan_digest : null,
         repo: args.repo || null,
         reason: args.reason,
+        code: result.code || null,
         error,
         output: result.output,
         history: series('github_sync', 5, cwd),
@@ -600,10 +647,14 @@ export function findTool(name) {
 /**
  * Runs a tool by name and always resolves with a payload (never throws).
  * Shared by the MCP server and the CLI so both surfaces stay in sync.
+ * In read-only mode the write tool is indistinguishable from an unknown tool.
  */
 export async function callTool(name, args = {}, context = {}) {
   const tool = findTool(name);
   if (!tool) return { ok: false, error: `unknown tool: ${String(name)}` };
+  if (context.readOnly === true && tool.annotations && tool.annotations.readOnlyHint === false) {
+    return { ok: false, error: `unknown tool: ${String(name)}` };
+  }
   try {
     return await tool.run(args || {}, context);
   } catch (error) {
@@ -612,8 +663,9 @@ export async function callTool(name, args = {}, context = {}) {
 }
 
 /** Public tool descriptors (what MCP clients see in tools/list). */
-export function toolDescriptors() {
-  return TOOLS.map((tool) => ({
+export function toolDescriptors(options = {}) {
+  const readOnly = options && options.readOnly === true;
+  return TOOLS.filter((tool) => !(readOnly && tool.annotations && tool.annotations.readOnlyHint === false)).map((tool) => ({
     name: tool.name,
     description: tool.description,
     inputSchema: tool.inputSchema,

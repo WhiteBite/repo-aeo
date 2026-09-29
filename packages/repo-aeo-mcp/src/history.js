@@ -3,7 +3,7 @@
  * ("your npm quality score went 0.62 -> 0.81 over the last month").
  * Storage is a JSON file under .discoverability/cache/ (git-ignored).
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 const MAX_POINTS = 500;
@@ -26,7 +26,18 @@ export function readHistory(cwd = process.cwd()) {
 export function writeHistory(history, cwd = process.cwd()) {
   const path = historyPath(cwd);
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${JSON.stringify(history, null, 2)}\n`, 'utf8');
+  const temp = join(dirname(path), `metrics.json.${process.pid}.${Date.now()}.tmp`);
+  writeFileSync(temp, `${JSON.stringify(history, null, 2)}\n`, 'utf8');
+  try {
+    renameSync(temp, path);
+  } catch (error) {
+    try {
+      unlinkSync(temp);
+    } catch {
+      // best-effort cleanup of the abandoned temp file
+    }
+    throw error;
+  }
   return path;
 }
 
@@ -37,7 +48,11 @@ export function record(metric, value, cwd = process.cwd()) {
   const series = Array.isArray(history[metric]) ? history[metric] : [];
   series.push(point);
   history[metric] = series.slice(-MAX_POINTS);
-  writeHistory(history, cwd);
+  try {
+    writeHistory(history, cwd);
+  } catch {
+    // best-effort by contract: an unwritable cache (e.g. read-only mount) must never fail a read-only tool call
+  }
   return point;
 }
 

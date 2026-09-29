@@ -91,6 +91,29 @@ test('tools/call reports a guarded write without applying it', async () => {
   assert.match(payload.error, /refusing to write/);
 });
 
+test('read-only mode hides the write tool from tools/list and refuses calls to it', async () => {
+  const context = { readOnly: true };
+
+  const list = await handleMessage({ jsonrpc: '2.0', id: 'ro-list', method: 'tools/list' }, context);
+  const names = list.result.tools.map((tool) => tool.name);
+  assert.equal(names.length, 7, 'the write tool must be omitted from tools/list');
+  assert.ok(!names.includes('github_sync_metadata'));
+
+  const call = await handleMessage(
+    {
+      jsonrpc: '2.0',
+      id: 'ro-call',
+      method: 'tools/call',
+      params: { name: 'github_sync_metadata', arguments: { ack: 'WRONG', reason: 'unit test' } },
+    },
+    context,
+  );
+  assert.equal(call.result.isError, true);
+  const payload = JSON.parse(call.result.content[0].text);
+  assert.equal(payload.ok, false);
+  assert.match(payload.error, /unknown tool: github_sync_metadata/);
+});
+
 test('malformed requests get JSON-RPC error codes', async () => {
   const notObject = await handleMessage('nope');
   assert.equal(notObject.error.code, -32600);

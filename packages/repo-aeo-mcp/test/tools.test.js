@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { TOOLS, callTool, toolDescriptors } from '../src/tools.js';
+import { TOOLS, callTool, toolDescriptors, firstHeadingOf } from '../src/tools.js';
 import { record, series, trend, listMetrics, historyPath } from '../src/history.js';
 
 /** A disposable directory so history never leaks between tests. */
@@ -118,6 +118,82 @@ test('github_sync_metadata refuses to write without the acknowledgement and reas
   } finally {
     box.cleanup();
   }
+});
+
+test('refusals and the tool schema never leak the acknowledgement constant', async () => {
+  const box = sandbox();
+  try {
+    const missing = await callTool('github_sync_metadata', { cwd: box.dir });
+    assert.equal(missing.ok, false);
+    assert.ok(!missing.error.includes('I_ACK_RDK_GITHUB_WRITE'), 'the refusal must not teach the ack in one round trip');
+
+    const wrong = await callTool('github_sync_metadata', { cwd: box.dir, ack: 'PLEASE', reason: 'because' });
+    assert.ok(!String(wrong.error).includes('I_ACK_RDK_GITHUB_WRITE'));
+
+    const descriptor = toolDescriptors().find((entry) => entry.name === 'github_sync_metadata');
+    assert.ok(!JSON.stringify(descriptor).includes('I_ACK_RDK_GITHUB_WRITE'), 'the inputSchema must not carry the ack literal');
+    assert.match(descriptor.inputSchema.properties.ack.description, /configured/i);
+  } finally {
+    box.cleanup();
+  }
+});
+
+test('github_sync_metadata refuses apply without a plan digest and relays the preview contract', async () => {
+  const box = sandbox();
+  try {
+    const refused = await callTool('github_sync_metadata', {
+      cwd: box.dir,
+      ack: 'I_ACK_RDK_GITHUB_WRITE',
+      reason: 'unit test',
+      apply: true,
+    });
+    assert.equal(refused.ok, false);
+    assert.equal(refused.code, 'plan_digest_required');
+    assert.match(refused.error, /plan_digest/);
+
+    const preview = await callTool('github_sync_metadata', {
+      cwd: box.dir,
+      ack: 'I_ACK_RDK_GITHUB_WRITE',
+      reason: 'unit test',
+      apply: false,
+    });
+    assert.ok(Array.isArray(preview.plan), 'the preview response carries the structured plan');
+    assert.ok(
+      preview.plan_digest === null || /^[0-9a-f]{64}$/.test(preview.plan_digest),
+      `plan_digest must be a sha256 hex or null, got ${JSON.stringify(preview.plan_digest)}`,
+    );
+  } finally {
+    box.cleanup();
+  }
+});
+
+test('read-only mode hides the write tool from descriptors and calls', async () => {
+  const visible = toolDescriptors().map((entry) => entry.name);
+  assert.ok(visible.includes('github_sync_metadata'));
+
+  const restricted = toolDescriptors({ readOnly: true }).map((entry) => entry.name);
+  assert.equal(restricted.length, visible.length - 1);
+  assert.ok(!restricted.includes('github_sync_metadata'));
+
+  const box = sandbox();
+  try {
+    const payload = await callTool(
+      'github_sync_metadata',
+      { cwd: box.dir, ack: 'I_ACK_RDK_GITHUB_WRITE', reason: 'unit test' },
+      { readOnly: true },
+    );
+    assert.equal(payload.ok, false);
+    assert.match(payload.error, /unknown tool: github_sync_metadata/);
+  } finally {
+    box.cleanup();
+  }
+});
+
+test('first heading extraction survives a served BOM', () => {
+  const bom = String.fromCharCode(0xfeff);
+  assert.equal(firstHeadingOf(`${bom}# Project docs\n\n- [Docs](https://example.com)\n`), 'Project docs');
+  assert.equal(firstHeadingOf('# No BOM\n'), 'No BOM');
+  assert.equal(firstHeadingOf('no heading at all'), null);
 });
 
 test('repo_get_discoverability_score audits offline and records a trend', async () => {
@@ -259,6 +335,35 @@ test('history survives a corrupt cache file', () => {
     assert.equal(series('discoverability_score', 10, box.dir).length, 0);
     record('discoverability_score', 71, box.dir);
     assert.equal(trend('discoverability_score', box.dir).last, 71);
+  } finally {
+    box.cleanup();
+  }
+});
+
+test('record never throws when the cache location is unwritable', () => {
+  const box = sandbox();
+  try {
+    writeFileSync(join(box.dir, '.discoverability'), 'not a directory');
+    const point = record('discoverability_score', 50, box.dir);
+    assert.equal(point.value, 50);
+    assert.equal(series('discoverability_score', 10, box.dir).length, 0);
+  } finally {
+    box.cleanup();
+  }
+});
+
+test('history writes are atomic and leave no temp files behind', () => {
+  const box = sandbox();
+  try {
+    record('discoverability_score', 60, box.dir);
+    record('discoverability_score', 61, box.dir);
+    const cacheDir = join(box.dir, '.discoverability', 'cache');
+    assert.ok(existsSync(join(cacheDir, 'metrics.json')));
+    assert.deepEqual(
+      readdirSync(cacheDir).filter((name) => name !== 'metrics.json'),
+      [],
+    );
+    assert.equal(series('discoverability_score', 10, box.dir).length, 2);
   } finally {
     box.cleanup();
   }

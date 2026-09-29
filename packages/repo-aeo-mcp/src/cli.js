@@ -10,7 +10,7 @@ import { listMetrics, series } from './history.js';
 const USAGE = `repo-aeo-mcp - continuous discoverability monitoring
 
 Usage:
-  repo-aeo-mcp serve                          run the MCP server on stdio (default)
+  repo-aeo-mcp serve [--read-only]              run the MCP server on stdio (default)
   repo-aeo-mcp score [--json] [--online]      discoverability score + trend
   repo-aeo-mcp findings [--severity s] [-n 20] audit findings
   repo-aeo-mcp npm-score [package]            npms.io score + gaps + trend
@@ -21,7 +21,7 @@ Usage:
   repo-aeo-mcp history [metric]               stored metric history
   repo-aeo-mcp tools                          list MCP tool names
 
-Flags: --cwd <path>  --json
+Flags: --cwd <path>  --json  --read-only (or RDK_READ_ONLY=1)
 `;
 
 function parseFlags(argv) {
@@ -46,8 +46,13 @@ function parseFlags(argv) {
     } else if (arg === '--reason') {
       flags.reason = argv[i + 1];
       i += 1;
+    } else if (arg === '--plan-digest') {
+      flags.planDigest = argv[i + 1];
+      i += 1;
     } else if (arg === '--apply') {
       flags.apply = true;
+    } else if (arg === '--read-only') {
+      flags.readOnly = true;
     } else if (arg === '-h' || arg === '--help') {
       flags.help = true;
     } else if (!arg.startsWith('-')) {
@@ -88,7 +93,7 @@ export async function main(argv = process.argv.slice(2), io = {}) {
   try {
     switch (command) {
       case 'serve':
-        await serve({ cwd: flags.cwd });
+        await serve({ cwd: flags.cwd, readOnly: flags.readOnly || process.env.RDK_READ_ONLY === '1', input: io.input, output: io.output });
         return 0;
 
       case 'tools':
@@ -193,6 +198,7 @@ export async function main(argv = process.argv.slice(2), io = {}) {
           ack: flags.ack,
           reason: flags.reason,
           apply: flags.apply === true,
+          plan_digest: flags.planDigest,
         });
         print(payload, {
           json: flags.json,
@@ -202,7 +208,7 @@ export async function main(argv = process.argv.slice(2), io = {}) {
               ? [
                   `${value.dry_run ? 'Dry run' : 'Applied'}: ${value.mutation_count} mutation(s)${value.repo ? ` for ${value.repo}` : ''}`,
                   ...(value.output ? [value.output] : []),
-                  ...(value.dry_run ? ['Pass --apply --ack <ACK> --reason "<why>" to write.'] : []),
+                  ...(value.dry_run ? ['Pass --apply --ack <ACK> --reason "<why>" --plan-digest <PLAN_DIGEST> to write.'] : []),
                 ].join('\n')
               : `github-sync refused: ${value.error}`,
         });

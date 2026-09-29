@@ -1,5 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { PassThrough } from 'node:stream';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { main } from '../src/cli.js';
 
 /** Runs the CLI in-process and captures everything it writes. */
@@ -67,15 +71,91 @@ test('score records history, so its own trend line is not always empty', async (
   // Regression: the CLI used to call audit() directly and never recorded the
   // metric, which made `trend` a permanent "no history yet" and made the CLI
   // disagree with the MCP server.
-  const first = await run(['score']);
-  assert.equal(first.code, 0);
-  const second = await run(['score']);
-  assert.equal(second.code, 0);
-  // Two consecutive audits of an unchanged repository must agree; the point is
-  // that a number is reported at all, not which number it is.
-  assert.match(second.output, /trend: (\d+) -> \1 \(flat\)/, `expected a real trend, got: ${second.output}`);
+  // sandbox repo: real-tree history is polluted by parallel edits
+  const dir = mkdtempSync(join(tmpdir(), 'repo-aeo-mcp-cli-'));
+  try {
+    writeFileSync(join(dir, 'README.md'), '# demo\n\nNothing to see here.\n');
+    const first = await run(['score', '--cwd', dir]);
+    assert.equal(first.code, 0);
+    const second = await run(['score', '--cwd', dir]);
+    assert.equal(second.code, 0);
+    // the point is that a number is reported at all, not which number it is
+    assert.match(second.output, /trend: (\d+) -> \1 \(flat\)/, `expected a real trend, got: ${second.output}`);
 
-  const history = await run(['history']);
-  assert.equal(history.code, 0);
-  assert.match(history.output, /discoverability_score: \d+ point\(s\)/);
+    const history = await run(['history', '--cwd', dir]);
+    assert.equal(history.code, 0);
+    assert.match(history.output, /discoverability_score: \d+ point\(s\)/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('serve --read-only hides the write tool from tools/list', async () => {
+  const chunks = [];
+  const input = new PassThrough();
+  const output = {
+    write(chunk) {
+      chunks.push(String(chunk));
+      return true;
+    },
+  };
+  const pending = main(['serve', '--read-only'], { log: () => {}, input, output });
+  input.write(`${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' })}\n`);
+  input.end();
+  assert.equal(await pending, 0);
+
+  const messages = chunks
+    .join('')
+    .split('\n')
+    .filter((line) => line.trim() !== '')
+    .map((line) => JSON.parse(line));
+  const names = messages[0].result.tools.map((tool) => tool.name);
+  assert.equal(names.length, 7);
+  assert.ok(!names.includes('github_sync_metadata'));
+});
+
+test('RDK_READ_ONLY=1 has the same effect as --read-only', async () => {
+  const previous = process.env.RDK_READ_ONLY;
+  process.env.RDK_READ_ONLY = '1';
+  try {
+    const chunks = [];
+    const input = new PassThrough();
+    const output = {
+      write(chunk) {
+        chunks.push(String(chunk));
+        return true;
+      },
+    };
+    const pending = main(['serve'], { log: () => {}, input, output });
+    input.write(`${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'github_sync_metadata', arguments: {} } })}\n`);
+    input.end();
+    await pending;
+
+    const messages = chunks
+      .join('')
+      .split('\n')
+      .filter((line) => line.trim() !== '')
+      .map((line) => JSON.parse(line));
+    assert.equal(messages[0].result.isError, true);
+    assert.match(JSON.parse(messages[0].result.content[0].text).error, /unknown tool: github_sync_metadata/);
+  } finally {
+    if (previous === undefined) delete process.env.RDK_READ_ONLY;
+    else process.env.RDK_READ_ONLY = previous;
+  }
+});
+
+test('github-sync --apply with a mismatched plan digest is refused before any write', async () => {
+  const { code, output } = await run([
+    'github-sync',
+    '--ack',
+    'I_ACK_RDK_GITHUB_WRITE',
+    '--reason',
+    'cli smoke test',
+    '--apply',
+    '--plan-digest',
+    '0'.repeat(64),
+  ]);
+  assert.equal(code, 1);
+  assert.match(output, /github-sync refused:/);
+  assert.doesNotMatch(output, /updated/);
 });
