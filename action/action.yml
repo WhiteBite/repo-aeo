@@ -14,9 +14,9 @@ inputs:
     required: false
     default: 'true'
   cli:
-    description: 'Command used to invoke the CLI'
+    description: "Command used to invoke the CLI; this repository's own workflow falls back to the in-repo CLI when the published package is unavailable"
     required: false
-    default: 'npx --yes @repo-aeo/rdk-cli@latest'
+    default: 'npx --yes @repo-aeo/rdk-cli@^0.1.0'
   comment:
     description: 'Publish/update a PR comment with the report'
     required: false

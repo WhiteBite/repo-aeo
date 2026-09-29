@@ -7,7 +7,7 @@ headings and the commentary.
 Reproduce:
 
 ```bash
-npm test                                                             # 62 tests
+npm test                                                             # 106 tests
 node packages/rdk-cli/bin/rdk.js audit                               # section 1
 node packages/rdk-cli/bin/rdk.js audit --online                      # adds link + GitHub checks
 node packages/rdk-cli/bin/rdk.js npm-surface                         # section 4
@@ -71,7 +71,9 @@ score: 96/100 (grade A) · checks: 39/41 passed · findings: 0 error, 0 warn, 2 
 The two remaining findings are informational and honest: link health is not
 probed offline, and the packages are pre-1.0 (the npms.io completeness bonus
 needs >= 1.0.0). Both are decisions for a human, not something a tool should
-fake. `duration_ms` is 82 for all 41 checks.
+fake. The offline audit of all 41 checks completes in under 200 ms on the
+reference run (`duration_ms` in the JSON report; the exact value varies by
+machine).
 
 ---
 
@@ -180,7 +182,7 @@ Full transcript: [`docs/examples/demo-before-after.md`](./docs/examples/demo-bef
 
 | Stage | Score | Grade | Errors | Autofixable |
 | --- | --- | --- | --- | --- |
-| before | 29/100 | F | 12 | 13 |
+| before | 29/100 | F | 12 | 16 |
 | after `rdk init --apply` | 67/100 | D | 6 | 4 |
 | after `rdk fix --apply` | 71/100 | C | 5 | 0 |
 
@@ -227,8 +229,8 @@ Note: `rdk npm-surface` never publishes. Publishing requires an explicit `npm pu
 ## 5. Test suite
 
 ```
-# tests 62
-# pass 62
+# tests 106
+# pass 106
 # fail 0
 ```
 
@@ -240,7 +242,7 @@ must write nothing, `github-sync` without `--ack` must refuse), the MCP tool
 registry contract (naming, annotations, JSON Schema, the write guard) and the
 JSON-RPC transport (handshake, notifications, error codes, junk input).
 
-Split: `npm run test:cli` (35 tests) and `npm run test:mcp` (27 tests).
+Split: `npm run test:cli` (69 tests) and `npm run test:mcp` (37 tests).
 
 ---
 

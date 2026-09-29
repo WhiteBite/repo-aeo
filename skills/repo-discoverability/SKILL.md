@@ -41,7 +41,7 @@ node packages/rdk-cli/bin/rdk.js audit --format markdown      # human report
 node packages/rdk-cli/bin/rdk.js audit --format github-comment
 ```
 
-If `.discoverability/project.yml` does not exist yet, run `rdk init` (dry run
+If `.discoverability/project.yml` does not exist yet, run `rdk init` (preview
 first) to scaffold it from `package.json` and the git remote.
 
 The audit scores six axes (0–100, renormalised over the axes that apply):
@@ -67,10 +67,10 @@ Order by severity × weight. Anything marked `error` goes first.
 Safe, idempotent autofixes (formatting, missing sections, stub files):
 
 ```bash
-node packages/rdk-cli/bin/rdk.js fix --dry-run     # review the diff first
+node packages/rdk-cli/bin/rdk.js fix               # preview is the default
 node packages/rdk-cli/bin/rdk.js fix --apply       # only when the diff is right
 node packages/rdk-cli/bin/rdk.js npm-surface       # publish-surface report
-node packages/rdk-cli/bin/rdk.js github-sync --dry-run
+node packages/rdk-cli/bin/rdk.js github-sync       # preview is the default; writes need --apply --ack --reason
 ```
 
 Everything else (real examples, version bumps, exports redesign, claims with
@@ -81,7 +81,7 @@ voice of the project.
 
 ```bash
 npm test                                   # or the project's test command
-node packages/rdk-cli/bin/rdk.js npm-surface --pack   # tarball contents
+node packages/rdk-cli/bin/rdk.js npm-surface   # tarball contents; npm pack runs by default, --no-pack skips it
 node packages/rdk-cli/bin/rdk.js audit --online       # links + GitHub API
 node packages/rdk-cli/bin/rdk.js audit --format json  # score must not regress
 ```
@@ -115,8 +115,8 @@ If the score dropped, revert the patch and re-plan.
 
 ## References (load only when needed)
 
-- `references/checks-catalog.md` — every check, its weight and its fix.
-- `references/scoring.md` — how the 0–100 score is computed.
-- `references/mcp-manifest.md` — checks for projects that ship an MCP server.
-- `references/geo-playbook.md` — why these moves work for AI discovery.
-- `scripts/audit.sh` — thin wrapper around the CLI for agents without Node on PATH.
+- `references/checks-catalog.md` — read when you need the exact weight or fix text of a finding id.
+- `references/scoring.md` — read when you need to explain or predict how the 0–100 score moves.
+- `references/mcp-manifest.md` — read if the project ships an MCP server.
+- `references/geo-playbook.md` — read before writing positioning or discovery copy; it explains why these moves work.
+- `scripts/audit.sh` — run if Node is not on PATH; a thin wrapper around the CLI.

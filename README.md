@@ -33,8 +33,10 @@ npm test
 ```
 
 Two-minute setup for a repository you do not own yet: clone it, run
-`npx rdk init --apply`, then `npx rdk audit`. Everything RDK writes is a
-reviewable diff — it never publishes, tags or force-pushes.
+`npx rdk init --apply`, then `npx rdk audit`. Everything the CLI writes is a
+reviewable diff — it never publishes, tags or force-pushes. The one exception
+lives in CI: the opt-in autofix job force-pushes its own dated
+`rdk/autofix-<date>` bot branch and opens a reviewable PR.
 
 ## Who is it for
 
@@ -76,8 +78,8 @@ offline; `--online` adds link checks and live GitHub metadata.
 ### 1. Score a repository
 
 ```bash
-$ npx rdk audit
-score: 44/100 (grade F) · checks: 17/41 passed · findings: 8 error, 11 warn, 5 info (12 autofixable)
+$ npx rdk audit            # measured on fixtures/demo-repo, offline
+score: 29/100 (grade F) · checks: 10/41 passed · findings: 12 error, 13 warn, 6 info (16 autofixable) · mode: offline (use --online for link + GitHub checks)
 ```
 
 ### 2. Fix what is safe to fix
@@ -102,8 +104,13 @@ $ npx rdk npm-surface --pack
 - uses: actions/checkout@v4
 - uses: actions/setup-node@v4
   with: { node-version: '22' }
-- run: npx @repo-aeo/rdk-cli audit --format github-comment --online
+- run: npx --yes @repo-aeo/rdk-cli@^0.1.0 audit --format github-comment --online
+- run: npx --yes @repo-aeo/rdk-cli@^0.1.0 audit --format json --online --min-score "${{ github.event.inputs.min_score || vars.RDK_MIN_SCORE || 0 }}"
 ```
+
+The CLI itself never force-pushes; the workflow's opt-in autofix job (gated by
+`safety.allow_autofix`) force-pushes only its own dated `rdk/autofix-<date>`
+bot branch and opens a PR for review.
 
 ### 5. Monitor it continuously
 
@@ -111,8 +118,11 @@ $ npx rdk npm-surface --pack
 $ npx repo-aeo-mcp score
 Discoverability score: 96/100 (grade A)
 checks passed: 39/41 - errors 0 - warnings 0 - autofixable 0
-trend: 90 -> 96 (up)
+trend: no history yet
 ```
+
+The first run records the score; every subsequent run prints the delta instead
+(for example `trend: 90 -> 96 (up)`).
 
 ### 6. Teach an agent to do it
 

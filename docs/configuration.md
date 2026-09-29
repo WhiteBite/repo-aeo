@@ -4,6 +4,11 @@ The config is the single source of truth. Every generator, check and sync
 command reads it. Create it with `npx rdk init` (seeded from `package.json` and
 the git remote) or copy the annotated template from `rdk init --dry-run`.
 
+## `schema_version`
+
+Config schema revision. Currently `1`. `rdk` warns when a config file carries
+any other value and continues with best-effort defaults.
+
 ## `project`
 
 | Field | Meaning |
@@ -12,6 +17,7 @@ the git remote) or copy the annotated template from `rdk init --dry-run`.
 | `one_liner` | one sentence; used as the GitHub description and the llms.txt summary |
 | `description` | longer paragraph for README/npm `description` |
 | `category` | `library` · `app` · `template` · `research` · `tool` · `dataset` · `mcp-server` |
+| `copyright_holder` | name on the LICENSE copyright line and the JSON-LD `author`; `rdk init` seeds it from the git owner |
 
 ## `audiences`
 
@@ -59,6 +65,10 @@ the audit flags them.
 | `has_npm_package` | enables the npm axis (also implied by the presence of `package.json`) |
 | `has_docs_site` | enables the docs axis (also implied by `links.homepage`/`links.docs`) |
 
+When `has_docs_site: false` while `links.homepage` or `links.docs` is set,
+`rdk` emits the `config.docs_site_overridden` warning: the links imply a docs
+presence, so the docs axis stays enabled.
+
 ## `differentiators`
 
 "Why this repo, not the alternatives." 2–4 bullets, ideally with numbers and
@@ -70,6 +80,7 @@ named sources. Feeds the README "Why choose this" section.
 | --- | --- | --- |
 | `allow_autofix` | `false` | when `true`, the Action may open an autofix pull request |
 | `require_ack_for_publish` | `true` | publish/tag/release always require an explicit human ACK |
+| `ack` | `null` | server-configured acknowledgement override for `github-sync`; a non-empty string replaces the default ACK constant, `null`/absent keeps it |
 
 ## Safety model
 
@@ -83,4 +94,6 @@ named sources. Feeds the README "Why choose this" section.
 
 The ACK string for this repository is `I_ACK_RDK_GITHUB_WRITE`
 (`DEFAULT_ACK` in `src/commands/githubSync.js`); the reason is required so every
-repository write is auditable.
+repository write is auditable. A non-empty `safety.ack` overrides that constant
+(for server-configured deployments); the default constant stays
+`I_ACK_RDK_GITHUB_WRITE` when it is `null` or absent.
