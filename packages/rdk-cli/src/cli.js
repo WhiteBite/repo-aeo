@@ -24,12 +24,12 @@ Common flags:
   --online                                       enable link checks + GitHub API reads
   --min-score <n>                                exit 2 when the score is below n
   --apply                                       write changes (required for any write)
-  --dry-run                                     preview only (default for fix/init/sync)
   --only <ids>                                   comma-separated patch ids for fix/init
   --skip <ids>                                   comma-separated patch ids to skip
   --repo <owner/name>                            target repository for github-sync
   --ack <string>                                 explicit acknowledgement for writes
   --reason <text>                                auditable reason for writes
+  --plan-digest <hex>                            plan digest from the github-sync preview; the write is refused if the plan changed
   --secrets-depth <n>                            commits scanned for secrets (default 20)
   --no-github                                    skip GitHub API reads even with --online
   --no-pack                                      skip \`npm pack --dry-run\` in npm-surface
@@ -40,8 +40,9 @@ Common flags:
   -v, --version                                  print the CLI version
 
 Safety model:
-  Audit is read-only and offline by default. Any write requires an explicit flag:
-  \`rdk fix --apply\`, \`rdk init --apply\`, \`rdk github-sync --apply --ack <ACK> --reason "..."\`.
+  Audit is read-only and offline by default. fix, init and github-sync preview
+  by default; any write requires an explicit flag: \`rdk fix --apply\`,
+  \`rdk init --apply\`, \`rdk github-sync --apply --ack <ACK> --reason "..."\`.
   Publishing, tagging and force-pushing are never performed by rdk.
 `;
 
@@ -131,7 +132,7 @@ export async function main(argv = process.argv.slice(2), io = {}) {
       }
       case 'github-sync': {
         const loaded = loadConfig(cwd);
-        const result = await githubSyncCommand({ cwd, options: flags, config: loaded.config });
+        const result = await githubSyncCommand({ cwd, options: { ...flags, plan_digest: flags.planDigest }, config: loaded.config });
         if (!flags.quiet) log(result.output);
         return result.exitCode;
       }

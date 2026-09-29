@@ -384,7 +384,7 @@ export const PATCHES = [
     },
     mutations(ctx) {
       const path = join(ctx.cwd, 'LICENSE');
-      const holder = (ctx.config.project && ctx.config.project.name) || 'the authors';
+      const holder = (ctx.config.project && ctx.config.project.copyright_holder) || 'the authors';
       return [mutation(path, null, renderLicense(holder))];
     },
   },

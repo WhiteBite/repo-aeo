@@ -36,34 +36,53 @@ async function curlProbe(url, timeoutMs) {
   }
 }
 
-/** Probes one URL with HEAD/GET via fetch, falling back to curl on network errors. */
-export async function probeUrl(url, { timeoutMs = 6000 } = {}) {
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function retryable(status) {
+  return status === 429 || (status >= 500 && status <= 599);
+}
+
+function retryAfterMs(response) {
+  const seconds = Number.parseInt(response.headers.get('retry-after') || '', 10);
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : null;
+}
+
+async function fetchOnce(url, method, timeoutMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    let response = await fetch(url, {
-      method: 'HEAD',
+    return await fetch(url, {
+      method,
       redirect: 'follow',
       signal: controller.signal,
       headers: { 'user-agent': USER_AGENT },
     });
-    if (response.status === 405 || response.status === 501) {
-      response = await fetch(url, {
-        method: 'GET',
-        redirect: 'follow',
-        signal: controller.signal,
-        headers: { 'user-agent': USER_AGENT },
-      });
-    }
-    return { url, status: response.status, ok: response.status < 400, error: null };
-  } catch (error) {
-    // A network-level failure (proxy, egress restriction) is not proof that the
-    // link is dead, so retry with curl before reporting it.
-    const fallback = await curlProbe(url, timeoutMs);
-    if (fallback.ok || fallback.status !== null) return fallback;
-    return { url, status: null, ok: false, error: String((error && error.message) || error) };
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/** Probes one URL with HEAD/GET via fetch, falling back to curl on network errors. */
+export async function probeUrl(url, { timeoutMs = 6000, retries = 2, retryBaseMs = 500 } = {}) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      let response = await fetchOnce(url, 'HEAD', timeoutMs);
+      if (response.status === 405 || response.status === 501) {
+        response = await fetchOnce(url, 'GET', timeoutMs);
+      }
+      if (retryable(response.status) && attempt < retries) {
+        await response.body?.cancel().catch(() => {});
+        const wait = retryAfterMs(response) ?? retryBaseMs * 2 ** attempt;
+        if (wait > 0) await sleep(wait);
+        continue;
+      }
+      return { url, status: response.status, ok: response.status < 400, error: null };
+    } catch (error) {
+      // a network-level failure is not proof the link is dead: fall back to curl before reporting it
+      const fallback = await curlProbe(url, timeoutMs);
+      if (fallback.ok || fallback.status !== null) return fallback;
+      return { url, status: null, ok: false, error: String((error && error.message) || error) };
+    }
   }
 }
 

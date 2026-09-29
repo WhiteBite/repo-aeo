@@ -3,11 +3,35 @@
  * GitHub. Read-only by default: writes need --apply AND an --ack string, and
  * every call is logged with its reason.
  */
+import { createHash } from 'node:crypto';
 import { run } from '../util/proc.js';
 import { slugifyTopic, uniq } from '../audit/checks/_shared.js';
 import { gitInfo } from '../util/git.js';
 
 export const DEFAULT_ACK = 'I_ACK_RDK_GITHUB_WRITE';
+
+const ACK_HINT =
+  'the acknowledgement string configured for this repository (safety.ack in .discoverability/project.yml; the default is documented in the package README)';
+
+/** The ack a caller must present: safety.ack when set to a non-empty string, else the built-in default. */
+export function effectiveAck(config) {
+  const configured = config && config.safety && config.safety.ack;
+  return typeof configured === 'string' && configured !== '' ? configured : DEFAULT_ACK;
+}
+
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const keys = Object.keys(value).sort();
+    return `{${keys.map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+/** sha256 hex of the canonical JSON (sorted keys) of a sync plan, so an approved preview can be pinned. */
+export function planDigest(plan) {
+  return createHash('sha256').update(canonicalJson(plan)).digest('hex');
+}
 
 function gh(args, { cwd }) {
   return run('gh', args, { cwd, timeout: 20000 });
@@ -24,6 +48,17 @@ export async function githubSyncCommand({ cwd, options = {}, config }) {
   const lines = [];
   lines.push('# rdk github-sync');
   lines.push('');
+
+  if (options.apply) {
+    if (String(options.ack || '') !== effectiveAck(config)) {
+      lines.push(`Refusing to write: --ack must equal ${ACK_HINT}.`);
+      return { ok: false, error: `refusing to write: --ack must equal ${ACK_HINT}`, output: `${lines.join('\n')}\n`, exitCode: 1, applied: [] };
+    }
+    if (!options.reason || String(options.reason).trim().length < 5) {
+      lines.push('Refusing to write: pass --reason "<why this change is correct>" so the change is auditable.');
+      return { ok: false, error: 'refusing to write: a non-trivial reason is required and is logged', output: `${lines.join('\n')}\n`, exitCode: 1, applied: [] };
+    }
+  }
 
   const repo = resolveRepo(cwd, options);
   if (!repo) {
@@ -63,9 +98,24 @@ export async function githubSyncCommand({ cwd, options = {}, config }) {
     plan.push({ field: 'homepage', from: live.homepageUrl || '', to: config.links.homepage });
   }
 
+  const digest = planDigest(plan);
+
+  if (options.apply && options.plan_digest !== undefined && String(options.plan_digest) !== digest) {
+    lines.push('Refusing to write: the plan changed since the approved preview (plan_digest mismatch).');
+    return {
+      ok: false,
+      code: 'plan_digest_mismatch',
+      error: 'refusing to write: plan_digest mismatch - the live repository state changed since the approved preview; re-run the preview and approve the new plan',
+      plan_digest: digest,
+      output: `${lines.join('\n')}\n`,
+      exitCode: 1,
+      applied: [],
+    };
+  }
+
   if (plan.length === 0) {
     lines.push(`✅ ${repo} already matches .discoverability/project.yml (description, homepage, topics).`);
-    return { ok: true, output: `${lines.join('\n')}\n`, exitCode: 0, applied: [] };
+    return { ok: true, output: `${lines.join('\n')}\n`, exitCode: 0, applied: [], plan, plan_digest: digest };
   }
 
   lines.push(`Repository: ${repo}`);
@@ -78,17 +128,9 @@ export async function githubSyncCommand({ cwd, options = {}, config }) {
   lines.push('');
 
   if (!options.apply) {
-    lines.push('Dry run. Re-run with `--apply --ack <ACK_STRING> --reason "<why>"` to write these values.');
-    return { ok: true, output: `${lines.join('\n')}\n`, exitCode: 0, applied: [], plan };
-  }
-
-  if (String(options.ack || '') !== DEFAULT_ACK) {
-    lines.push(`Refusing to write: pass --ack ${DEFAULT_ACK} to confirm an explicit repository write.`);
-    return { ok: false, error: `refusing to write: pass --ack ${DEFAULT_ACK} to confirm an explicit repository write`, output: `${lines.join('\n')}\n`, exitCode: 1, applied: [] };
-  }
-  if (!options.reason || String(options.reason).trim().length < 5) {
-    lines.push('Refusing to write: pass --reason "<why this change is correct>" so the change is auditable.');
-    return { ok: false, error: 'refusing to write: a non-trivial reason is required and is logged', output: `${lines.join('\n')}\n`, exitCode: 1, applied: [] };
+    lines.push(`Plan digest: ${digest}`);
+    lines.push('Dry run. Re-run with `--apply --ack <ACK_STRING> --reason "<why>" --plan-digest <PLAN_DIGEST>` to write these values.');
+    return { ok: true, output: `${lines.join('\n')}\n`, exitCode: 0, applied: [], plan, plan_digest: digest };
   }
 
   const applied = [];
@@ -111,7 +153,7 @@ export async function githubSyncCommand({ cwd, options = {}, config }) {
   }
   lines.push('');
   lines.push(`Reason logged: ${options.reason}`);
-  return { ok: true, output: `${lines.join('\n')}\n`, exitCode: 0, applied, plan };
+  return { ok: true, output: `${lines.join('\n')}\n`, exitCode: 0, applied, plan, plan_digest: digest };
 }
 
 export default { githubSyncCommand };

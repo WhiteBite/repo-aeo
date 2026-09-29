@@ -11,11 +11,13 @@ import { gitInfo } from './util/git.js';
 export const CONFIG_RELATIVE_PATH = '.discoverability/project.yml';
 
 export const DEFAULT_CONFIG = {
+  schema_version: 1,
   project: {
     name: null,
     one_liner: null,
     description: null,
     category: 'library',
+    copyright_holder: null,
   },
   audiences: [],
   use_cases: [],
@@ -43,6 +45,7 @@ export const DEFAULT_CONFIG = {
   safety: {
     allow_autofix: false,
     require_ack_for_publish: true,
+    ack: null,
   },
 };
 
@@ -86,6 +89,13 @@ export function loadConfig(cwd = process.cwd()) {
   const pkg = readJsonIfExists(join(cwd, 'package.json'));
   const git = gitInfo(cwd);
 
+  if (userConfig.schema_version !== undefined && userConfig.schema_version !== 1) {
+    warnings.push({
+      code: 'config.schema_version',
+      message: `${CONFIG_RELATIVE_PATH}: unsupported schema_version ${JSON.stringify(userConfig.schema_version)} (expected 1); continuing with best-effort defaults.`,
+    });
+  }
+
   if (pkg) {
     config.project.name = config.project.name || pkg.name || null;
     config.project.description = config.project.description || pkg.description || null;
@@ -101,6 +111,13 @@ export function loadConfig(cwd = process.cwd()) {
 
   if (git.host === 'github.com' && git.owner && git.repo && !config.links.issues) {
     config.links.issues = `https://github.com/${git.owner}/${git.repo}/issues`;
+  }
+
+  if (config.artifacts.has_docs_site === false && (config.links.homepage || config.links.docs)) {
+    warnings.push({
+      code: 'config.docs_site_overridden',
+      message: 'links.homepage/links.docs imply a docs presence: the docs axis stays enabled even though artifacts.has_docs_site is false.',
+    });
   }
 
   const publishable = resolvePackage(cwd);
@@ -192,6 +209,7 @@ export function buildSeedConfig(cwd = process.cwd()) {
   const { config, pkg, git } = loadConfig(cwd);
   const project = { ...config.project };
   if (!project.name) project.name = (pkg && pkg.name) || (git.repo ? `${git.owner}/${git.repo}` : 'my-project');
+  if (!project.copyright_holder && git.owner) project.copyright_holder = git.owner;
   if (!project.one_liner) project.one_liner = (pkg && pkg.description) || 'TODO: one sentence describing what this does and who it is for';
   if (!project.description) project.description = project.one_liner;
   if (!project.category || project.category === 'library') {

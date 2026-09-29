@@ -10,14 +10,16 @@ import {
   renderCodeowners,
   renderProjectYml,
   renderReadme,
+  renderJsonLd,
 } from '../src/generate/index.js';
 import { parse } from '../src/yaml.js';
 import { makeRepo, removeRepo } from './helpers.js';
-import { loadConfig } from '../src/config.js';
+import { loadConfig, CONFIG_RELATIVE_PATH } from '../src/config.js';
 import { planPatches, applyPatches } from '../src/fix/patches.js';
 
 const FULL_CONFIG = {
-  project: { name: 'round-trip', one_liner: 'It round-trips', description: 'Longer text', category: 'tool' },
+  schema_version: 1,
+  project: { name: 'round-trip', one_liner: 'It round-trips', description: 'Longer text', category: 'tool', copyright_holder: 'Round Trip Authors' },
   audiences: ['devs'],
   use_cases: ['one', 'two'],
   keywords: { github_topics: ['cli', 'developer-tools'], npm_keywords: ['cli'] },
@@ -25,7 +27,7 @@ const FULL_CONFIG = {
   quickstart: { prerequisites: ['Node.js >= 18'], install: 'npm i round-trip', run: 'npm start', test: 'npm test' },
   artifacts: { has_npm_package: true, has_docs_site: false },
   differentiators: ['because'],
-  safety: { allow_autofix: false, require_ack_for_publish: true },
+  safety: { allow_autofix: false, require_ack_for_publish: true, ack: null },
 };
 
 function contextFor(dir) {
@@ -44,6 +46,12 @@ function contextFor(dir) {
 test('renderProjectYml output round-trips through the YAML parser', () => {
   const parsed = parse(renderProjectYml(FULL_CONFIG));
   assert.deepEqual(parsed, FULL_CONFIG);
+});
+
+test('renderProjectYml emits schema_version as the first key', () => {
+  const yml = renderProjectYml(FULL_CONFIG);
+  const firstKey = yml.split('\n').find((line) => /^[a-z_]+:/.test(line));
+  assert.ok(firstKey.startsWith('schema_version: 1'), `first key is not schema_version: ${firstKey}`);
 });
 
 test('renderProjectYml handles empty lists', () => {
@@ -108,4 +116,53 @@ test('generated project.yml points at the tool documentation, not at the audited
   assert.ok(docsLine, 'the generated config must carry a docs link');
   assert.ok(docsLine.includes('/blob/main/docs/configuration.md'), docsLine);
   assert.ok(!docsLine.includes('someone-else'), 'the docs link belongs to the tool, not to the audited repo');
+});
+
+test('renderJsonLd emits author and sameAs from config and package facts', () => {
+  const config = {
+    project: { name: 'jsonld-demo', one_liner: 'Demo', copyright_holder: 'Ada Lovelace' },
+    links: { issues: 'https://github.com/o/r/issues' },
+    keywords: { npm_keywords: ['demo'] },
+  };
+  const json = JSON.parse(renderJsonLd(config, { name: 'jsonld-demo', version: '1.0.0' }));
+  assert.equal(json.author, 'Ada Lovelace');
+  assert.deepEqual(json.sameAs, ['https://github.com/o/r', 'https://www.npmjs.com/package/jsonld-demo']);
+});
+
+test('renderJsonLd falls back to the repository owner and skips npm for private packages', () => {
+  const json = JSON.parse(renderJsonLd({ project: { name: 'x' }, links: { issues: 'https://github.com/some-owner/x/issues' } }, { name: 'x', private: true }));
+  assert.equal(json.author, 'some-owner');
+  assert.deepEqual(json.sameAs, ['https://github.com/some-owner/x']);
+});
+
+test('renderJsonLd omits author and sameAs when no source for them exists', () => {
+  const json = JSON.parse(renderJsonLd({ project: { name: 'bare' } }, null));
+  assert.equal('author' in json, false);
+  assert.equal('sameAs' in json, false);
+});
+
+test('license stub names the configured copyright holder, not the project name', () => {
+  const dir = makeRepo({
+    'package.json': JSON.stringify({ name: 'licensed-project' }),
+    [CONFIG_RELATIVE_PATH]: 'project:\n  name: licensed-project\n  copyright_holder: "Ada Lovelace"\n',
+  });
+  try {
+    applyPatches(planPatches(contextFor(dir), { only: ['license.stub'] }));
+    const license = readFileSync(join(dir, 'LICENSE'), 'utf8');
+    assert.match(license, /Copyright \(c\) \d{4} Ada Lovelace/);
+    assert.ok(!license.includes('licensed-project'));
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('license stub falls back to the authors without a copyright_holder', () => {
+  const dir = makeRepo({ 'package.json': JSON.stringify({ name: 'unlicensed-project' }) });
+  try {
+    applyPatches(planPatches(contextFor(dir), { only: ['license.stub'] }));
+    const license = readFileSync(join(dir, 'LICENSE'), 'utf8');
+    assert.match(license, /Copyright \(c\) \d{4} the authors/);
+  } finally {
+    removeRepo(dir);
+  }
 });

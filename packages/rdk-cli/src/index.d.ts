@@ -146,8 +146,32 @@ export declare function toolDocUrl(path?: string, ref?: string): string;
 
 export declare function grade(total: number): Grade;
 
+export interface RdkConfig {
+  schema_version: number;
+  project: {
+    name: string | null;
+    one_liner: string | null;
+    description: string | null;
+    category: string;
+    copyright_holder: string | null;
+  };
+  audiences: string[];
+  use_cases: string[];
+  keywords: { github_topics: string[]; npm_keywords: string[] };
+  links: { homepage: string | null; docs: string | null; demo: string | null; issues: string | null };
+  quickstart: { prerequisites: string[]; install: string | null; run: string | null; test: string | null };
+  artifacts: { has_npm_package: boolean; has_docs_site: boolean };
+  differentiators: string[];
+  safety: {
+    allow_autofix: boolean;
+    require_ack_for_publish: boolean;
+    /** Non-empty string overrides the github-sync ACK constant; null keeps the default. */
+    ack: string | null;
+  };
+}
+
 export declare function loadConfig(cwd?: string): {
-  config: Record<string, unknown>;
+  config: RdkConfig;
   configPath: string;
   exists: boolean;
   warnings: Array<{ code: string; message: string }>;
@@ -161,6 +185,6 @@ export declare function loadConfig(cwd?: string): {
   git: Record<string, unknown>;
 };
 
-export declare function buildSeedConfig(cwd?: string): Record<string, unknown>;
+export declare function buildSeedConfig(cwd?: string): RdkConfig;
 export declare const CONFIG_RELATIVE_PATH: string;
 export declare function parseYaml(text: string): unknown;

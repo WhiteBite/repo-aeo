@@ -2,8 +2,9 @@
  * Axis 5 — Docs readiness: llms.txt / llms-full.txt, JSON-LD, link health.
  * Only applied when the project has a docs site or homepage configured.
  */
-import { check, finding, parseMarkdown } from './_shared.js';
+import { check, finding } from './_shared.js';
 import { exists, readTextIfExists } from '../../util/fs.js';
+import { generatedDrift } from '../../generate/index.js';
 import { join } from 'node:path';
 
 export const docsChecks = [
@@ -126,26 +127,16 @@ export const docsChecks = [
     id: 'docs.readme_sync',
     axis: 'docs',
     weight: 6,
-    title: 'llms.txt is not older than the README it summarises',
+    title: 'Generated llms files match their sources',
     why: 'An out-of-date llms.txt is worse than none: agents trust it and quote stale facts. This is the check that keeps the AI-facing surface honest.',
-    fix: 'Regenerate llms.txt after every README change (`rdk fix` is idempotent) and commit both together.',
+    fix: 'Run `rdk fix` to regenerate the drifted files and commit them together with the source change.',
     effort: 'S',
     autoFixable: true,
     patchId: 'llms.generate',
     run(ctx) {
-      const llms = join(ctx.cwd, 'llms.txt');
-      const readme = join(ctx.cwd, 'README.md');
-      if (!exists(llms) || !exists(readme)) return null;
-      try {
-        const llmsTime = statSync(llms).mtimeMs;
-        const readmeTime = statSync(readme).mtimeMs;
-        if (readmeTime - llmsTime > 60 * 60 * 1000) {
-          return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'llms.txt is older than README.md', why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'llms.generate', weight: this.weight });
-        }
-      } catch {
-        return null;
-      }
-      return null;
+      const stale = generatedDrift(ctx.cwd, ctx.config, ctx.pkg);
+      if (stale.length === 0) return null;
+      return finding({ id: this.id, axis: this.axis, severity: 'warn', title: `${stale.join(' and ')} drifted from the rendered output`, why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'llms.generate', weight: this.weight });
     },
   }),
 ];

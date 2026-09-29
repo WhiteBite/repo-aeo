@@ -24,13 +24,16 @@ export const hygieneChecks = [
     weight: 15,
     title: 'LICENSE file present',
     why: 'Without a license the project legally cannot be reused, and agents that check reuse permissions skip it entirely.',
-    fix: 'Add a LICENSE file (MIT/Apache-2.0 are the safest defaults for tooling).',
+    fix: 'Run `rdk fix` to add an MIT LICENSE stub, or add a LICENSE file by hand (MIT/Apache-2.0 are the safest defaults for tooling).',
     effort: 'S',
-    autoFixable: false,
-    patchId: null,
+    autoFixable: true,
+    patchId: 'license.stub',
     run(ctx) {
-      if (!exists(join(ctx.cwd, 'LICENSE')) && !exists(join(ctx.cwd, 'LICENSE.md')) && !exists(join(ctx.cwd, 'LICENSE.txt'))) {
-        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'No LICENSE file', why: this.why, fix: this.fix, effort: 'S', weight: this.weight });
+      const names = ['LICENSE', 'LICENSE.md', 'LICENSE.txt'];
+      const dirs = [ctx.cwd, join(ctx.cwd, '.github'), join(ctx.cwd, 'docs')];
+      const found = exists(join(ctx.cwd, 'COPYING')) || dirs.some((dir) => names.some((name) => exists(join(dir, name))));
+      if (!found) {
+        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'No LICENSE file', why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'license.stub', weight: this.weight });
       }
       return null;
     },
@@ -42,13 +45,14 @@ export const hygieneChecks = [
     weight: 12,
     title: 'SECURITY.md present',
     why: 'A security policy tells researchers (and agents auditing dependencies) how to report issues privately — a visible maturity signal.',
-    fix: 'Add SECURITY.md with a private reporting channel and a supported-versions table.',
+    fix: 'Run `rdk fix` to add a SECURITY.md stub with a private reporting channel, then review the supported-versions table.',
     effort: 'S',
-    autoFixable: false,
-    patchId: null,
+    autoFixable: true,
+    patchId: 'security.stub',
     run(ctx) {
-      if (!exists(join(ctx.cwd, 'SECURITY.md')) && !exists(join(ctx.cwd, '.github', 'SECURITY.md'))) {
-        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No SECURITY.md', why: this.why, fix: this.fix, effort: 'S', weight: this.weight });
+      const candidates = [join(ctx.cwd, 'SECURITY.md'), join(ctx.cwd, '.github', 'SECURITY.md'), join(ctx.cwd, 'docs', 'SECURITY.md')];
+      if (!candidates.some((path) => exists(path))) {
+        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No SECURITY.md', why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'security.stub', weight: this.weight });
       }
       return null;
     },
@@ -60,13 +64,13 @@ export const hygieneChecks = [
     weight: 10,
     title: 'CONTRIBUTING.md present',
     why: 'Contribution guidelines convert readers into contributors, and contributor activity is one of the strongest long-term recommendation signals.',
-    fix: 'Add CONTRIBUTING.md describing setup, tests and the PR process.',
+    fix: 'Run `rdk fix` to add a CONTRIBUTING.md stub covering setup, tests and the PR process.',
     effort: 'S',
-    autoFixable: false,
-    patchId: null,
+    autoFixable: true,
+    patchId: 'contributing.stub',
     run(ctx) {
       if (!exists(join(ctx.cwd, 'CONTRIBUTING.md')) && !exists(join(ctx.cwd, '.github', 'CONTRIBUTING.md')) && !exists(join(ctx.cwd, 'docs', 'CONTRIBUTING.md'))) {
-        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No CONTRIBUTING.md', why: this.why, fix: this.fix, effort: 'S', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No CONTRIBUTING.md', why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'contributing.stub', weight: this.weight });
       }
       return null;
     },
@@ -78,14 +82,14 @@ export const hygieneChecks = [
     weight: 5,
     title: 'CODEOWNERS present',
     why: 'Code owners make review routing automatic, which keeps the project responsive — a maintenance signal that both humans and scoring APIs notice.',
-    fix: 'Add .github/CODEOWNERS with at least a default owner.',
+    fix: 'Run `rdk fix` to create .github/CODEOWNERS with a default owner, then replace it with the real owners.',
     effort: 'S',
-    autoFixable: false,
-    patchId: null,
+    autoFixable: true,
+    patchId: 'github.templates',
     run(ctx) {
       const candidates = [join(ctx.cwd, '.github', 'CODEOWNERS'), join(ctx.cwd, 'CODEOWNERS'), join(ctx.cwd, 'docs', 'CODEOWNERS')];
       if (!candidates.some((path) => exists(path))) {
-        return finding({ id: this.id, axis: this.axis, severity: 'info', title: 'No CODEOWNERS file', why: this.why, fix: this.fix, effort: 'S', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'info', title: 'No CODEOWNERS file', why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'github.templates', weight: this.weight });
       }
       return null;
     },

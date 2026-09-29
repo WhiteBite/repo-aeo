@@ -3,6 +3,8 @@
  * .discoverability/project.yml plus facts read from the repository — the
  * generator never invents claims it cannot source from the config.
  */
+import { join } from 'node:path';
+import { exists, readTextIfExists, mtimeMs } from '../util/fs.js';
 import { repoOwner, toolDocUrl } from '../util/repo.js';
 
 function yamlList(items, indent = '  ') {
@@ -63,6 +65,35 @@ export function mergeGenerated(existing, generated) {
   return null; // hand-edited legacy file: caller must not overwrite
 }
 
+/**
+ * Names of the generated llms files whose on-disk content no longer matches the
+ * rendered output. Marker-managed files are compared by content (so `rdk fix`
+ * clearing the drift is guaranteed); hand-written files without markers fall
+ * back to README mtime, which `rdk fix` never overwrites.
+ */
+export function generatedDrift(cwd, config, pkg) {
+  const readmePath = join(cwd, 'README.md');
+  const readme = exists(readmePath) ? readTextIfExists(readmePath) : renderReadme(config, pkg);
+  const stale = [];
+  const targets = [
+    ['llms.txt', renderLlmsTxt(config, pkg, readme)],
+    ['llms-full.txt', renderLlmsFullTxt(config, pkg, readme)],
+  ];
+  for (const [relative, generated] of targets) {
+    const path = join(cwd, relative);
+    if (!exists(path)) continue;
+    const text = readTextIfExists(path);
+    if (text.includes(GENERATED_START) && text.includes(GENERATED_END)) {
+      if (mergeGenerated(text, generated) !== text) stale.push(relative);
+    } else {
+      const fileTime = mtimeMs(path);
+      const readmeTime = mtimeMs(readmePath);
+      if (fileTime !== null && readmeTime !== null && readmeTime - fileTime > 60 * 60 * 1000) stale.push(relative);
+    }
+  }
+  return stale;
+}
+
 export function renderProjectYml(config) {
   const project = config.project || {};
   const keywords = config.keywords || {};
@@ -77,11 +108,14 @@ export function renderProjectYml(config) {
 # the repo-discoverability skill, and the rdk-audit GitHub Action.
 # Docs: ${toolDocUrl('docs/configuration.md')}
 
+schema_version: ${typeof config.schema_version === 'number' ? config.schema_version : 1}   # config schema revision; rdk warns on any other value
+
 project:
   name:${yamlScalar(project.name)}
   one_liner:${yamlScalar(project.one_liner)}   # 1 sentence, shown as the GitHub description
   description:${yamlScalar(project.description)}
   category:${yamlScalar(project.category || 'library')}   # library | app | template | research | tool | dataset | mcp-server
+  copyright_holder:${yamlScalar(project.copyright_holder)}   # name on the LICENSE copyright line; seeded from the git owner
 
 ${yamlBlock('audiences', config.audiences)}
 
@@ -112,6 +146,7 @@ ${yamlBlock('differentiators', config.differentiators)}   # "why this repo, not 
 safety:
   allow_autofix: ${safety.allow_autofix ? 'true' : 'false'}          # lets the Action open autofix PRs
   require_ack_for_publish: ${safety.require_ack_for_publish === false ? 'false' : 'true'}
+  ack:${yamlScalar(safety.ack)}   # optional override of the github-sync ACK string; empty keeps the default
 `;
 }
 
@@ -392,6 +427,14 @@ export function renderJsonLd(config, pkg) {
   if (pkg && pkg.version) data.softwareVersion = pkg.version;
   const repoUrl = repositoryUrl(config, pkg);
   if (repoUrl) data.codeRepository = repoUrl;
+  const ownerMatch = repoUrl ? /^https?:\/\/[^/\s]+\/([^/\s]+)\/[^/\s]+/.exec(repoUrl) : null;
+  const author = project.copyright_holder || (ownerMatch && ownerMatch[1]);
+  if (author) data.author = author;
+  const sameAs = [];
+  const identityUrl = repoUrl || (config.links && config.links.homepage);
+  if (identityUrl) sameAs.push(identityUrl);
+  if (pkg && pkg.name && !pkg.private) sameAs.push(`https://www.npmjs.com/package/${pkg.name}`);
+  if (sameAs.length > 0) data.sameAs = sameAs;
   return `${JSON.stringify(data, null, 2)}\n`;
 }
 
