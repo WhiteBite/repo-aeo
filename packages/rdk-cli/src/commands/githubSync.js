@@ -16,7 +16,7 @@ function gh(args, { cwd }) {
 export function resolveRepo(cwd, options) {
   if (options.repo) return options.repo;
   const git = gitInfo(cwd);
-  if (git.owner && git.repo) return `${git.owner}/${git.repo}`;
+  if (git.host === 'github.com' && git.owner && git.repo) return `${git.owner}/${git.repo}`;
   return null;
 }
 
@@ -27,7 +27,7 @@ export async function githubSyncCommand({ cwd, options = {}, config }) {
 
   const repo = resolveRepo(cwd, options);
   if (!repo) {
-    return { ok: false, error: 'cannot resolve a GitHub repository (no --repo and no origin remote)', output: `${lines.join('\n')}\nCannot resolve a GitHub repository (no --repo and no origin remote).\n`, exitCode: 1 };
+    return { ok: false, error: 'cannot resolve a GitHub repository (no --repo and no github.com origin remote)', output: `${lines.join('\n')}\nCannot resolve a GitHub repository (no --repo and no github.com origin remote).\n`, exitCode: 1 };
   }
 
   const ghAvailable = gh(['--version'], { cwd }).ok;
@@ -49,6 +49,7 @@ export async function githubSyncCommand({ cwd, options = {}, config }) {
 
   const desiredTopics = uniq(((config.keywords && config.keywords.github_topics) || []).map(slugifyTopic).filter(Boolean));
   const liveTopics = uniq((live.repositoryTopics || []).map((t) => (t && t.name) || String(t)));
+  const fields = Array.isArray(options.fields) && options.fields.length > 0 ? options.fields : null;
 
   const plan = [];
   const wantDescription = config.project.one_liner || config.project.description || null;
@@ -85,13 +86,14 @@ export async function githubSyncCommand({ cwd, options = {}, config }) {
     lines.push(`Refusing to write: pass --ack ${DEFAULT_ACK} to confirm an explicit repository write.`);
     return { ok: false, error: `refusing to write: pass --ack ${DEFAULT_ACK} to confirm an explicit repository write`, output: `${lines.join('\n')}\n`, exitCode: 1, applied: [] };
   }
-  if (!options.reason) {
+  if (!options.reason || String(options.reason).trim().length < 5) {
     lines.push('Refusing to write: pass --reason "<why this change is correct>" so the change is auditable.');
-    return { ok: false, error: 'refusing to write: pass --reason "<why this change is correct>" so the change is auditable', output: `${lines.join('\n')}\n`, exitCode: 1, applied: [] };
+    return { ok: false, error: 'refusing to write: a non-trivial reason is required and is logged', output: `${lines.join('\n')}\n`, exitCode: 1, applied: [] };
   }
 
   const applied = [];
-  for (const change of plan) {
+  const planned = fields ? plan.filter((change) => fields.includes(change.field)) : plan;
+  for (const change of planned) {
     let result;
     if (change.field === 'topics') {
       const args = ['api', '--method', 'PUT', `repos/${repo}/topics`];

@@ -208,7 +208,7 @@ export const TOOLS = [
     async run(args, context = {}) {
       const cwd = resolveCwd(args, context);
       const { git } = loadConfig(cwd);
-      const repo = args.repo || (git.owner && git.repo ? `${git.owner}/${git.repo}` : null);
+      const repo = args.repo || (git.host === 'github.com' && git.owner && git.repo ? `${git.owner}/${git.repo}` : null);
       if (!repo) return { ok: false, error: 'no repository resolved (pass repo=owner/name)' };
 
       const result = await gh(

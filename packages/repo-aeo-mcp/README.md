@@ -60,7 +60,7 @@ Every tool is annotated `readOnlyHint: true` except `github_sync_metadata`, whic
 2. requires a `reason` of at least 5 characters, which is stored in the local history,
 3. **previews by default** - pass `apply: true` only after reviewing `output`.
 
-The same guard is implemented once, in the CLI, and reused here.
+The ack and reason rules are enforced by the CLI command on every write; this tool additionally requires both on every call and previews until `apply: true`.
 
 ## Configuration
 
