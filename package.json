@@ -1,7 +1,7 @@
 {
   "name": "repo-aeo",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Repo Discoverability Kit (RDK): make any repository, npm package and docs site maximally findable and recommendable for humans, AI agents and search engines.",
   "type": "module",
   "license": "MIT",
@@ -16,10 +16,10 @@
     "mcp": "node packages/repo-aeo-mcp/bin/repo-aeo-mcp.js serve",
     "audit": "node packages/rdk-cli/bin/rdk.js audit",
     "audit:json": "node packages/rdk-cli/bin/rdk.js audit --format json",
-    "fix:dry": "node packages/rdk-cli/bin/rdk.js fix --dry-run",
+    "fix:dry": "node packages/rdk-cli/bin/rdk.js fix",
     "fix": "node packages/rdk-cli/bin/rdk.js fix --apply",
     "npm-surface": "node packages/rdk-cli/bin/rdk.js npm-surface",
-    "github-sync": "node packages/rdk-cli/bin/rdk.js github-sync --dry-run",
+    "github-sync": "node packages/rdk-cli/bin/rdk.js github-sync",
     "test": "node --test \"packages/*/test/*.test.js\"",
     "test:cli": "node --test \"packages/rdk-cli/test/*.test.js\"",
     "test:mcp": "node --test \"packages/repo-aeo-mcp/test/*.test.js\""
