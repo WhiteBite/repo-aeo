@@ -242,6 +242,23 @@ time. None of them repairs the repository; RDK does not replace any of them.
   profile accepts CODE_OF_CONDUCT in `.github/`, root or `docs/`; RDK's checks
   look at fixed paths.
 
+### What llms.txt provably buys
+
+Consumed **on demand** by agents: the [spec](https://llmstxt.org) states the
+file is "used on demand, when an agent needs information about a topic while
+assisting a user", for inference rather than training. OpenClaw ships llms.txt
+discovery as default agent behavior since 2026-02; Chrome's
+[Lighthouse Agentic Browsing](https://developer.chrome.com/docs/lighthouse/agentic-browsing/llms-txt)
+scores sites on it; Cloudflare, Mintlify, GitBook, Wix and Yoast publish or
+generate it as the ecosystem convention, and tools like
+[mcpdoc](https://github.com/langchain-ai/mcpdoc) feed it to IDE agents.
+
+What it does **not** buy: none of GPTBot, ClaudeBot, PerplexityBot,
+Google-Extended or Bingbot documents fetching `/llms.txt` during training or
+indexing crawls — their official bot pages contain no mention of it. The
+defensible value is inference-time agents, repo-reading tooling and the
+discoverability audits above, not crawler traffic.
+
 ### Where RDK leads
 
 - The only tool above whose unit of analysis is the working tree: everything
