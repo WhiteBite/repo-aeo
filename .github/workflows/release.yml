@@ -84,8 +84,13 @@ jobs:
       - name: Publish the engine first
         working-directory: packages/rdk-cli
         run: |
+          name=$(node -p "require('./package.json').name")
+          local=$(node -p "require('./package.json').version")
+          published=$(npm view "$name" version 2>/dev/null || echo none)
           if [ "${{ inputs.dry_run }}" = "true" ]; then
             npm publish --dry-run --access public
+          elif [ "$local" = "$published" ]; then
+            echo "$name@$local is already in the registry; skipping"
           else
             npm publish --access public
           fi
@@ -96,8 +101,13 @@ jobs:
       - name: Publish the MCP server
         working-directory: packages/repo-aeo-mcp
         run: |
+          name=$(node -p "require('./package.json').name")
+          local=$(node -p "require('./package.json').version")
+          published=$(npm view "$name" version 2>/dev/null || echo none)
           if [ "${{ inputs.dry_run }}" = "true" ]; then
             npm publish --dry-run --access public
+          elif [ "$local" = "$published" ]; then
+            echo "$name@$local is already in the registry; skipping"
           else
             npm publish --access public
           fi
