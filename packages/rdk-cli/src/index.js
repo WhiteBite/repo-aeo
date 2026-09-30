@@ -1,4 +1,4 @@
-/** Programmatic API for @whitebite/rdk-cli. */
+/** Programmatic API for repo-aeo. */
 export { audit } from './audit/index.js';
 export { loadConfig, buildSeedConfig, CONFIG_RELATIVE_PATH } from './config.js';
 export { planPatches, applyPatches, PATCHES } from './fix/patches.js';

@@ -38,7 +38,7 @@ Check-by-check weights live in
 Example gate:
 
 ```yaml
-- run: npx @whitebite/rdk-cli audit --min-score 70
+- run: npx repo-aeo audit --min-score 70
 ```
 
 ## What the score is not

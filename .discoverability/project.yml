@@ -57,7 +57,7 @@ links:
 quickstart:
   prerequisites:
     - "Node.js >= 18"
-  install: "npm install --save-dev @whitebite/rdk-cli"
+  install: "npm install --save-dev repo-aeo"
   run: "npx rdk audit"
   test: "npm test"
 

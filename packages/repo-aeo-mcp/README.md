@@ -2,7 +2,7 @@
 
 Continuous discoverability monitoring as an [MCP](https://modelcontextprotocol.io) server.
 
-The CLI (`@whitebite/rdk-cli`) audits a repository once, on demand. This server keeps the same engine available to an AI agent or a monitoring job, adds a **trend history** so regressions are visible, and wraps everything in the tool format agents already know.
+The CLI (`repo-aeo`) audits a repository once, on demand. This server keeps the same engine available to an AI agent or a monitoring job, adds a **trend history** so regressions are visible, and wraps everything in the tool format agents already know.
 
 - 8 tools, zero runtime dependencies, Node.js >= 18
 - Read-only by default: the single write tool previews first and requires an acknowledgement

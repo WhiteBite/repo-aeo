@@ -1,11 +1,12 @@
 {
-  "name": "@whitebite/rdk-cli",
+  "name": "repo-aeo",
   "version": "0.2.0",
   "description": "Audit and improve repository discoverability: GitHub metadata and topics, README structure, AGENTS.md, npm package surface, llms.txt and structured data.",
   "type": "module",
   "license": "MIT",
   "bin": {
-    "rdk": "bin/rdk.js"
+    "rdk": "bin/rdk.js",
+    "repo-aeo": "bin/rdk.js"
   },
   "main": "./src/index.js",
   "types": "./src/index.d.ts",

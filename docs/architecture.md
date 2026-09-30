@@ -54,7 +54,7 @@ and a weekly cron:
 
 1. `actions/checkout`
 2. `actions/setup-node@v4` (Node 22)
-3. `npx @whitebite/rdk-cli audit --format github-comment --online`
+3. `npx repo-aeo audit --format github-comment --online`
 4. post/update a PR comment carrying the marker
    `<!-- rdk-discoverability-audit -->` (so repeated runs edit one comment)
 

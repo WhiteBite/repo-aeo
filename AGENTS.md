@@ -50,7 +50,7 @@ every change.
   audit, the patches (including idempotency), the CLI end to end, the MCP tool
   registry and the JSON-RPC transport.
 - **Do** keep `packages/repo-aeo-mcp` free of runtime dependencies too: it
-  reuses `@whitebite/rdk-cli` for the engine and implements the MCP transport
+  reuses `repo-aeo` for the engine and implements the MCP transport
   itself.
 - **Do** keep `.discoverability/project.yml` and `packages/rdk-cli/package.json`
   in sync — `rdk audit` compares them.

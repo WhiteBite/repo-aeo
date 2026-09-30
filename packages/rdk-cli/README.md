@@ -1,4 +1,4 @@
-# @whitebite/rdk-cli
+# repo-aeo
 
 Audit and improve repository discoverability: GitHub metadata and topics, README
 structure, `AGENTS.md`, the npm publish surface, `llms.txt` and structured data.
@@ -8,7 +8,7 @@ Zero runtime dependencies. Node >= 18. Read-only by default.
 ## Install
 
 ```bash
-npm install --save-dev @whitebite/rdk-cli
+npm install --save-dev repo-aeo
 npx rdk --help
 ```
 
@@ -42,7 +42,7 @@ npx rdk audit --out report.md           # also write to a file
 ## Programmatic use
 
 ```js
-import { audit, planPatches, renderGithubComment } from '@whitebite/rdk-cli';
+import { audit, planPatches, renderGithubComment } from 'repo-aeo';
 
 const report = await audit(process.cwd(), { online: false });
 console.log(report.score.total, report.findings.length);
