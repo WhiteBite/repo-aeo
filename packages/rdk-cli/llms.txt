@@ -16,7 +16,7 @@ Discoverability Kit (RDK) monorepo: https://github.com/WhiteBite/repo-aeo
 ## Key facts
 
 - Install: `npm install --save-dev repo-aeo`
-- Run: `npx rdk audit`
+- Run: `npx repo-aeo audit`
 - Test: `npm test`
 - Commands: `init`, `audit`, `fix`, `npm-surface`, `github-sync`.
 - Programmatic API: `import { audit, planPatches, renderGithubComment } from 'repo-aeo'`.

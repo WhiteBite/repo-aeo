@@ -1,7 +1,7 @@
 # Configuration reference: `.discoverability/project.yml`
 
 The config is the single source of truth. Every generator, check and sync
-command reads it. Create it with `npx rdk init` (seeded from `package.json` and
+command reads it. Create it with `npx repo-aeo init` (seeded from `package.json` and
 the git remote) or copy the annotated template from `rdk init --dry-run`.
 
 ## `schema_version`

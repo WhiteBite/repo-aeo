@@ -58,7 +58,7 @@ quickstart:
   prerequisites:
     - "Node.js >= 18"
   install: "npm install --save-dev repo-aeo"
-  run: "npx rdk audit"
+  run: "npx repo-aeo audit"
   test: "npm test"
 
 artifacts:

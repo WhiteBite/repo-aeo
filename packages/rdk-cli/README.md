@@ -9,7 +9,7 @@ Zero runtime dependencies. Node >= 18. Read-only by default.
 
 ```bash
 npm install --save-dev repo-aeo
-npx rdk --help
+npx repo-aeo --help
 ```
 
 ## Commands
@@ -25,10 +25,10 @@ npx rdk --help
 ## Output formats
 
 ```bash
-npx rdk audit --format json             # machine readable (stdout is pure JSON)
-npx rdk audit --format markdown         # full human report
-npx rdk audit --format github-comment   # compact PR comment (marker: <!-- rdk-discoverability-audit -->)
-npx rdk audit --out report.md           # also write to a file
+npx repo-aeo audit --format json             # machine readable (stdout is pure JSON)
+npx repo-aeo audit --format markdown         # full human report
+npx repo-aeo audit --format github-comment   # compact PR comment (marker: <!-- rdk-discoverability-audit -->)
+npx repo-aeo audit --out report.md           # also write to a file
 ```
 
 ## Safety model

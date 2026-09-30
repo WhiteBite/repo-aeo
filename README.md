@@ -23,17 +23,17 @@ runtime dependencies**, so `npx` stays fast and the supply chain stays small.
 npm install --save-dev repo-aeo
 
 # 2. scaffold the config and the missing files
-npx rdk init --apply
+npx repo-aeo init --apply
 
 # 3. see the score and the prioritised fix list
-npx rdk audit
+npx repo-aeo audit
 
 # 4. run the test suite
 npm test
 ```
 
 Two-minute setup for a repository you do not own yet: clone it, run
-`npx rdk init --apply`, then `npx rdk audit`. Everything the CLI writes is a
+`npx repo-aeo init --apply`, then `npx repo-aeo audit`. Everything the CLI writes is a
 reviewable diff — it never publishes, tags or force-pushes. The one exception
 lives in CI: the opt-in autofix job force-pushes its own dated
 `rdk/autofix-<date>` bot branch and opens a reviewable PR.
@@ -59,11 +59,11 @@ Three layers, because a one-off script is not enough:
 ## Commands
 
 ```bash
-npx rdk init          # create .discoverability/project.yml + minimal safe files
-npx rdk audit         # score 0-100 + findings (json | markdown | github-comment)
-npx rdk fix           # preview safe autofixes; --apply to write them
-npx rdk npm-surface   # package.json publish surface + npm pack --dry-run
-npx rdk github-sync   # push description/homepage/topics (needs --apply --ack --reason)
+npx repo-aeo init          # create .discoverability/project.yml + minimal safe files
+npx repo-aeo audit         # score 0-100 + findings (json | markdown | github-comment)
+npx repo-aeo fix           # preview safe autofixes; --apply to write them
+npx repo-aeo npm-surface   # package.json publish surface + npm pack --dry-run
+npx repo-aeo github-sync   # push description/homepage/topics (needs --apply --ack --reason)
 
 npx repo-aeo-mcp serve # the same engine as an MCP server: 8 read-mostly tools
 claude mcp add rdk -- npx repo-aeo-mcp serve
@@ -78,21 +78,21 @@ offline; `--online` adds link checks and live GitHub metadata.
 ### 1. Score a repository
 
 ```bash
-$ npx rdk audit            # measured on fixtures/demo-repo, offline
+$ npx repo-aeo audit            # measured on fixtures/demo-repo, offline
 score: 29/100 (grade F) · checks: 10/41 passed · findings: 12 error, 13 warn, 6 info (16 autofixable) · mode: offline (use --online for link + GitHub checks)
 ```
 
 ### 2. Fix what is safe to fix
 
 ```bash
-$ npx rdk fix --dry-run     # review the diff
-$ npx rdk fix --apply       # 18 files: README sections, AGENTS.md draft, llms.txt, CITATION.cff, ...
+$ npx repo-aeo fix --dry-run     # review the diff
+$ npx repo-aeo fix --apply       # 18 files: README sections, AGENTS.md draft, llms.txt, CITATION.cff, ...
 ```
 
 ### 3. Check the publish surface
 
 ```bash
-$ npx rdk npm-surface --pack
+$ npx repo-aeo npm-surface --pack
 | exports | conditions: import, require; subpaths: . |
 ⚠️ present in the repo but not in the tarball: llms.txt
 ```

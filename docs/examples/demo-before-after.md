@@ -7,10 +7,10 @@ Reproduce with:
 
 ```bash
 cp -r fixtures/demo-repo /tmp/rdk-demo && cd /tmp/rdk-demo
-npx rdk audit            # before
-npx rdk init --apply
-npx rdk fix --apply
-npx rdk audit            # after
+npx repo-aeo audit            # before
+npx repo-aeo init --apply
+npx repo-aeo fix --apply
+npx repo-aeo audit            # after
 ```
 
 ## Before
