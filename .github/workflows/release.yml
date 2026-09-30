@@ -22,6 +22,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -38,8 +39,9 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
@@ -62,8 +64,7 @@ jobs:
   publish:
     name: Publish to npm
     needs: verify
-    # The `npm` environment holds the approval rule and the NPM_TOKEN secret,
-    # so a reviewer must approve the job before anything is published.
+    # The `npm` environment holds the approval rule; auth is OIDC trusted publishing, no long-lived token.
     environment: npm
     runs-on: ubuntu-latest
     steps:
@@ -73,21 +74,20 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
       - name: Publish the engine first
         working-directory: packages/rdk-cli
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           if [ "${{ inputs.dry_run }}" = "true" ]; then
             npm publish --dry-run --access public
           else
-            npm publish --access public --provenance
+            npm publish --access public
           fi
 
       # repo-aeo-mcp declares a dependency on the published version of the
@@ -95,13 +95,11 @@ jobs:
       # resolves a real @repo-aeo/rdk-cli tarball.
       - name: Publish the MCP server
         working-directory: packages/repo-aeo-mcp
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           if [ "${{ inputs.dry_run }}" = "true" ]; then
             npm publish --dry-run --access public
           else
-            npm publish --access public --provenance
+            npm publish --access public
           fi
 
       - name: Summary
