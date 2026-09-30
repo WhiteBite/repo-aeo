@@ -104,11 +104,7 @@ export function renderProjectYml(config) {
   const artifacts = config.artifacts || {};
   const safety = config.safety || {};
 
-  return `# .discoverability/project.yml
-# Single source of truth for this repository's discoverability metadata.
-# Consumed by: rdk audit / rdk fix / rdk github-sync / rdk npm-surface,
-# the repo-discoverability skill, and the rdk-audit GitHub Action.
-# Docs: ${toolDocUrl('docs/configuration.md')}
+  return `# Docs: ${toolDocUrl('docs/configuration.md')}
 
 schema_version: ${typeof config.schema_version === 'number' ? config.schema_version : 1}   # config schema revision; rdk warns on any other value
 
