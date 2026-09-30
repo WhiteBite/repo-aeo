@@ -52,15 +52,17 @@ export const HANDWRITTEN_NOTE = '<!-- Everything below the end marker is preserv
  *                           manual work
  */
 export function mergeGenerated(existing, generated) {
-  const body = String(generated).trim();
+  const bodyRaw = String(generated).trim();
   if (existing === null || existing === undefined) {
-    return `${GENERATED_START}\n${body}\n${GENERATED_END}\n\n## Hand-written notes\n\n${HANDWRITTEN_NOTE}\n`;
+    return `${GENERATED_START}\n${bodyRaw}\n${GENERATED_END}\n\n## Hand-written notes\n\n${HANDWRITTEN_NOTE}\n`;
   }
   const text = String(existing);
   if (text.includes(GENERATED_START) && text.includes(GENERATED_END)) {
+    const eol = text.includes('\r\n') ? '\r\n' : '\n';
+    const body = eol === '\r\n' ? bodyRaw.replace(/\n/g, '\r\n') : bodyRaw;
     const head = text.slice(0, text.indexOf(GENERATED_START));
     const tail = text.slice(text.indexOf(GENERATED_END) + GENERATED_END.length);
-    return `${head}${GENERATED_START}\n${body}\n${GENERATED_END}${tail}`;
+    return `${head}${GENERATED_START}${eol}${body}${eol}${GENERATED_END}${tail}`;
   }
   return null; // hand-edited legacy file: caller must not overwrite
 }

@@ -60,6 +60,14 @@ test('renderProjectYml handles empty lists', () => {
   assert.deepEqual(parsed.keywords.github_topics, []);
 });
 
+test('mergeGenerated keeps CRLF files CRLF inside the regenerated block', () => {
+  const crlf = `head\r\n${GENERATED_START}\r\nOLD BODY\r\n${GENERATED_END}\r\ntail\r\n`;
+  const merged = mergeGenerated(crlf, 'NEW BODY\nsecond line');
+  assert.ok(merged.includes('NEW BODY\r\nsecond line'));
+  assert.equal(merged.replace(/\r\n/g, '').includes('\n'), false);
+  assert.equal(mergeGenerated(merged, 'NEW BODY\nsecond line'), merged);
+});
+
 test('mergeGenerated wraps new files and preserves hand-written tails', () => {
   const first = mergeGenerated(null, 'GENERATED BODY');
   assert.ok(first.includes(GENERATED_START));

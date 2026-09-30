@@ -47,6 +47,9 @@ Fast, tool-controlled proxies:
 - llms.txt / AGENTS.md presence and freshness.
 - Open issue count, release freshness.
 - GitHub topic coverage and README structure score.
+- Served docs sites: add `<link rel="alternate" type="text/plain" href="/llms.txt">`
+  (and `rel="describedby"` for llms-full.txt) to the HTML head — the llms.txt v2
+  discovery mechanism for crawlers and agents that fetch sites, per the spec.
 
 Slow, manual, quarterly: ask ChatGPT/Claude/Perplexity "best library for X" and
 check whether the project is mentioned. Treat it as a checkpoint, not a KPI.

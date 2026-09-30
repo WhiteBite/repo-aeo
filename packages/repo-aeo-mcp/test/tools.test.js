@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { TOOLS, callTool, toolDescriptors, firstHeadingOf } from '../src/tools.js';
 import { record, series, trend, listMetrics, historyPath } from '../src/history.js';
 
@@ -325,6 +326,19 @@ test('history records metrics, series and trends in a disposable directory', () 
   } finally {
     box.cleanup();
   }
+});
+
+test('the skill MCP manifest dogfood numbers match the live tool registry', () => {
+  const manifestPath = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'skills', 'repo-discoverability', 'references', 'mcp-manifest.md');
+  const text = readFileSync(manifestPath, 'utf8');
+  const readOnly = TOOLS.filter((tool) => tool.annotations.readOnlyHint === true).length;
+  const named = /snake_case \| (\d+) tools, e.g\./.exec(text);
+  const annotated = /(\d+) tools annotated `readOnlyHint: true`/.exec(text);
+  const exact = /exactly (\d+)/.exec(text);
+  assert.ok(named && annotated && exact, 'manifest dogfood rows missing');
+  assert.equal(Number(named[1]), TOOLS.length, 'manifest tool count drifted from the registry');
+  assert.equal(Number(annotated[1]), readOnly, 'manifest readOnly count drifted from the registry');
+  assert.equal(Number(exact[1]), TOOLS.length, 'manifest exact-count row drifted from the registry');
 });
 
 test('history survives a corrupt cache file', () => {

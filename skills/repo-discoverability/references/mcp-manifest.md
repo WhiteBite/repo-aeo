@@ -43,7 +43,7 @@ applied to it directly:
 | 1–2 sentence descriptions, params in the schema | descriptions state the outcome; `limit`, `severity`, `cwd`, `apply` live in `inputSchema` |
 | Dockerfile | `packages/repo-aeo-mcp/Dockerfile` (`node:22-alpine`, stdio only) |
 | No dependencies | zero runtime dependencies; the engine is a workspace link to `@repo-aeo/rdk-cli` |
-| Read-only by default, write needs ack + reason | 7 tools annotated `readOnlyHint: true`; `github_sync_metadata` requires `I_ACK_RDK_GITHUB_WRITE` plus a reason and previews before it writes |
+| Read-only by default, write needs ack + reason | 7 tools annotated `readOnlyHint: true`; `github_sync_metadata` requires the configured acknowledgement string (default `I_ACK_RDK_GITHUB_WRITE`, overridable via `safety.ack`) plus a reason, binds the write to an approved plan digest and previews before it writes |
 | ≤ 8 tools in v1 | exactly 8 |
 
 An agent auditing this repository should read the same table as evidence, not as
