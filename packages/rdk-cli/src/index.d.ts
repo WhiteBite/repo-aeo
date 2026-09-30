@@ -1,5 +1,5 @@
 /**
- * Type definitions for the programmatic API of @repo-aeo/rdk-cli.
+ * Type definitions for the programmatic API of @whitebite/rdk-cli.
  * The package itself is plain ESM JavaScript; these declarations describe the
  * shapes returned by `audit()` and consumed by the report renderers.
  */

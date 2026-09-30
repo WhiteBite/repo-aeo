@@ -67,8 +67,8 @@ jobs:
         run: |
           # Prefer the published package, fall back to the in-repo copy so the
           # workflow also works before the first release.
-          if npx --yes @repo-aeo/rdk-cli@^0.1.0 --version >/dev/null 2>&1; then
-            echo "command=npx --yes @repo-aeo/rdk-cli@^0.1.0" >> "$GITHUB_OUTPUT"
+          if npx --yes @whitebite/rdk-cli@^0.2.0 --version >/dev/null 2>&1; then
+            echo "command=npx --yes @whitebite/rdk-cli@^0.2.0" >> "$GITHUB_OUTPUT"
           else
             echo "command=node packages/rdk-cli/bin/rdk.js" >> "$GITHUB_OUTPUT"
           fi

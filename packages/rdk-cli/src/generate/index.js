@@ -585,7 +585,7 @@ Thanks for taking the time to contribute.
 
 - Keep pull requests small and focused.
 - Run \`npm test\` before pushing.
-- Run \`npx @repo-aeo/rdk-cli audit\` and do not regress the discoverability score.
+- Run \`npx @whitebite/rdk-cli audit\` and do not regress the discoverability score.
 - Never publish, tag or force-push on behalf of the maintainers.
 
 ## Code of conduct

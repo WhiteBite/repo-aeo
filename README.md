@@ -20,7 +20,7 @@ runtime dependencies**, so `npx` stays fast and the supply chain stays small.
 
 ```bash
 # 1. add RDK to your repository
-npm install --save-dev @repo-aeo/rdk-cli
+npm install --save-dev @whitebite/rdk-cli
 
 # 2. scaffold the config and the missing files
 npx rdk init --apply
@@ -104,8 +104,8 @@ $ npx rdk npm-surface --pack
 - uses: actions/checkout@v4
 - uses: actions/setup-node@v4
   with: { node-version: '22' }
-- run: npx --yes @repo-aeo/rdk-cli@^0.1.0 audit --format github-comment --online
-- run: npx --yes @repo-aeo/rdk-cli@^0.1.0 audit --format json --online --min-score "${{ github.event.inputs.min_score || vars.RDK_MIN_SCORE || 0 }}"
+- run: npx --yes @whitebite/rdk-cli@^0.2.0 audit --format github-comment --online
+- run: npx --yes @whitebite/rdk-cli@^0.2.0 audit --format json --online --min-score "${{ github.event.inputs.min_score || vars.RDK_MIN_SCORE || 0 }}"
 ```
 
 The CLI itself never force-pushes; the workflow's opt-in autofix job (gated by
@@ -286,7 +286,7 @@ server. IDE packaging is next
 
 | Path | Purpose |
 | --- | --- |
-| `packages/rdk-cli/` | the `@repo-aeo/rdk-cli` package (zero dependencies) |
+| `packages/rdk-cli/` | the `@whitebite/rdk-cli` package (zero dependencies) |
 | `packages/repo-aeo-mcp/` | the `repo-aeo-mcp` MCP server (8 tools, stdio, Dockerfile) |
 | `skills/repo-discoverability/` | SKILL.md + references + scripts for coding agents |
 | `action/`, `.github/workflows/` | GitHub Action and reusable composite action |

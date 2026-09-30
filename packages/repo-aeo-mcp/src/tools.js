@@ -20,7 +20,7 @@ import {
   generatedDrift,
   GENERATED_START,
   GENERATED_END,
-} from '@repo-aeo/rdk-cli';
+} from '@whitebite/rdk-cli';
 import { record, trend, series } from './history.js';
 
 const execFileAsync = promisify(execFile);

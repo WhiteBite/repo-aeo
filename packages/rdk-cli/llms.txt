@@ -1,4 +1,4 @@
-# @repo-aeo/rdk-cli
+# @whitebite/rdk-cli
 
 > Audit and improve repository discoverability: GitHub metadata and topics, README structure, AGENTS.md, the npm publish surface, llms.txt and structured data.
 
@@ -15,9 +15,9 @@ Discoverability Kit (RDK) monorepo: https://github.com/WhiteBite/repo-aeo
 
 ## Key facts
 
-- Install: `npm install --save-dev @repo-aeo/rdk-cli`
+- Install: `npm install --save-dev @whitebite/rdk-cli`
 - Run: `npx rdk audit`
 - Test: `npm test`
 - Commands: `init`, `audit`, `fix`, `npm-surface`, `github-sync`.
-- Programmatic API: `import { audit, planPatches, renderGithubComment } from '@repo-aeo/rdk-cli'`.
+- Programmatic API: `import { audit, planPatches, renderGithubComment } from '@whitebite/rdk-cli'`.
 - Safety: audit-only by default; `fix`/`init` need `--apply`; `github-sync` needs `--apply --ack <ACK> --reason "<why>"`; publish/tag/release are never performed.

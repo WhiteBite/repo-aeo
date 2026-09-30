@@ -152,7 +152,7 @@ export async function audit(cwd = process.cwd(), options = {}) {
 
   return {
     schema: 'rdk-audit/1',
-    tool: '@repo-aeo/rdk-cli',
+    tool: '@whitebite/rdk-cli',
     generated_at: new Date().toISOString(),
     duration_ms: Date.now() - started,
     project: {

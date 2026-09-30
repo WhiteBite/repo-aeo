@@ -1,5 +1,5 @@
 {
-  "name": "@repo-aeo/rdk-cli",
+  "name": "@whitebite/rdk-cli",
   "version": "0.2.0",
   "description": "Audit and improve repository discoverability: GitHub metadata and topics, README structure, AGENTS.md, npm package surface, llms.txt and structured data.",
   "type": "module",
