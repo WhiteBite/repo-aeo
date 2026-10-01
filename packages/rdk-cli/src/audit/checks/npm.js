@@ -2,7 +2,7 @@
  * Axis 4 — npm readiness: package.json metadata, exports map, types, tarball
  * hygiene, dependency health. Only applied when the project ships a package.
  */
-import { check, finding } from './_shared.js';
+import { check, finding, skip } from './_shared.js';
 import { exists, readJsonIfExists, readTextIfExists } from '../../util/fs.js';
 import { join, dirname } from 'node:path';
 
@@ -66,7 +66,7 @@ export const npmChecks = [
     patchId: 'package.metadata',
     run(ctx) {
       const pkg = ctx.pkg;
-      if (!pkg) return null;
+      if (!pkg) return skip('package.json is missing or unparsable');
       const missing = [];
       if (!pkg.description) missing.push('description');
       if (!Array.isArray(pkg.keywords) || pkg.keywords.length === 0) missing.push('keywords');
@@ -91,7 +91,7 @@ export const npmChecks = [
     patchId: 'package.keywords',
     run(ctx) {
       const pkg = ctx.pkg;
-      if (!pkg) return null;
+      if (!pkg) return skip('package.json is missing or unparsable');
       const keywords = Array.isArray(pkg.keywords) ? pkg.keywords.filter((k) => typeof k === 'string' && k.trim() !== '') : [];
       if (keywords.length === 0) {
         return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'No keywords in package.json', why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'package.keywords', weight: this.weight });
@@ -118,7 +118,7 @@ export const npmChecks = [
     patchId: null,
     run(ctx) {
       const pkg = ctx.pkg;
-      if (!pkg) return null;
+      if (!pkg) return skip('package.json is missing or unparsable');
       if (!pkg.exports) {
         if (pkg.main) {
           return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'package.json has "main" but no "exports" map', why: this.why, fix: this.fix, effort: 'M', weight: this.weight });
@@ -155,7 +155,7 @@ export const npmChecks = [
     patchId: null,
     run(ctx) {
       const pkg = ctx.pkg;
-      if (!pkg) return null;
+      if (!pkg) return skip('package.json is missing or unparsable');
       const exportsText = pkg.exports ? JSON.stringify(pkg.exports) : '';
       const hasTypes = Boolean(pkg.types || pkg.typings) || exportsText.includes('.d.ts') || exportsText.includes('"types"');
       if (hasTypes) return null;
@@ -179,7 +179,8 @@ export const npmChecks = [
     patchId: null,
     run(ctx) {
       const pkg = ctx.pkg;
-      if (!pkg || !pkg.exports) return null;
+      if (!pkg) return skip('package.json is missing or unparsable');
+      if (!pkg.exports) return null;
       if (pkg.sideEffects === undefined) {
         return finding({ id: this.id, axis: this.axis, severity: 'info', title: 'sideEffects is not declared', why: this.why, fix: this.fix, effort: 'S', weight: this.weight });
       }
@@ -199,7 +200,7 @@ export const npmChecks = [
     patchId: 'package.files',
     run(ctx) {
       const pkg = ctx.pkg;
-      if (!pkg) return null;
+      if (!pkg) return skip('package.json is missing or unparsable');
       const files = Array.isArray(pkg.files) ? pkg.files : null;
       const hasNpmignore = exists(join(ctx.cwd, '.npmignore'));
       if (!files && !hasNpmignore) {
@@ -235,7 +236,7 @@ export const npmChecks = [
     patchId: 'package.engines',
     run(ctx) {
       const pkg = ctx.pkg;
-      if (!pkg) return null;
+      if (!pkg) return skip('package.json is missing or unparsable');
       if (!pkg.engines || !pkg.engines.node) {
         return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'engines.node is not declared', why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'package.engines', weight: this.weight });
       }
@@ -255,7 +256,8 @@ export const npmChecks = [
     patchId: null,
     run(ctx) {
       const pkg = ctx.pkg;
-      if (!pkg || !pkg.version) return null;
+      if (!pkg) return skip('package.json is missing or unparsable');
+      if (!pkg.version) return null;
       if (String(pkg.deprecated || '').length > 0) {
         return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'Package is marked deprecated', why: this.why, fix: 'Remove the "deprecated" field.', effort: 'S', weight: this.weight });
       }
@@ -279,7 +281,7 @@ export const npmChecks = [
     patchId: null,
     run(ctx) {
       const pkg = ctx.pkg;
-      if (!pkg) return null;
+      if (!pkg) return skip('package.json is missing or unparsable');
       const scripts = pkg.scripts || {};
       if (!scripts.test && !scripts['test:unit'] && !scripts.check) {
         return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No test script in package.json', why: this.why, fix: this.fix, effort: 'M', weight: this.weight });
@@ -300,7 +302,7 @@ export const npmChecks = [
     patchId: null,
     run(ctx) {
       const pkg = ctx.pkg;
-      if (!pkg) return null;
+      if (!pkg) return skip('package.json is missing or unparsable');
       const problems = [];
       for (const field of ['dependencies', 'devDependencies']) {
         const deps = pkg[field];
@@ -318,3 +320,19 @@ export const npmChecks = [
     },
   }),
 ];
+
+export const npmPackageInvalidCheck = check({
+  id: 'npm.package_invalid',
+  axis: 'npm',
+  weight: 10,
+  title: 'package.json is missing or unparsable but has_npm_package is set',
+  why: 'The npm axis is claimed but cannot be measured: without a parsable package.json the npm checks would either all fail or all silently pass, and a silent pass invents a fact the audit never observed.',
+  fix: 'Repair package.json, or remove artifacts.has_npm_package from .discoverability/project.yml so the npm axis stops being claimed.',
+  effort: 'S',
+  autoFixable: false,
+  patchId: null,
+  run(ctx) {
+    if (ctx.pkg) return null;
+    return finding({ id: this.id, axis: this.axis, severity: 'error', title: this.title, why: this.why, fix: this.fix, effort: 'S', weight: this.weight });
+  },
+});

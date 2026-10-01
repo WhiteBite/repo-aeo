@@ -34,6 +34,12 @@ export function repoOwner(cwd = process.cwd()) {
   return parsed.owner || DEFAULT_OWNER;
 }
 
+/** Like repoOwner, but null instead of the tool owner when no remote can be read. */
+export function repoOwnerStrict(cwd = process.cwd()) {
+  const parsed = parseRemote(gitInfo(cwd).remote);
+  return parsed.owner || null;
+}
+
 /** Documentation URL for a file in this tool's repository. */
 export function toolDocUrl(path = '', ref = 'main') {
   const clean = String(path).replace(/^\/+/, '');

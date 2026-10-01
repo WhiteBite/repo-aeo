@@ -63,7 +63,7 @@ npx repo-aeo init          # create .discoverability/project.yml + minimal safe 
 npx repo-aeo audit         # score 0-100 + findings (json | markdown | github-comment)
 npx repo-aeo fix           # preview safe autofixes; --apply to write them
 npx repo-aeo npm-surface   # package.json publish surface + npm pack --dry-run
-npx repo-aeo github-sync   # push description/homepage/topics (needs --apply --ack --reason)
+npx repo-aeo github-sync   # push description/homepage/topics (needs --apply --ack --reason --plan-digest)
 npx repo-aeo skill install # link the agent skill into OpenCode/Claude/Codex skill dirs
 
 npx repo-aeo-mcp serve # the same engine as an MCP server: 8 read-mostly tools

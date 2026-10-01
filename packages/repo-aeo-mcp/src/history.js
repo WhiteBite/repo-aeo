@@ -3,10 +3,13 @@
  * ("your npm quality score went 0.62 -> 0.81 over the last month").
  * Storage is a JSON file under .discoverability/cache/ (git-ignored).
  */
-import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 const MAX_POINTS = 500;
+const LOCK_STALE_MS = 2000;
+const LOCK_ATTEMPTS = 4;
+const LOCK_RETRY_MS = 50;
 
 export function historyPath(cwd = process.cwd()) {
   return join(cwd, '.discoverability', 'cache', 'metrics.json');
@@ -19,6 +22,11 @@ export function readHistory(cwd = process.cwd()) {
     const parsed = JSON.parse(readFileSync(path, 'utf8'));
     return parsed && typeof parsed === 'object' ? parsed : {};
   } catch {
+    try {
+      renameSync(path, join(dirname(path), `metrics.json.corrupt-${Date.now()}`));
+    } catch {
+      // best-effort forensics: rotating the corrupt file aside must never fail the read
+    }
     return {};
   }
 }
@@ -41,19 +49,74 @@ export function writeHistory(history, cwd = process.cwd()) {
   return path;
 }
 
+function lockDir(cwd = process.cwd()) {
+  return `${historyPath(cwd)}.lock`;
+}
+
+function sleepSync(ms) {
+  const deadline = Date.now() + ms;
+  while (Date.now() < deadline) {}
+}
+
+// mkdir is atomic on every platform, so the lock directory is the cross-process mutex
+function acquireLock(cwd) {
+  const lock = lockDir(cwd);
+  try {
+    mkdirSync(dirname(lock), { recursive: true });
+  } catch {
+    return false;
+  }
+  for (let attempt = 0; attempt < LOCK_ATTEMPTS; attempt += 1) {
+    try {
+      mkdirSync(lock);
+      return true;
+    } catch (error) {
+      if (!error || error.code !== 'EEXIST') return false;
+    }
+    let stale = false;
+    try {
+      stale = Date.now() - statSync(lock).mtimeMs > LOCK_STALE_MS;
+    } catch {
+      stale = false;
+    }
+    if (stale) {
+      try {
+        rmSync(lock, { recursive: true, force: true });
+      } catch {
+        return false;
+      }
+    }
+    sleepSync(LOCK_RETRY_MS);
+  }
+  return false;
+}
+
+function releaseLock(cwd) {
+  try {
+    rmSync(lockDir(cwd), { recursive: true, force: true });
+  } catch {
+    // a stuck lock dir is stolen by the stale timeout on a later record
+  }
+}
+
 /** Appends one data point for a metric and returns the stored point. */
 export function record(metric, value, cwd = process.cwd()) {
-  const history = readHistory(cwd);
-  const point = { at: new Date().toISOString(), value };
-  const series = Array.isArray(history[metric]) ? history[metric] : [];
-  series.push(point);
-  history[metric] = series.slice(-MAX_POINTS);
+  const locked = acquireLock(cwd);
   try {
-    writeHistory(history, cwd);
-  } catch {
-    // best-effort by contract: an unwritable cache (e.g. read-only mount) must never fail a read-only tool call
+    const history = readHistory(cwd);
+    const point = { at: new Date().toISOString(), value };
+    const series = Array.isArray(history[metric]) ? history[metric] : [];
+    series.push(point);
+    history[metric] = series.slice(-MAX_POINTS);
+    try {
+      writeHistory(history, cwd);
+    } catch {
+      // best-effort by contract: an unwritable cache (e.g. read-only mount) must never fail a read-only tool call
+    }
+    return point;
+  } finally {
+    if (locked) releaseLock(cwd);
   }
-  return point;
 }
 
 /** Returns the most recent points for a metric (oldest first). */

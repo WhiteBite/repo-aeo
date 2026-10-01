@@ -23,6 +23,18 @@ export const githubChecks = [
       const configured = ctx.config.project.one_liner || ctx.config.project.description || null;
       const description = configured || live;
       if (!description) {
+        if (!ctx.github || !ctx.github.available) {
+          return finding({
+            id: 'github.description',
+            axis: 'github',
+            severity: 'info',
+            title: 'Repository description not checked (offline mode)',
+            why: this.why,
+            fix: 'Run `rdk audit --online` to read the live description, or set project.one_liner in .discoverability/project.yml.',
+            effort: 'S',
+            weight: this.weight,
+          });
+        }
         return finding({
           id: 'github.description',
           axis: 'github',
@@ -79,6 +91,18 @@ export const githubChecks = [
       const topics = uniq([...(live || []), ...configured].filter(Boolean)).map((t) => String(t));
       const count = topics.length;
       if (count === 0) {
+        if (!ctx.github || !ctx.github.available) {
+          return finding({
+            id: 'github.topics_count',
+            axis: 'github',
+            severity: 'info',
+            title: 'GitHub topics not checked (offline mode)',
+            why: this.why,
+            fix: 'Run `rdk audit --online` to read live topics, or fill keywords.github_topics in .discoverability/project.yml.',
+            effort: 'M',
+            weight: this.weight,
+          });
+        }
         return finding({
           id: 'github.topics_count',
           axis: 'github',

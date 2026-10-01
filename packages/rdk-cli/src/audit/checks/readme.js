@@ -2,7 +2,7 @@
  * Axis 2 — README primitives: first success path, examples, audience sections,
  * heading structure, verifiable claims, local link health.
  */
-import { check, finding, parseMarkdown, hasFirstSuccessPath, countQuantifiedClaims, normalizeHeading } from './_shared.js';
+import { check, finding, skip, parseMarkdown, hasFirstSuccessPath, countQuantifiedClaims, normalizeHeading } from './_shared.js';
 import { exists, readTextIfExists } from '../../util/fs.js';
 import { join } from 'node:path';
 
@@ -50,9 +50,7 @@ export const readmeChecks = [
     patchId: 'readme.quickstart_stub',
     run(ctx) {
       const text = readTextIfExists(join(ctx.cwd, 'README.md'));
-      if (text === null) {
-        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'README.md is missing', why: this.why, fix: this.fix, effort: this.effort, autoFixable: true, patchId: 'readme.generate', weight: this.weight });
-      }
+      if (text === null) return skip('README.md is missing');
       const path = hasFirstSuccessPath(text, 60);
       if (!path.install && !path.run) {
         return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'No install/run commands in the first 60 lines', why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'readme.quickstart_stub', weight: this.weight });
@@ -76,7 +74,7 @@ export const readmeChecks = [
     patchId: null,
     run(ctx) {
       const text = readTextIfExists(join(ctx.cwd, 'README.md'));
-      if (text === null) return null;
+      if (text === null) return skip('README.md is missing');
       const doc = parseMarkdown(text);
       const exampleSection = ['usage', 'examples', 'example', 'quickstart', 'getting started'].map(normalizeHeading).find((key) => doc.sections.has(key));
       const blocks = exampleSection ? doc.sections.get(exampleSection).body.match(/^(?:```|~~~)/gm) : null;
@@ -106,9 +104,7 @@ export const readmeChecks = [
     patchId: 'readme.sections_stub',
     run(ctx) {
       const text = readTextIfExists(join(ctx.cwd, 'README.md'));
-      if (text === null) {
-        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'README.md is missing', why: this.why, fix: 'Run `rdk init`.', effort: 'M', autoFixable: true, patchId: 'readme.generate', weight: this.weight });
-      }
+      if (text === null) return skip('README.md is missing');
       const doc = parseMarkdown(text);
       const present = REQUIRED_SECTIONS.filter((section) => {
         if (section.key === 'status') return STATUS_ALIASES.some((alias) => doc.sections.has(alias));
@@ -144,7 +140,7 @@ export const readmeChecks = [
     patchId: null,
     run(ctx) {
       const text = readTextIfExists(join(ctx.cwd, 'README.md'));
-      if (text === null) return null;
+      if (text === null) return skip('README.md is missing');
       const doc = parseMarkdown(text);
       const h2 = doc.headings.filter((h) => h.level === 2).length;
       const h1 = doc.headings.filter((h) => h.level === 1).length;
@@ -170,7 +166,7 @@ export const readmeChecks = [
     patchId: null,
     run(ctx) {
       const text = readTextIfExists(join(ctx.cwd, 'README.md'));
-      if (text === null) return null;
+      if (text === null) return skip('README.md is missing');
       const doc = parseMarkdown(text);
       const claims = countQuantifiedClaims(text);
       const hasSourceLink = doc.links.some((link) => /^https?:\/\//.test(link.url));
@@ -196,7 +192,7 @@ export const readmeChecks = [
     patchId: null,
     run(ctx) {
       const text = readTextIfExists(join(ctx.cwd, 'README.md'));
-      if (text === null) return null;
+      if (text === null) return skip('README.md is missing');
       const doc = parseMarkdown(text);
       const broken = [];
       for (const link of doc.links) {

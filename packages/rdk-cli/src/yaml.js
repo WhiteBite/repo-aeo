@@ -174,6 +174,11 @@ function parseList(lines, i, indent) {
   const out = [];
   while (i < lines.length && lines[i].indent === indent && lines[i].text.startsWith('- ')) {
     const text = lines[i].text.slice(2).trim();
+    if (/^"(?:[^"\\]|\\.)*"$/.test(text) || /^'(?:[^']|'')*'$/.test(text)) {
+      out.push(parseScalar(text));
+      i += 1;
+      continue;
+    }
     const match = /^("(?:[^"\\]|\\.)*"|'[^']*'|[^:]+?)\s*:(?:\s+(.*))?$/.exec(text);
     if (match) {
       // list of maps: `- key: value` with possible nested keys below

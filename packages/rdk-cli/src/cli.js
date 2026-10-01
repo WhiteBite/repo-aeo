@@ -113,7 +113,7 @@ export async function main(argv = process.argv.slice(2), io = {}) {
       }
       case 'audit':
       case 'score': {
-        const result = await auditCommand({ cwd, options: flags });
+        const result = await auditCommand({ cwd, options: { ...flags, github: flags.noGithub ? false : flags.github } });
         if (!flags.quiet) log(result.output);
         // The summary goes to stderr so stdout stays machine-parseable
         // (`--format json` / `--format github-comment` can be piped directly).
@@ -127,7 +127,7 @@ export async function main(argv = process.argv.slice(2), io = {}) {
         return result.ok ? 0 : 1;
       }
       case 'npm-surface': {
-        const result = npmSurfaceCommand({ cwd, options: flags });
+        const result = npmSurfaceCommand({ cwd, options: { ...flags, pack: flags.noPack ? false : flags.pack } });
         if (!flags.quiet) log(result.output);
         else log(`npm-surface: ${result.report ? `${result.report.name}@${result.report.version}` : 'no package'}`);
         return result.exitCode;

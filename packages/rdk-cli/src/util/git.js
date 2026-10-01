@@ -21,15 +21,30 @@ export function gitInfo(cwd = process.cwd()) {
   };
 }
 
+const SCHEME_URL = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//;
+const GIT_SCHEMES = new Set(['ssh:', 'git:', 'http:', 'https:']);
+
+function parseSchemeUrl(url) {
+  if (!SCHEME_URL.test(url)) return null;
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  if (!GIT_SCHEMES.has(parsed.protocol) || !parsed.hostname) return null;
+  const path = parsed.pathname.replace(/\/+$/, '').replace(/^\/+/, '').replace(/\.git$/, '');
+  const slash = path.indexOf('/');
+  if (slash === -1) return null;
+  return { host: parsed.hostname, owner: path.slice(0, slash), repo: path.slice(slash + 1) };
+}
+
 export function parseRemote(url) {
   if (!url) return { host: null, owner: null, repo: null };
-  // git@github.com:owner/repo.git
+  const scheme = parseSchemeUrl(url);
+  if (scheme) return scheme;
   const ssh = /^(?:git@|ssh:\/\/git@)([^/:]+)[:/]([^/]+)\/(.+?)(?:\.git)?\/?$/.exec(url);
   if (ssh) return { host: ssh[1], owner: ssh[2], repo: ssh[3] };
-  // https://github.com/owner/repo(.git)
-  const https = /^(?:https?:\/\/)([^/]+)\/([^/]+)\/(.+?)(?:\.git)?\/?$/.exec(url);
-  if (https) return { host: https[1], owner: https[2], repo: https[3] };
-  // github.com/owner/repo (shorthand)
   const short = /^(?:github\.com)[/:]([^/]+)\/(.+?)(?:\.git)?\/?$/.exec(url);
   if (short) return { host: 'github.com', owner: short[1], repo: short[2] };
   return { host: null, owner: null, repo: null };

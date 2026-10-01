@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { loadConfig, buildSeedConfig } from '../src/config.js';
 import { planPatches, applyPatches, PATCHES } from '../src/fix/patches.js';
 import { makeRepo, removeRepo } from './helpers.js';
@@ -89,6 +90,29 @@ test('topics normalisation rewrites non-canonical topics', () => {
     assert.match(text, /- "cli"/);
     assert.match(text, /- "developer-tools"/);
     assert.doesNotMatch(text, /- CLI/);
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('github.templates skips CODEOWNERS when the repository has no remote', () => {
+  const dir = makeRepo({ 'package.json': JSON.stringify({ name: 'no-remote' }) });
+  try {
+    applyPatches(planPatches(contextFor(dir), { only: ['github.templates'] }));
+    assert.ok(existsSync(join(dir, '.github', 'ISSUE_TEMPLATE', 'bug_report.md')));
+    assert.equal(existsSync(join(dir, '.github', 'CODEOWNERS')), false, 'never guess an owner for CODEOWNERS');
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('github.templates writes CODEOWNERS when the remote owner is known', () => {
+  const dir = makeRepo({ 'package.json': JSON.stringify({ name: 'with-remote' }) });
+  try {
+    execSync('git init -q . && git remote add origin git@github.com/someone-else/their-tool.git', { cwd: dir });
+    applyPatches(planPatches(contextFor(dir), { only: ['github.templates'] }));
+    const codeowners = readFileSync(join(dir, '.github', 'CODEOWNERS'), 'utf8');
+    assert.match(codeowners, /\* @someone-else/);
   } finally {
     removeRepo(dir);
   }

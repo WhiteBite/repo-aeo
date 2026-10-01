@@ -5,7 +5,7 @@
  */
 import { extname, join } from 'node:path';
 import { exists, listFiles, readTextIfExists, mtimeMs } from '../util/fs.js';
-import { repoOwner, toolDocUrl } from '../util/repo.js';
+import { repoOwnerStrict, toolDocUrl } from '../util/repo.js';
 
 function yamlList(items, indent = '  ') {
   if (!Array.isArray(items) || items.length === 0) return `${indent}[]`;
@@ -395,7 +395,6 @@ export function renderCitationCff(config, pkg) {
 message: "${message}"
 title: ${JSON.stringify(project.name || '')}
 version: ${JSON.stringify(String((config.version || '0.1.0')))}
-date-released: ${new Date().toISOString().slice(0, 10)}
 license: MIT
 type: software
 authors:
@@ -569,8 +568,10 @@ export function renderPrTemplate() {
  * assign their code to us.
  */
 export function renderCodeowners(cwd = process.cwd()) {
+  const owner = repoOwnerStrict(cwd);
+  if (!owner) return null;
   return `# Default owners for everything
-* @${repoOwner(cwd)}
+* @${owner}
 `;
 }
 

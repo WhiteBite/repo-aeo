@@ -26,6 +26,17 @@ import { record, trend, series } from './history.js';
 const execFileAsync = promisify(execFile);
 const USER_AGENT = `repo-aeo-mcp/0.1 (+${TOOL_HOME})`;
 
+/** Splits curl stdout (body plus the `-w '\n%{http_code}'` write-out) into body text and numeric status. */
+export function parseCurlStatus(stdout) {
+  const raw = String(stdout);
+  const split = raw.lastIndexOf('\n');
+  if (split !== -1) {
+    const status = Number.parseInt(raw.slice(split + 1).trim(), 10);
+    if (Number.isInteger(status) && status > 0) return { text: raw.slice(0, split), status };
+  }
+  return { text: raw, status: null };
+}
+
 /** GET a URL as text, falling back to curl when fetch() cannot reach the network. */
 async function httpGet(url, { timeoutMs = 10000, maxBytes = 512 * 1024 } = {}) {
   try {
@@ -43,10 +54,11 @@ async function httpGet(url, { timeoutMs = 10000, maxBytes = 512 * 1024 } = {}) {
     try {
       const { stdout } = await execFileAsync(
         'curl',
-        ['-sS', '-L', '--max-time', String(Math.ceil(timeoutMs / 1000)), '-A', USER_AGENT, url],
+        ['-sS', '-L', '--max-time', String(Math.ceil(timeoutMs / 1000)), '-A', USER_AGENT, '-w', '\\n%{http_code}', url],
         { timeout: timeoutMs + 2000, maxBuffer: maxBytes * 2 },
       );
-      return { ok: true, status: 200, text: String(stdout).slice(0, maxBytes), via: 'curl' };
+      const { text, status } = parseCurlStatus(stdout);
+      return { ok: status !== null && status < 400, status, text: text.slice(0, maxBytes), via: 'curl' };
     } catch {
       return { ok: false, status: null, text: '', error: String(fetchError.message || fetchError), via: 'none' };
     }

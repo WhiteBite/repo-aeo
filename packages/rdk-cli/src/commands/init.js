@@ -73,7 +73,7 @@ export function initCommand({ cwd, options = {} }) {
   lines.push('  1. Review .discoverability/project.yml — it is the source of truth for every generated file.');
   lines.push('  2. Fill in project.one_liner, audiences, use_cases, keywords and differentiators.');
   lines.push('  3. Run `rdk audit` for the score, then `rdk fix --dry-run` for the safe autofixes.');
-  return { ok: true, output: `${lines.join('\n')}\n`, written: options.apply ? applyPatches(planned) : [] };
+  return { ok: true, output: `${lines.join('\n')}\n`, written: [] };
 }
 
 export default { initCommand };

@@ -1,8 +1,3 @@
-/**
- * `rdk github-sync` — push the config's description / homepage / topics to
- * GitHub. Read-only by default: writes need --apply AND an --ack string, and
- * every call is logged with its reason.
- */
 import { createHash } from 'node:crypto';
 import { run } from '../util/proc.js';
 import { slugifyTopic, uniq } from '../audit/checks/_shared.js';
@@ -33,7 +28,7 @@ export function planDigest(plan) {
   return createHash('sha256').update(canonicalJson(plan)).digest('hex');
 }
 
-function gh(args, { cwd }) {
+function defaultGh(args, { cwd }) {
   return run('gh', args, { cwd, timeout: 20000 });
 }
 
@@ -44,7 +39,8 @@ export function resolveRepo(cwd, options) {
   return null;
 }
 
-export async function githubSyncCommand({ cwd, options = {}, config }) {
+export async function githubSyncCommand({ cwd, options = {}, config, ghRunner }) {
+  const gh = ghRunner || defaultGh;
   const lines = [];
   lines.push('# rdk github-sync');
   lines.push('');
@@ -57,6 +53,17 @@ export async function githubSyncCommand({ cwd, options = {}, config }) {
     if (!options.reason || String(options.reason).trim().length < 5) {
       lines.push('Refusing to write: pass --reason "<why this change is correct>" so the change is auditable.');
       return { ok: false, error: 'refusing to write: a non-trivial reason is required and is logged', output: `${lines.join('\n')}\n`, exitCode: 1, applied: [] };
+    }
+    if (options.plan_digest === undefined || options.plan_digest === null || String(options.plan_digest).trim() === '') {
+      lines.push('Refusing to write: --plan-digest is required so the write binds to the approved preview.');
+      return {
+        ok: false,
+        code: 'plan_digest_required',
+        error: 'refusing to write: --plan-digest is required - run the dry-run preview first and pass its Plan digest with --plan-digest',
+        output: `${lines.join('\n')}\n`,
+        exitCode: 1,
+        applied: [],
+      };
     }
   }
 
@@ -86,21 +93,27 @@ export async function githubSyncCommand({ cwd, options = {}, config }) {
   const liveTopics = uniq((live.repositoryTopics || []).map((t) => (t && t.name) || String(t)));
   const fields = Array.isArray(options.fields) && options.fields.length > 0 ? options.fields : null;
 
-  const plan = [];
+  const fullPlan = [];
   const wantDescription = config.project.one_liner || config.project.description || null;
-  if (options.topics !== false && JSON.stringify(desiredTopics) !== JSON.stringify(liveTopics)) {
-    plan.push({ field: 'topics', from: liveTopics, to: desiredTopics });
+  if (desiredTopics.length === 0) {
+    if (options.topics !== false) {
+      lines.push('desired topics empty - refusing to clear remote topics; fill keywords.github_topics in .discoverability/project.yml');
+      lines.push('');
+    }
+  } else if (options.topics !== false && JSON.stringify(desiredTopics) !== JSON.stringify(liveTopics)) {
+    fullPlan.push({ field: 'topics', from: liveTopics, to: desiredTopics });
   }
   if (options.description !== false && wantDescription && wantDescription !== (live.description || '')) {
-    plan.push({ field: 'description', from: live.description || '', to: wantDescription });
+    fullPlan.push({ field: 'description', from: live.description || '', to: wantDescription });
   }
   if (options.homepage !== false && config.links.homepage && config.links.homepage !== (live.homepageUrl || '')) {
-    plan.push({ field: 'homepage', from: live.homepageUrl || '', to: config.links.homepage });
+    fullPlan.push({ field: 'homepage', from: live.homepageUrl || '', to: config.links.homepage });
   }
 
+  const plan = fields ? fullPlan.filter((change) => fields.includes(change.field)) : fullPlan;
   const digest = planDigest(plan);
 
-  if (options.apply && options.plan_digest !== undefined && String(options.plan_digest) !== digest) {
+  if (options.apply && String(options.plan_digest) !== digest) {
     lines.push('Refusing to write: the plan changed since the approved preview (plan_digest mismatch).');
     return {
       ok: false,
@@ -134,8 +147,7 @@ export async function githubSyncCommand({ cwd, options = {}, config }) {
   }
 
   const applied = [];
-  const planned = fields ? plan.filter((change) => fields.includes(change.field)) : plan;
-  for (const change of planned) {
+  for (const change of plan) {
     let result;
     if (change.field === 'topics') {
       const args = ['api', '--method', 'PUT', `repos/${repo}/topics`];

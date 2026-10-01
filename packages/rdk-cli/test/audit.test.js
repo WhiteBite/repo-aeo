@@ -24,7 +24,7 @@ test('audit reports the expected findings on the bare demo fixture', async () =>
   }
 
   assert.equal(report.environment.offline, true);
-  assert.equal(report.score.total < 50, true, 'a bare repo must score low');
+  assert.equal(report.score.total < 60, true, 'a bare repo must score low');
   assert.equal(report.summary.errors > 0, true);
   assert.equal(report.score.axes.npm.applicable, true);
   assert.equal(report.score.axes.docs.applicable, true);

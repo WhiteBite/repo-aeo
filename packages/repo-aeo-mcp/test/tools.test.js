@@ -1,11 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { TOOLS, callTool, toolDescriptors, firstHeadingOf } from '../src/tools.js';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { TOOLS, callTool, toolDescriptors, firstHeadingOf, parseCurlStatus } from '../src/tools.js';
 import { record, series, trend, listMetrics, historyPath } from '../src/history.js';
+
+const HISTORY_MODULE_URL = pathToFileURL(join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'history.js')).href;
 
 /** A disposable directory so history never leaks between tests. */
 function sandbox() {
@@ -412,5 +415,70 @@ test('history writes are atomic and leave no temp files behind', () => {
     assert.equal(series('discoverability_score', 10, box.dir).length, 2);
   } finally {
     box.cleanup();
+  }
+});
+
+test('parseCurlStatus splits the write-out status line off the body', () => {
+  assert.deepEqual(parseCurlStatus('# docs\n\n- [Docs](https://example.com)\n200'), {
+    text: '# docs\n\n- [Docs](https://example.com)',
+    status: 200,
+  });
+  assert.deepEqual(parseCurlStatus('\n404'), { text: '', status: 404 });
+  assert.deepEqual(parseCurlStatus('body with trailing newline\n\n500'), { text: 'body with trailing newline\n', status: 500 });
+  assert.deepEqual(parseCurlStatus('no write-out at all'), { text: 'no write-out at all', status: null });
+  assert.deepEqual(parseCurlStatus('body\n000'), { text: 'body\n000', status: null });
+  assert.deepEqual(parseCurlStatus('body\nnot-a-status'), { text: 'body\nnot-a-status', status: null });
+  assert.deepEqual(parseCurlStatus(''), { text: '', status: null });
+});
+
+test('a corrupt cache file is rotated aside before history restarts empty', () => {
+  const box = sandbox();
+  try {
+    mkdirSync(join(box.dir, '.discoverability', 'cache'), { recursive: true });
+    writeFileSync(historyPath(box.dir), '{ not json');
+    record('discoverability_score', 71, box.dir);
+    const cacheDir = join(box.dir, '.discoverability', 'cache');
+    const rotated = readdirSync(cacheDir).filter((name) => /^metrics\.json\.corrupt-\d+$/.test(name));
+    assert.equal(rotated.length, 1, `expected one rotated corrupt file, got ${readdirSync(cacheDir).join(', ')}`);
+    assert.equal(readFileSync(join(cacheDir, rotated[0]), 'utf8'), '{ not json');
+    assert.equal(trend('discoverability_score', box.dir).last, 71);
+  } finally {
+    box.cleanup();
+  }
+});
+
+const RECORDER_SCRIPT = `
+const { record } = await import(process.env.HISTORY_MODULE);
+while (Date.now() < Number(process.env.START_AT)) {}
+record('concurrency', Number(process.env.TEST_VALUE), process.env.TEST_CWD);
+`;
+
+function spawnRecorder(box, value, startAt) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ['--input-type=module', '-e', RECORDER_SCRIPT], {
+      env: { ...process.env, HISTORY_MODULE: HISTORY_MODULE_URL, TEST_CWD: box.dir, TEST_VALUE: String(value), START_AT: String(startAt) },
+      stdio: ['ignore', 'ignore', 'pipe'],
+    });
+    let stderr = '';
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk;
+    });
+    child.on('error', reject);
+    child.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`recorder exited ${code}: ${stderr}`))));
+  });
+}
+
+test('concurrent record() calls from separate processes both land in the series', async () => {
+  for (let round = 0; round < 3; round += 1) {
+    const box = sandbox();
+    try {
+      const startAt = Date.now() + 400;
+      await Promise.all([spawnRecorder(box, 11, startAt), spawnRecorder(box, 22, startAt)]);
+      const values = series('concurrency', 10, box.dir).map((point) => point.value).sort((a, b) => a - b);
+      assert.deepEqual(values, [11, 22], `round ${round}: expected both points, got ${JSON.stringify(values)}`);
+    } finally {
+      box.cleanup();
+    }
   }
 });

@@ -528,7 +528,8 @@ export const PATCHES = [
       ];
       for (const [relative, content] of specs) {
         const path = join(ctx.cwd, relative);
-        if (exists(path)) continue;
+        // CODEOWNERS renders null when the remote owner is unknown: never guess one
+        if (exists(path) || content === null) continue;
         out.push(mutation(path, null, content));
       }
       return out;

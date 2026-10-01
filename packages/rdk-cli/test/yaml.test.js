@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parse, YamlError } from '../src/yaml.js';
+import { renderProjectYml } from '../src/generate/index.js';
 
 test('parses nested maps and lists', () => {
   const result = parse(`
@@ -81,4 +82,38 @@ test('throws on unexpected content', () => {
 test('empty document yields an object', () => {
   assert.deepEqual(parse(''), {});
   assert.deepEqual(parse('# only a comment\n'), {});
+});
+
+test('quoted list items containing colons parse as strings', () => {
+  const result = parse(`
+audiences:
+  - "a: b"
+  - plain
+keywords:
+  - "CLI: interface"
+  - 'single: quoted'
+`);
+  assert.deepEqual(result.audiences, ['a: b', 'plain']);
+  assert.deepEqual(result.keywords, ['CLI: interface', 'single: quoted']);
+});
+
+test('unquoted list item with a colon stays a map entry', () => {
+  const result = parse(`
+items:
+  - name: value
+`);
+  assert.deepEqual(result.items, [{ name: 'value' }]);
+});
+
+test('quoted key in a list item still splits on the trailing colon', () => {
+  const result = parse(`
+items:
+  - "a": b
+`);
+  assert.deepEqual(result.items, [{ a: 'b' }]);
+});
+
+test('renderProjectYml round-trips list items containing colons', () => {
+  const rendered = renderProjectYml({ audiences: ['a: b', 'plain'] });
+  assert.deepEqual(parse(rendered).audiences, ['a: b', 'plain']);
 });

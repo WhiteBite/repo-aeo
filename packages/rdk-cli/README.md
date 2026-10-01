@@ -20,7 +20,7 @@ npx repo-aeo --help
 | `rdk audit` | Discoverability Score 0–100 + findings with severity/why/fix/effort | never |
 | `rdk fix` | applies only safe, idempotent autofixes | with `--apply` |
 | `rdk npm-surface` | package.json publish surface + `npm pack --dry-run` hygiene | never |
-| `rdk github-sync` | pushes description/homepage/topics to GitHub | with `--apply --ack --reason` |
+| `rdk github-sync` | pushes description/homepage/topics to GitHub | with `--apply --ack --reason --plan-digest` |
 | `rdk skill install` | links the agent skill into OpenCode/Claude/Codex skill dirs (`uninstall`, `status`, `--project`) | with the subcommand |
 
 ## Output formats
@@ -37,7 +37,7 @@ npx repo-aeo audit --out report.md           # also write to a file
 - `audit` is read-only and offline by default; `--online` adds link checks and
   GitHub API reads.
 - `fix`/`init` are dry-run by default and write only with `--apply`.
-- `github-sync` requires `--apply --ack <ACK> --reason "<why>"`.
+- `github-sync` requires `--apply --ack <ACK> --reason "<why>" --plan-digest <DIGEST>` (the digest of the dry-run preview, so the write binds to the approved plan).
 - Nothing in this package publishes, tags, releases or force-pushes.
 
 ## Programmatic use

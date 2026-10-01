@@ -6,6 +6,17 @@ import { renderMarkdownReport } from '../report/markdown.js';
 import { renderGithubComment } from '../report/githubComment.js';
 
 export async function auditCommand({ cwd, options = {} }) {
+  const minScore = options.minScore === undefined || options.minScore === null ? undefined : Number(options.minScore);
+  if (Number.isNaN(minScore)) {
+    return {
+      ok: false,
+      report: null,
+      output: '',
+      summary: `rdk: --min-score must be a number, got ${JSON.stringify(String(options.minScore))}`,
+      exitCode: 1,
+    };
+  }
+
   const report = await audit(cwd, {
     online: Boolean(options.online),
     secretsDepth: options.secretsDepth,
@@ -38,7 +49,7 @@ export async function auditCommand({ cwd, options = {} }) {
     report.environment.offline ? 'mode: offline (use --online for link + GitHub checks)' : 'mode: online',
   ].join(' · ');
 
-  return { ok: true, report, output, summary, exitCode: options.minScore && report.score.total < Number(options.minScore) ? 2 : 0 };
+  return { ok: true, report, output, summary, exitCode: minScore !== undefined && report.score.total < minScore ? 2 : 0 };
 }
 
 export default { auditCommand };

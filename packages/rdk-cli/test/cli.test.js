@@ -5,6 +5,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { makeRepo, removeRepo } from './helpers.js';
+import { auditCommand } from '../src/commands/audit.js';
+import { initCommand } from '../src/commands/init.js';
 import { listFiles } from '../src/util/fs.js';
 
 const CLI = join(fileURLToPath(import.meta.url), '..', '..', 'bin', 'rdk.js');
@@ -32,9 +34,23 @@ test('--version and --help work', () => {
 });
 
 test('audit exits 2 when the score is below --min-score', () => {
-  const result = rdk(['audit', '--min-score', '100'], process.cwd());
-  assert.equal(result.status, 2);
-  assert.match(result.stderr, /score: \d+\/100/);
+  const dir = makeRepo({ 'package.json': JSON.stringify({ name: 'minscore', description: 'min score gate demo' }) });
+  try {
+    const result = rdk(['audit', '--min-score', '100'], dir);
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /score: \d+\/100/);
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('audit --min-score rejects non-numeric values with exit 1', () => {
+  const invalid = rdk(['audit', '--min-score', 'abc'], process.cwd());
+  assert.equal(invalid.status, 1);
+  assert.match(invalid.stderr, /--min-score must be a number/);
+
+  const zero = rdk(['audit', '--min-score', '0'], process.cwd());
+  assert.equal(zero.status, 0);
 });
 
 test('audit --format json emits pure JSON on stdout', () => {
@@ -151,6 +167,69 @@ test('npm-surface reports a blocking issue for a bare package.json', () => {
     assert.equal(result.status, 2);
     assert.match(result.stdout, /missing description/);
     assert.match(result.stdout, /never publishes/);
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('npm-surface --no-pack skips the tarball section', () => {
+  const dir = makeRepo({
+    'package.json': JSON.stringify({
+      name: 'nopack',
+      version: '0.0.1',
+      description: 'no pack demo',
+      main: 'index.js',
+      repository: { type: 'git', url: 'git+https://example.com/nopack.git' },
+      keywords: ['a', 'b', 'c', 'd', 'e'],
+      engines: { node: '>=18' },
+      files: ['index.js'],
+      scripts: { test: 'node --test' },
+    }),
+  });
+  try {
+    const result = rdk(['npm-surface', '--no-pack'], dir);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout, /## Publishability/);
+    assert.doesNotMatch(result.stdout, /## Tarball/);
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('auditCommand forwards github: false to the engine', async () => {
+  const dir = makeRepo({ 'package.json': JSON.stringify({ name: 'fwd', description: 'forwarding demo' }) });
+  try {
+    const disabled = await auditCommand({ cwd: dir, options: { online: true, github: false } });
+    assert.equal(disabled.report.environment.github_source, 'offline mode (pass --online to query GitHub)');
+
+    const enabled = await auditCommand({ cwd: dir, options: { online: true } });
+    assert.equal(enabled.report.environment.github_source, 'no GitHub remote detected');
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('audit --online --no-github skips GitHub reads', () => {
+  const dir = makeRepo({ 'package.json': JSON.stringify({ name: 'nogithub', description: 'no github demo' }) });
+  try {
+    const skipped = rdk(['audit', '--online', '--no-github', '--format', 'json'], dir);
+    assert.equal(skipped.status, 0, skipped.stdout + skipped.stderr);
+    assert.equal(JSON.parse(skipped.stdout).environment.github_source, 'offline mode (pass --online to query GitHub)');
+
+    const online = rdk(['audit', '--online', '--format', 'json'], dir);
+    assert.equal(JSON.parse(online.stdout).environment.github_source, 'no GitHub remote detected');
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('init dry run returns written: [] and writes nothing', () => {
+  const dir = makeRepo({ 'package.json': JSON.stringify({ name: 'initdry', description: 'init dry run demo' }) });
+  try {
+    const result = initCommand({ cwd: dir, options: {} });
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.written, []);
+    assert.equal(existsSync(join(dir, 'README.md')), false);
   } finally {
     removeRepo(dir);
   }

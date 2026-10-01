@@ -13,6 +13,17 @@ export function check({ id, axis, weight, title, why, fix, effort = 'S', autoFix
   return { id, axis, weight, title, why, fix, effort, autoFixable, patchId, run };
 }
 
+const SKIP_MARKER = Symbol('rdk.audit.skip');
+
+/** A check whose subject is absent: excluded from both passed and total tallies. */
+export function skip(reason) {
+  return { [SKIP_MARKER]: true, reason: String(reason) };
+}
+
+export function isSkip(result) {
+  return Boolean(result && typeof result === 'object' && result[SKIP_MARKER] === true);
+}
+
 const HEADING_RE = /^(#{1,6})\s+(.*?)\s*#*$/;
 const FENCE_RE = /^(?:```|~~~)\s*([A-Za-z0-9_+-]*)\s*$/;
 

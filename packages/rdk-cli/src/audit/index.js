@@ -9,11 +9,11 @@ import { gitInfo } from '../util/git.js';
 import { repoWebUrl } from '../util/repo.js';
 import { run } from '../util/proc.js';
 import { probeUrls, isProbeable } from '../util/http.js';
-import { parseMarkdown } from './checks/_shared.js';
+import { parseMarkdown, isSkip } from './checks/_shared.js';
 import { githubChecks } from './checks/github.js';
 import { readmeChecks } from './checks/readme.js';
 import { agentsChecks } from './checks/agents.js';
-import { npmChecks } from './checks/npm.js';
+import { npmChecks, npmPackageInvalidCheck } from './checks/npm.js';
 import { docsChecks } from './checks/docs.js';
 import { hygieneChecks } from './checks/hygiene.js';
 import { AXIS_WEIGHTS, computeScore } from './score.js';
@@ -97,16 +97,16 @@ export async function audit(cwd = process.cwd(), options = {}) {
     ...githubChecks,
     ...readmeChecks,
     ...agentsChecks,
-    ...(hasNpm ? npmChecks : []),
+    ...(hasNpm ? (publishable.pkg ? npmChecks : [npmPackageInvalidCheck]) : []),
     ...(hasSite ? docsChecks : []),
     ...hygieneChecks,
   ];
 
   const findings = [];
   const perAxis = {};
+  let ranChecks = 0;
   for (const definition of registry) {
     const tally = perAxis[definition.axis] || { passed: 0, total: 0 };
-    tally.total += 1;
     let result = null;
     try {
       result = definition.run(ctx);
@@ -124,11 +124,14 @@ export async function audit(cwd = process.cwd(), options = {}) {
         weight: definition.weight,
       };
     }
-    if (result === null || result === undefined) {
-      tally.passed += 1;
-    } else {
-      findings.push(result);
+    if (isSkip(result)) {
+      perAxis[definition.axis] = tally;
+      continue;
     }
+    ranChecks += 1;
+    tally.total += 1;
+    if (result !== null && result !== undefined) findings.push(result);
+    if (result === null || result === undefined || result.severity === 'info') tally.passed += 1;
     perAxis[definition.axis] = tally;
   }
 
@@ -139,14 +142,14 @@ export async function audit(cwd = process.cwd(), options = {}) {
   });
 
   const score = computeScore(perAxis, applicableAxes);
-  findings.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] || b.weight - a.weight);
+  findings.sort((a, b) => (SEVERITY_ORDER[a.severity] ?? SEVERITY_ORDER.info) - (SEVERITY_ORDER[b.severity] ?? SEVERITY_ORDER.info) || (b.weight || 0) - (a.weight || 0));
 
   const summary = {
     errors: findings.filter((f) => f.severity === 'error').length,
     warnings: findings.filter((f) => f.severity === 'warn').length,
     info: findings.filter((f) => f.severity === 'info').length,
     autofixable: findings.filter((f) => f.autoFixable).length,
-    checks: registry.length,
+    checks: ranChecks,
     passedChecks: Object.values(perAxis).reduce((sum, t) => sum + t.passed, 0),
   };
 

@@ -8,6 +8,7 @@ import {
   GENERATED_END,
   mergeGenerated,
   renderCodeowners,
+  renderCitationCff,
   renderProjectYml,
   renderReadme,
   renderJsonLd,
@@ -114,8 +115,20 @@ test('generated CODEOWNERS names the audited repository owner, not ours', () => 
     removeRepo(dir);
   }
 
-  // Without a remote the documented fallback still applies.
-  assert.match(renderCodeowners('/tmp'), /\* @WhiteBite$/m);
+  const noRemote = makeRepo();
+  try {
+    assert.equal(renderCodeowners(noRemote), null, 'no remote means no owner: CODEOWNERS must not guess one');
+  } finally {
+    removeRepo(noRemote);
+  }
+});
+
+test('renderCitationCff is deterministic and omits date-released', () => {
+  const config = { project: { name: 'cite-me', description: 'A citable project' }, keywords: { npm_keywords: ['cli'] } };
+  const first = renderCitationCff(config, null);
+  assert.equal(renderCitationCff(config, null), first);
+  assert.ok(!first.includes('date-released'), 'date-released made the generated file churn daily');
+  assert.match(first, /cff-version: 1\.2\.0/);
 });
 
 test('generated project.yml points at the tool documentation, not at the audited repo', () => {
