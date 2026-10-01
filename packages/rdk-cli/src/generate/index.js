@@ -53,10 +53,25 @@ export const GENERATED_END = '<!-- rdk:generated:end -->';
 
 export const HANDWRITTEN_NOTE = '<!-- Everything below the end marker is preserved by `rdk fix`. Put hand-written context here; the block above is regenerated from .discoverability/project.yml. -->';
 
+const HANDWRITTEN_HEADING = '## Hand-written notes';
+
+function findMarkers(text) {
+  const markers = [];
+  for (const [kind, marker] of [['start', GENERATED_START], ['end', GENERATED_END]]) {
+    let index = text.indexOf(marker);
+    while (index !== -1) {
+      markers.push({ kind, index, end: index + marker.length });
+      index = text.indexOf(marker, index + marker.length);
+    }
+  }
+  return markers.sort((a, b) => a.index - b.index);
+}
+
 /**
  * Merges freshly generated content into an existing file:
  *   - no file            -> generated content wrapped in markers + note
  *   - file with markers  -> only the marked region is replaced
+ *   - corrupted markers  -> healed: every span collapses into one fresh block
  *   - file without markers that differs from the generated content
  *                        -> treated as hand-edited and left untouched (the
  *                           caller reports it), so `rdk fix` never destroys
@@ -65,17 +80,39 @@ export const HANDWRITTEN_NOTE = '<!-- Everything below the end marker is preserv
 export function mergeGenerated(existing, generated) {
   const bodyRaw = String(generated).trim();
   if (existing === null || existing === undefined) {
-    return `${GENERATED_START}\n${bodyRaw}\n${GENERATED_END}\n\n## Hand-written notes\n\n${HANDWRITTEN_NOTE}\n`;
+    return `${GENERATED_START}\n${bodyRaw}\n${GENERATED_END}\n\n${HANDWRITTEN_HEADING}\n\n${HANDWRITTEN_NOTE}\n`;
   }
   const text = String(existing);
-  if (text.includes(GENERATED_START) && text.includes(GENERATED_END)) {
-    const eol = text.includes('\r\n') ? '\r\n' : '\n';
-    const body = eol === '\r\n' ? bodyRaw.replace(/\n/g, '\r\n') : bodyRaw;
-    const head = text.slice(0, text.indexOf(GENERATED_START));
-    const tail = text.slice(text.indexOf(GENERATED_END) + GENERATED_END.length);
-    return `${head}${GENERATED_START}${eol}${body}${eol}${GENERATED_END}${tail}`;
+  const markers = findMarkers(text);
+  if (markers.length === 0) return null; // hand-edited legacy file: caller must not overwrite
+  const eol = text.includes('\r\n') ? '\r\n' : '\n';
+  const body = eol === '\r\n' ? bodyRaw.replace(/\n/g, '\r\n') : bodyRaw;
+  const head = text.slice(0, markers[0].index);
+  const tailRaw = text.slice(markers[markers.length - 1].end);
+  const hasEnd = markers.some((marker) => marker.kind === 'end');
+  const middles = [];
+  let depth = 0;
+  for (let i = 0; i < markers.length - 1; i += 1) {
+    depth = Math.max(0, depth + (markers[i].kind === 'start' ? 1 : -1));
+    if (hasEnd && depth > 0) continue; // inside a start..end span: old generated body
+    const chunk = text.slice(markers[i].end, markers[i + 1].index);
+    if (chunk.trim() !== '') middles.push(chunk.trim());
   }
-  return null; // hand-edited legacy file: caller must not overwrite
+  let tail = tailRaw;
+  let separated = middles.length > 0;
+  if (!hasEnd) {
+    // orphan start: the region up to the heading is the old generated body
+    const heading = text.indexOf(HANDWRITTEN_HEADING, markers[markers.length - 1].index);
+    if (heading !== -1) {
+      tail = text.slice(heading);
+      separated = true;
+    }
+  }
+  if (!separated) return `${head}${GENERATED_START}${eol}${body}${eol}${GENERATED_END}${tail}`;
+  const parts = [...middles];
+  const tailContent = tail.replace(/^(?:\r?\n)+/, '');
+  if (tailContent.trim() !== '') parts.push(tailContent);
+  return `${head}${GENERATED_START}${eol}${body}${eol}${GENERATED_END}${eol}${eol}${parts.join(eol + eol)}`;
 }
 
 /**
@@ -412,7 +449,7 @@ export function renderCitationCff(config, pkg) {
   return `cff-version: 1.2.0
 message: "${message}"
 title: ${JSON.stringify(project.name || '')}
-version: ${JSON.stringify(String((config.version || '0.1.0')))}
+version: ${JSON.stringify(String(config.version || (pkg && pkg.version) || '0.1.0'))}
 license: MIT
 type: software
 authors:

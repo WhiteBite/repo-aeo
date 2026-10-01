@@ -142,6 +142,58 @@ test('bare rdk with no command prints usage and exits 0', () => {
   assert.match(flagOnly.stdout, /Usage:/);
 });
 
+test('skill install --project with a stray path is rejected before anything is written', () => {
+  const dir = makeRepo({
+    'package.json': JSON.stringify({ name: 'stray-skill', description: 'stray skill demo' }),
+    '.opencode/.keep': '',
+  });
+  try {
+    const result = rdk(['skill', 'install', '--project', 'C:\\some\\path'], dir);
+    assert.equal(result.status, 1);
+    assert.equal(result.stdout, '');
+    assert.match(result.stderr, /unexpected argument "C:\\some\\path" for command "skill"/);
+    assert.equal(existsSync(join(dir, '.opencode', 'skills')), false);
+    assert.equal(existsSync(join(dir, '.claude', 'skills')), false);
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('stray positional arguments are rejected with exit 1', () => {
+  const dir = makeRepo({ 'package.json': JSON.stringify({ name: 'stray', description: 'stray argument demo' }) });
+  try {
+    const auditStray = rdk(['audit', 'extra-arg'], dir);
+    assert.equal(auditStray.status, 1);
+    assert.match(auditStray.stderr, /unexpected argument "extra-arg" for command "audit"/);
+
+    const skillStray = rdk(['skill', 'install', 'C:\\some\\path'], dir);
+    assert.equal(skillStray.status, 1);
+    assert.match(skillStray.stderr, /unexpected argument "C:\\some\\path" for command "skill"/);
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('valid invocations are unaffected by the stray-argument guard', () => {
+  const dir = makeRepo({
+    'package.json': JSON.stringify({ name: 'valid-calls', description: 'valid invocation demo' }),
+    '.opencode/.keep': '',
+  });
+  try {
+    const status = rdk(['skill', 'status'], dir);
+    assert.equal(status.status, 0, status.stdout + status.stderr);
+
+    const audit = rdk(['audit'], dir);
+    assert.equal(audit.status, 0, audit.stdout + audit.stderr);
+
+    const project = rdk(['skill', 'install', '--project'], dir);
+    assert.equal(project.status, 0, project.stdout + project.stderr);
+    assert.ok(existsSync(join(dir, '.opencode', 'skills', 'repo-discoverability')));
+  } finally {
+    removeRepo(dir);
+  }
+});
+
 test('init --apply then fix --apply raises the score on a bare repo', () => {
   const dir = makeRepo({ 'package.json': JSON.stringify({ name: 'cli-demo', description: 'CLI demo project', scripts: { test: 'node --test', start: 'node .' } }) });
   try {

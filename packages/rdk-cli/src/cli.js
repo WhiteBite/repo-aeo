@@ -88,6 +88,25 @@ export function parseArgs(argv) {
   return { command: positional[0] || 'audit', flags, positional };
 }
 
+const POSITIONAL_LIMITS = {
+  init: 1,
+  audit: 1,
+  score: 1,
+  fix: 1,
+  'npm-surface': 1,
+  'github-sync': 1,
+  skill: 2,
+};
+
+function strayArgument(command, flags, positional) {
+  const limit = POSITIONAL_LIMITS[command];
+  if (limit === undefined) return undefined;
+  if (positional.length > limit) return positional[limit];
+  // --project is valueless for skill, so a value it swallowed is a hidden stray positional
+  if (command === 'skill' && typeof flags.project === 'string') return flags.project;
+  return undefined;
+}
+
 export async function main(argv = process.argv.slice(2), io = {}) {
   const { command, flags, positional } = parseArgs(argv);
   const log = io.log || ((text) => process.stdout.write(`${text}\n`));
@@ -105,6 +124,12 @@ export async function main(argv = process.argv.slice(2), io = {}) {
   if (positional.length === 0) {
     log(USAGE);
     return 0;
+  }
+
+  const stray = strayArgument(command, flags, positional);
+  if (stray !== undefined) {
+    error(`rdk: unexpected argument "${stray}" for command "${command}" (see --help)`);
+    return 1;
   }
 
   try {

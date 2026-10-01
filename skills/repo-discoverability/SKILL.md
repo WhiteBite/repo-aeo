@@ -71,7 +71,7 @@ Safe, idempotent autofixes (formatting, missing sections, stub files):
 node packages/rdk-cli/bin/rdk.js fix               # preview is the default
 node packages/rdk-cli/bin/rdk.js fix --apply       # only when the diff is right
 node packages/rdk-cli/bin/rdk.js npm-surface       # publish-surface report
-node packages/rdk-cli/bin/rdk.js github-sync       # preview is the default; writes need --apply --ack --reason
+node packages/rdk-cli/bin/rdk.js github-sync       # preview is the default; writes need --apply --ack --reason --plan-digest
 ```
 
 Everything else (real examples, version bumps, exports redesign, claims with
@@ -110,7 +110,7 @@ If the score dropped, revert the patch and re-plan.
 
 - Publishing, tagging, releasing and force-pushing are **out of scope** for this
   skill. If the user asks for them, stop and ask for an explicit ACK.
-- `github-sync` writes only with `--apply --ack <ACK> --reason "<why>"`.
+- `github-sync` writes only with `--apply --ack <ACK> --reason "<why>" --plan-digest <DIGEST>` (the digest of the dry-run preview, so the write binds to the approved plan).
 - Autofix branches are reviewable: the Action opens a PR instead of pushing to
   the default branch.
 

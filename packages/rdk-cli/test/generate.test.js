@@ -6,6 +6,7 @@ import { execSync } from 'node:child_process';
 import {
   GENERATED_START,
   GENERATED_END,
+  HANDWRITTEN_NOTE,
   mergeGenerated,
   renderCodeowners,
   renderCitationCff,
@@ -85,6 +86,71 @@ test('mergeGenerated wraps new files and preserves hand-written tails', () => {
   assert.equal(mergeGenerated('some hand written file', 'GENERATED BODY'), null);
 });
 
+test('mergeGenerated collapses duplicated marker spans into one fresh block', () => {
+  const duplicated = `head\n${GENERATED_START}\nSTALE ONE\n${GENERATED_END} ${GENERATED_START}\nSTALE TWO\n${GENERATED_END}\ntail\n`;
+  const merged = mergeGenerated(duplicated, 'FRESH');
+  assert.equal(merged.split(GENERATED_START).length - 1, 1);
+  assert.equal(merged.split(GENERATED_END).length - 1, 1);
+  assert.ok(merged.startsWith(`head\n${GENERATED_START}\n`));
+  assert.ok(merged.endsWith(`${GENERATED_END}\ntail\n`));
+  assert.ok(!merged.includes('STALE'));
+  assert.equal(mergeGenerated(merged, 'FRESH'), merged);
+});
+
+test('mergeGenerated preserves manual content between duplicated spans', () => {
+  const duplicated = `${GENERATED_START}\nOLD\n${GENERATED_END}\nmanual note\n${GENERATED_START}\nOLD2\n${GENERATED_END}\n\n## Hand-written notes\n\nkeep\n`;
+  const merged = mergeGenerated(duplicated, 'FRESH');
+  assert.equal(merged.split(GENERATED_START).length - 1, 1);
+  assert.equal(merged.split(GENERATED_END).length - 1, 1);
+  assert.ok(!merged.includes('OLD'));
+  assert.ok(merged.includes('manual note'));
+  assert.ok(merged.includes('## Hand-written notes'));
+  assert.ok(merged.includes('keep'));
+  assert.ok(merged.indexOf('manual note') < merged.indexOf('## Hand-written notes'));
+  assert.equal(mergeGenerated(merged, 'FRESH'), merged);
+});
+
+test('mergeGenerated heals an orphan start marker, dropping the stale body at the heading', () => {
+  const orphan = `${GENERATED_START}\nSTALE BODY\n\n## Hand-written notes\n\n${HANDWRITTEN_NOTE}\nmanual survives\n`;
+  const merged = mergeGenerated(orphan, 'FRESH');
+  assert.equal(merged.split(GENERATED_START).length - 1, 1);
+  assert.equal(merged.split(GENERATED_END).length - 1, 1);
+  assert.ok(!merged.includes('STALE BODY'));
+  assert.ok(merged.includes('## Hand-written notes'));
+  assert.ok(merged.includes('manual survives'));
+  assert.equal(mergeGenerated(merged, 'FRESH'), merged);
+});
+
+test('mergeGenerated heals an orphan start marker without a heading, losing nothing', () => {
+  const orphan = `head\n${GENERATED_START}\nold body\nmanual tail\n`;
+  const merged = mergeGenerated(orphan, 'FRESH');
+  assert.equal(merged.split(GENERATED_START).length - 1, 1);
+  assert.equal(merged.split(GENERATED_END).length - 1, 1);
+  assert.ok(merged.includes('old body'));
+  assert.ok(merged.includes('manual tail'));
+  assert.equal(mergeGenerated(merged, 'FRESH'), merged);
+});
+
+test('mergeGenerated heals an orphan end marker without losing content', () => {
+  const orphan = `old body\n${GENERATED_END}\n\n## Hand-written notes\n\nkeep\n`;
+  const merged = mergeGenerated(orphan, 'FRESH');
+  assert.equal(merged.split(GENERATED_START).length - 1, 1);
+  assert.equal(merged.split(GENERATED_END).length - 1, 1);
+  assert.ok(merged.includes('old body'));
+  assert.ok(merged.includes('## Hand-written notes'));
+  assert.ok(merged.includes('keep'));
+  assert.equal(mergeGenerated(merged, 'FRESH'), merged);
+});
+
+test('mergeGenerated healing keeps CRLF files CRLF', () => {
+  const duplicated = `head\r\n${GENERATED_START}\r\nOLD\r\n${GENERATED_END}\r\n${GENERATED_START}\r\nOLD2\r\n${GENERATED_END}\r\ntail\r\n`;
+  const merged = mergeGenerated(duplicated, 'FRESH\nLINE');
+  assert.equal(merged.split(GENERATED_START).length - 1, 1);
+  assert.ok(merged.includes('FRESH\r\nLINE'));
+  assert.equal(merged.replace(/\r\n/g, '').includes('\n'), false);
+  assert.equal(mergeGenerated(merged, 'FRESH\nLINE'), merged);
+});
+
 test('rdk fix does not clobber a hand-edited llms.txt', () => {
   const dir = makeRepo({ 'package.json': JSON.stringify({ name: 'keep-mine', description: 'Keep mine' }) });
   try {
@@ -93,6 +159,25 @@ test('rdk fix does not clobber a hand-edited llms.txt', () => {
     writeFileSync(llmsPath, '# my own llms.txt\n\nhand written, no markers\n', 'utf8');
     applyPatches(planPatches(contextFor(dir), { only: ['llms.generate'] }));
     assert.equal(readFileSync(llmsPath, 'utf8'), '# my own llms.txt\n\nhand written, no markers\n');
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('rdk fix heals a corrupted llms.txt with duplicated marker spans', () => {
+  const dir = makeRepo({ 'package.json': JSON.stringify({ name: 'heal-me', description: 'Heal me' }) });
+  try {
+    applyPatches(planPatches(contextFor(dir), { only: ['llms.generate'] }));
+    const llmsPath = join(dir, 'llms.txt');
+    writeFileSync(llmsPath, `${GENERATED_START}\nSTALE\n${GENERATED_END}${GENERATED_START}\nSTALE2\n${GENERATED_END}\n\n## Hand-written notes\n\nmanual\n`, 'utf8');
+    applyPatches(planPatches(contextFor(dir), { only: ['llms.generate'] }));
+    const healed = readFileSync(llmsPath, 'utf8');
+    assert.equal(healed.split(GENERATED_START).length - 1, 1);
+    assert.equal(healed.split(GENERATED_END).length - 1, 1);
+    assert.ok(!healed.includes('STALE'));
+    assert.ok(healed.includes('manual'));
+    applyPatches(planPatches(contextFor(dir), { only: ['llms.generate'] }));
+    assert.equal(readFileSync(llmsPath, 'utf8'), healed);
   } finally {
     removeRepo(dir);
   }
@@ -181,6 +266,26 @@ test('renderCitationCff is deterministic and omits date-released', () => {
   assert.equal(renderCitationCff(config, null), first);
   assert.ok(!first.includes('date-released'), 'date-released made the generated file churn daily');
   assert.match(first, /cff-version: 1\.2\.0/);
+});
+
+test('renderCitationCff takes the version from the package when the config has none', () => {
+  const config = { project: { name: 'cite-me', description: 'A citable project' } };
+  assert.match(renderCitationCff(config, { name: 'cite-me', version: '2.0.0' }), /version: "2\.0\.0"/);
+  assert.match(renderCitationCff({ ...config, version: '9.9.9' }, { version: '2.0.0' }), /version: "9\.9\.9"/);
+  assert.match(renderCitationCff(config, null), /version: "0\.1\.0"/);
+});
+
+test('citation stub takes the version from package.json', () => {
+  const dir = makeRepo({
+    'package.json': JSON.stringify({ name: 'cite-version', version: '2.0.0', description: 'Citable' }),
+  });
+  try {
+    applyPatches(planPatches(contextFor(dir), { only: ['citation.stub'] }));
+    const cff = readFileSync(join(dir, 'CITATION.cff'), 'utf8');
+    assert.match(cff, /version: "2\.0\.0"/);
+  } finally {
+    removeRepo(dir);
+  }
 });
 
 test('generated project.yml points at the tool documentation, not at the audited repo', () => {
