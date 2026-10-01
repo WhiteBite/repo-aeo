@@ -1,7 +1,7 @@
 {
   "name": "repo-aeo",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Repo Discoverability Kit (RDK): make any repository, npm package and docs site maximally findable and recommendable for humans, AI agents and search engines.",
   "type": "module",
   "license": "MIT",

@@ -62,7 +62,7 @@ export function renderGithubComment(report, { maxFindings = 8 } = {}) {
   ];
   lines.push(...checklist);
   lines.push('');
-  lines.push(`<sub>Automated by <a href="${report.project?.repo_url || TOOL_HOME}">Repo Discoverability Kit</a> · audit-only by default, no writes performed</sub>`);
+  lines.push(`<sub>Automated by <a href="${TOOL_HOME}">Repo Discoverability Kit</a> · audit-only by default, no writes performed</sub>`);
   lines.push('');
   return lines.join('\n');
 }

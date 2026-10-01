@@ -51,7 +51,7 @@ export function initCommand({ cwd, options = {} }) {
   }
 
   if (options.apply) {
-    const written = applyPatches(planned);
+    const written = [...new Set(applyPatches(planned))];
     lines.push(`Applied ${planned.length} patch group(s), wrote ${written.length} file(s):`);
     for (const path of written) lines.push(`  + ${path.replace(`${cwd}/`, '')}`);
     return { ok: true, output: `${lines.join('\n')}\n`, written };

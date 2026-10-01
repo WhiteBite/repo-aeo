@@ -6,7 +6,7 @@
 import { join, dirname } from 'node:path';
 import { readJsonIfExists, exists } from '../util/fs.js';
 import { resolvePackage } from '../config.js';
-import { run } from '../util/proc.js';
+import { run, npmBinary } from '../util/proc.js';
 
 function exportsSummary(pkg) {
   if (!pkg.exports) return { present: false, conditions: [], subpaths: [], main: pkg.main || null };
@@ -38,9 +38,11 @@ function exportsSummary(pkg) {
 }
 
 function packDryRun(cwd, packageDir) {
+  // Node forbids spawning .cmd without a shell (CVE-2024-27980); quote the path arg for cmd.exe.
+  const winShell = process.platform === 'win32';
   const args = ['pack', '--dry-run', '--json'];
-  if (packageDir && packageDir !== cwd) args.push(packageDir);
-  const npm = run('npm', args, { cwd, timeout: 60000 });
+  if (packageDir && packageDir !== cwd) args.push(winShell ? `"${packageDir}"` : packageDir);
+  const npm = run(npmBinary(), args, { cwd, timeout: 60000, shell: winShell });
   if (!npm.ok) return { ok: false, error: npm.stderr.trim().slice(0, 200) || 'npm pack failed' };
   try {
     const json = JSON.parse(npm.stdout);

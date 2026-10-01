@@ -105,8 +105,8 @@ $ npx repo-aeo npm-surface --pack
 - uses: actions/checkout@v4
 - uses: actions/setup-node@v4
   with: { node-version: '22' }
-- run: npx --yes repo-aeo@^0.2.0 audit --format github-comment --online
-- run: npx --yes repo-aeo@^0.2.0 audit --format json --online --min-score "${{ github.event.inputs.min_score || vars.RDK_MIN_SCORE || 0 }}"
+- run: npx --yes repo-aeo@^0.3.0 audit --format github-comment --online
+- run: npx --yes repo-aeo@^0.3.0 audit --format json --online --min-score "${{ github.event.inputs.min_score || vars.RDK_MIN_SCORE || 0 }}"
 ```
 
 The CLI itself never force-pushes; the workflow's opt-in autofix job (gated by

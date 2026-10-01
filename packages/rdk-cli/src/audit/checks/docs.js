@@ -115,9 +115,14 @@ export const docsChecks = [
         return finding({ id: this.id, axis: this.axis, severity: 'info', title: 'Link health not checked (offline mode)', why: this.why, fix: 'Run `rdk audit --online` to probe outbound links.', effort: 'S', weight: this.weight });
       }
       const results = ctx.online && ctx.online.linkResults ? ctx.online.linkResults : [];
-      const broken = results.filter((result) => !result.ok);
+      const broken = results.filter((result) => !result.ok && result.status !== 429);
+      const rateLimited = results.filter((result) => !result.ok && result.status === 429);
       if (broken.length > 0) {
-        return finding({ id: this.id, axis: this.axis, severity: 'error', title: `${broken.length} broken outbound link(s)`, why: this.why, fix: `Broken: ${broken.slice(0, 5).map((b) => `${b.url} (${b.status || b.error})`).join(', ')}`, effort: 'M', weight: this.weight });
+        const extra = rateLimited.length > 0 ? ` (plus ${rateLimited.length} rate-limited, inconclusive)` : '';
+        return finding({ id: this.id, axis: this.axis, severity: 'error', title: `${broken.length} broken outbound link(s)`, why: this.why, fix: `Broken: ${broken.slice(0, 5).map((b) => `${b.url} (${b.status || b.error})`).join(', ')}${extra}`, effort: 'M', weight: this.weight });
+      }
+      if (rateLimited.length > 0) {
+        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: `${rateLimited.length} link(s) rate-limited (HTTP 429) — health inconclusive`, why: this.why, fix: `Re-run the audit later; the site is alive but rate-limited: ${rateLimited.slice(0, 5).map((b) => b.url).join(', ')}`, effort: 'S', weight: this.weight });
       }
       return null;
     },
