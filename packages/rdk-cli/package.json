@@ -1,6 +1,6 @@
 {
   "name": "repo-aeo",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Audit and improve repository discoverability: GitHub metadata and topics, README structure, AGENTS.md, npm package surface, llms.txt and structured data.",
   "type": "module",
   "license": "MIT",
@@ -23,14 +23,16 @@
     "README.md",
     "llms.txt",
     "llms-full.txt",
-    "AGENTS.md"
+    "AGENTS.md",
+    "skills"
   ],
   "sideEffects": false,
   "engines": {
     "node": ">=18"
   },
   "scripts": {
-    "test": "node ../../scripts/run-tests.mjs test"
+    "test": "node ../../scripts/run-tests.mjs test",
+    "prepack": "node ./prepack.mjs"
   },
   "keywords": [
     "cli",

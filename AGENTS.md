@@ -35,7 +35,7 @@ every change.
 | `packages/rdk-cli/src/audit/score.js` | axis weights and the 0–100 model |
 | `packages/rdk-cli/src/fix/patches.js` | idempotent safe autofix patches |
 | `packages/rdk-cli/src/generate/index.js` | deterministic artifact generators |
-| `packages/rdk-cli/src/commands/` | CLI commands (init, audit, fix, npm-surface, github-sync) |
+| `packages/rdk-cli/src/commands/` | CLI commands (init, audit, fix, npm-surface, github-sync, skill) |
 | `packages/repo-aeo-mcp/src/tools.js` | the 8 MCP tools; every tool is read-only except the guarded sync |
 | `packages/repo-aeo-mcp/src/history.js` | metric history in `.discoverability/cache/metrics.json` (trends) |
 | `packages/repo-aeo-mcp/src/server.js` | dependency-free MCP stdio JSON-RPC 2.0 transport |

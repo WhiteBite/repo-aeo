@@ -21,6 +21,7 @@ npx repo-aeo --help
 | `rdk fix` | applies only safe, idempotent autofixes | with `--apply` |
 | `rdk npm-surface` | package.json publish surface + `npm pack --dry-run` hygiene | never |
 | `rdk github-sync` | pushes description/homepage/topics to GitHub | with `--apply --ack --reason` |
+| `rdk skill install` | links the agent skill into OpenCode/Claude/Codex skill dirs (`uninstall`, `status`, `--project`) | with the subcommand |
 
 ## Output formats
 

@@ -4,6 +4,7 @@ import { initCommand } from './commands/init.js';
 import { fixCommand } from './commands/fix.js';
 import { githubSyncCommand } from './commands/githubSync.js';
 import { npmSurfaceCommand } from './commands/npmSurface.js';
+import { skillCommand } from './commands/skill.js';
 import { loadConfig } from './config.js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -17,6 +18,7 @@ Usage:
   rdk fix                  Show (or apply) safe autofixes
   rdk npm-surface          Audit the publishable package.json surface
   rdk github-sync          Push description/homepage/topics to GitHub (needs --apply --ack)
+  rdk skill <install|uninstall|status>  Link the agent skill into harness skill dirs (--project: repo-local)
 
 Common flags:
   --format <json|markdown|github-comment|both>   report format (default markdown)
@@ -87,7 +89,7 @@ export function parseArgs(argv) {
 }
 
 export async function main(argv = process.argv.slice(2), io = {}) {
-  const { command, flags } = parseArgs(argv);
+  const { command, flags, positional } = parseArgs(argv);
   const log = io.log || ((text) => process.stdout.write(`${text}\n`));
   const error = io.error || ((text) => process.stderr.write(`${text}\n`));
   const cwd = flags.cwd ? String(flags.cwd) : process.cwd();
@@ -133,6 +135,11 @@ export async function main(argv = process.argv.slice(2), io = {}) {
       case 'github-sync': {
         const loaded = loadConfig(cwd);
         const result = await githubSyncCommand({ cwd, options: { ...flags, plan_digest: flags.planDigest }, config: loaded.config });
+        if (!flags.quiet) log(result.output);
+        return result.exitCode;
+      }
+      case 'skill': {
+        const result = skillCommand({ cwd, options: { ...flags, action: positional[1] || 'status' } });
         if (!flags.quiet) log(result.output);
         return result.exitCode;
       }

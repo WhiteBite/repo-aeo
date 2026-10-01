@@ -11,6 +11,7 @@ export { auditCommand } from './commands/audit.js';
 export { fixCommand } from './commands/fix.js';
 export { initCommand } from './commands/init.js';
 export { npmSurfaceCommand } from './commands/npmSurface.js';
+export { skillCommand, skillSourceDir, skillTargets } from './commands/skill.js';
 export { resolvePackage } from './config.js';
 export { TOOL_HOME, DEFAULT_OWNER, repoWebUrl, repoOwner, toolDocUrl } from './util/repo.js';
 export { generatedDrift, GENERATED_START, GENERATED_END, mergeGenerated } from './generate/index.js';

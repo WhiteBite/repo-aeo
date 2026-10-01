@@ -16,3 +16,5 @@ rdk-report.md
 *.log
 .DS_Store
 .env
+
+packages/rdk-cli/skills/
