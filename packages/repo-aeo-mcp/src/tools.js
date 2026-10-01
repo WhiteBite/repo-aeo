@@ -570,7 +570,7 @@ export const TOOLS = [
     name: 'github_sync_metadata',
     title: 'Sync metadata to GitHub',
     description:
-      'Write the description, homepage and topics from .discoverability/project.yml to GitHub. This is the only write tool: it requires the acknowledgement string and a reason, both of which are logged to the local history.',
+      'Write the description, homepage and topics from .discoverability/project.yml to GitHub. This is the only write tool: it requires the acknowledgement string and a reason (both logged to the local history), and apply additionally requires either an accepted elicitation confirmation from the user or the plan_digest of a preview.',
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     inputSchema: {
       type: 'object',
@@ -612,7 +612,52 @@ export const TOOLS = [
       }
       // Preview first: an agent must opt in to the write, exactly like `rdk fix`.
       const apply = args.apply === true;
-      if (apply && typeof args.plan_digest !== 'string') {
+      const preview = await githubSyncCommand({
+        cwd,
+        options: { apply: false, ack: args.ack, reason: args.reason, repo: args.repo, fields: args.fields },
+        config,
+      });
+      if (!apply) {
+        return {
+          ok: preview.ok !== false,
+          applied: false,
+          dry_run: true,
+          mutations: [],
+          mutation_count: 0,
+          plan: Array.isArray(preview.plan) ? preview.plan : [],
+          plan_digest: typeof preview.plan_digest === 'string' ? preview.plan_digest : null,
+          repo: args.repo || null,
+          reason: args.reason,
+          code: preview.code || null,
+          error: preview.error || null,
+          output: preview.output,
+          history: series('github_sync', 5, cwd),
+        };
+      }
+      let digest = typeof args.plan_digest === 'string' ? args.plan_digest : null;
+      const canElicit = typeof context.request === 'function' && Boolean(context.clientCapabilities && context.clientCapabilities.elicitation);
+      if (canElicit) {
+        let elicitation;
+        try {
+          elicitation = await context.request('elicitation/create', {
+            mode: 'form',
+            message: `Approve GitHub metadata sync for ${args.repo || 'the resolved repository'} (plan digest ${preview.plan_digest}): ${JSON.stringify(preview.plan || [])}`,
+            requestedSchema: {
+              type: 'object',
+              properties: { approve: { type: 'boolean', description: 'Approve this exact plan' } },
+              required: ['approve'],
+              additionalProperties: false,
+            },
+          });
+        } catch (error) {
+          return { ok: false, code: 'elicitation_failed', error: `refusing to write: elicitation failed: ${error.message}` };
+        }
+        if (!elicitation || elicitation.action !== 'accept' || !(elicitation.content && elicitation.content.approve === true)) {
+          return { ok: false, code: 'elicitation_declined', error: 'refusing to write: the confirmation request was declined or cancelled' };
+        }
+        digest = typeof preview.plan_digest === 'string' ? preview.plan_digest : digest;
+      }
+      if (!digest) {
         return {
           ok: false,
           code: 'plan_digest_required',
@@ -621,7 +666,7 @@ export const TOOLS = [
       }
       const result = await githubSyncCommand({
         cwd,
-        options: { apply, ack: args.ack, reason: args.reason, repo: args.repo, fields: args.fields, plan_digest: args.plan_digest },
+        options: { apply: true, ack: args.ack, reason: args.reason, repo: args.repo, fields: args.fields, plan_digest: digest },
         config,
       });
       const mutations = Array.isArray(result.applied) ? result.applied : [];

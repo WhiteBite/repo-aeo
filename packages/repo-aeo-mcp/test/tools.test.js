@@ -335,6 +335,31 @@ test('every tool descriptor carries a human-readable title', () => {
   }
 });
 
+test('github_sync_metadata confirms apply through elicitation when the client supports it', async () => {
+  const box = sandbox();
+  try {
+    const asked = [];
+    const accepting = {
+      cwd: box.dir,
+      clientCapabilities: { elicitation: {} },
+      request: async (method) => {
+        asked.push(method);
+        return { action: 'accept', content: { approve: true } };
+      },
+    };
+    const accepted = await callTool('github_sync_metadata', { ack: 'I_ACK_RDK_GITHUB_WRITE', reason: 'elicited write', apply: true }, accepting);
+    assert.deepEqual(asked, ['elicitation/create']);
+    assert.notEqual(accepted.code, 'elicitation_declined', 'an accepted elicitation must pass the confirmation gate');
+
+    const declining = { ...accepting, request: async () => ({ action: 'decline' }) };
+    const declined = await callTool('github_sync_metadata', { ack: 'I_ACK_RDK_GITHUB_WRITE', reason: 'elicited write', apply: true }, declining);
+    assert.equal(declined.code, 'elicitation_declined');
+    assert.equal(declined.ok, false);
+  } finally {
+    box.cleanup();
+  }
+});
+
 test('the skill MCP manifest dogfood numbers match the live tool registry', () => {
   const manifestPath = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'skills', 'repo-discoverability', 'references', 'mcp-manifest.md');
   const text = readFileSync(manifestPath, 'utf8');

@@ -1,7 +1,51 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { handleMessage, serve, PROTOCOL_VERSION, SERVER_NAME, SERVER_VERSION } from '../src/server.js';
+
+test('serve routes a server-initiated elicitation request and waits for the client answer', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'rdk-elic-'));
+  const input = new PassThrough();
+  const chunks = [];
+  const output = {
+    write(chunk) {
+      chunks.push(String(chunk));
+      return true;
+    },
+  };
+  const served = serve({ input, output, cwd: dir });
+  const messages = () => chunks
+    .join('')
+    .split('\n')
+    .filter((line) => line.trim() !== '')
+    .map((line) => JSON.parse(line));
+  const waitFor = async (predicate) => {
+    for (let i = 0; i < 100; i += 1) {
+      const found = messages().find(predicate);
+      if (found) return found;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    throw new Error('timed out waiting for a server message');
+  };
+  try {
+    input.write(`${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-11-25', capabilities: { elicitation: {} }, clientInfo: { name: 't', version: '0' } } })}\n`);
+    input.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`);
+    input.write(`${JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'github_sync_metadata', arguments: { ack: 'I_ACK_RDK_GITHUB_WRITE', reason: 'transport elicitation', apply: true } } })}\n`);
+    const request = await waitFor((message) => message.method === 'elicitation/create');
+    assert.match(String(request.id), /^server-/);
+    input.write(`${JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { action: 'decline' } })}\n`);
+    const final = await waitFor((message) => message.id === 2);
+    const payload = JSON.parse(final.result.content[0].text);
+    assert.equal(payload.code, 'elicitation_declined');
+  } finally {
+    input.end();
+    await served;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test('initialize answers with the protocol version and server info', async () => {
   const response = await handleMessage({
@@ -23,7 +67,7 @@ test('initialize answers with the protocol version and server info', async () =>
   assert.equal(response.result.serverInfo.name, SERVER_NAME);
   assert.equal(response.result.serverInfo.version, SERVER_VERSION);
   assert.ok(response.result.instructions.length > 20, 'the server must tell agents how to behave');
-  assert.deepEqual(response.result.capabilities, { tools: { listChanged: false } });
+  assert.deepEqual(response.result.capabilities, { tools: { listChanged: false }, elicitation: {} });
 });
 
 test('notifications never produce a response', async () => {

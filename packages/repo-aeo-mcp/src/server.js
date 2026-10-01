@@ -55,9 +55,10 @@ export async function handleMessage(message, context = {}) {
 
   switch (method) {
     case 'initialize':
+      if (context && params && params.capabilities) context.clientCapabilities = params.capabilities;
       return jsonRpcResult(id, {
         protocolVersion: params && SUPPORTED_PROTOCOL_VERSIONS.has(params.protocolVersion) ? params.protocolVersion : PROTOCOL_VERSION,
-        capabilities: { tools: { listChanged: false } },
+        capabilities: { tools: { listChanged: false }, elicitation: {} },
         serverInfo: { name: SERVER_NAME, version: SERVER_VERSION, title: 'Repo Discoverability Kit MCP server' },
         instructions:
           'Read-only by default. github_sync_metadata is the only write tool and requires an acknowledgement string plus a reason. Use repo_get_discoverability_score and repo_list_findings to work through improvements.',
@@ -110,7 +111,21 @@ export async function serve({
   const { createInterface } = await import('node:readline');
   const rl = createInterface({ input, crlfDelay: Infinity });
   const context = { cwd, readOnly: readOnly === true };
+  const pending = new Map();
+  let serverRequestId = 0;
+  context.request = (method, params, timeoutMs = 120000) =>
+    new Promise((resolve, reject) => {
+      serverRequestId += 1;
+      const requestId = `server-${serverRequestId}`;
+      const timer = setTimeout(() => {
+        pending.delete(requestId);
+        reject(new Error(`client did not answer ${method} within ${timeoutMs} ms`));
+      }, timeoutMs);
+      pending.set(requestId, { resolve, timer });
+      output.write(`${JSON.stringify({ jsonrpc: '2.0', id: requestId, method, params })}\n`);
+    });
 
+  const inFlight = [];
   for await (const line of rl) {
     const trimmed = line.trim();
     if (trimmed === '') continue;
@@ -121,11 +136,32 @@ export async function serve({
       output.write(`${JSON.stringify(jsonRpcError(null, JSON_RPC_ERRORS.parse, `invalid JSON: ${error.message}`))}\n`);
       continue;
     }
-    const response = await handleMessage(message, context);
-    if (response !== null) {
-      output.write(`${JSON.stringify(response)}\n`);
+    if (message && typeof message === 'object' && message.id !== undefined && (message.result !== undefined || message.error !== undefined) && pending.has(message.id)) {
+      const waiter = pending.get(message.id);
+      pending.delete(message.id);
+      clearTimeout(waiter.timer);
+      if (message.error) waiter.reject(new Error(message.error.message || 'client returned an error'));
+      else waiter.resolve(message.result);
+      continue;
     }
+    // invariant: the loop must stay free to read client answers while a handler awaits elicitation
+    inFlight.push(
+      Promise.resolve()
+        .then(async () => {
+          const response = await handleMessage(message, context);
+          if (response !== null) output.write(`${JSON.stringify(response)}\n`);
+        })
+        .catch((error) => {
+          const failedId = message && message.id !== undefined && message.id !== null ? message.id : null;
+          output.write(`${JSON.stringify(jsonRpcError(failedId, JSON_RPC_ERRORS.internal, String((error && error.message) || error)))}\n`);
+        }),
+    );
   }
+  for (const waiter of pending.values()) {
+    clearTimeout(waiter.timer);
+    waiter.reject(new Error('connection closed before the client answered'));
+  }
+  await Promise.allSettled(inFlight);
 }
 
 export default { serve, handleMessage, SERVER_NAME, SERVER_VERSION, PROTOCOL_VERSION };

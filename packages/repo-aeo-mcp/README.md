@@ -58,7 +58,10 @@ Every tool is annotated `readOnlyHint: true` except `github_sync_metadata`, whic
 
 1. requires `ack` to equal `I_ACK_RDK_GITHUB_WRITE`,
 2. requires a `reason` of at least 5 characters, which is stored in the local history,
-3. **previews by default** - pass `apply: true` only after reviewing `output`.
+3. **previews by default** - pass `apply: true` only after reviewing `output`,
+4. **binds the write to the approved preview** - `apply: true` requires the
+   `plan_digest` from the preview response, or, on clients that support MCP
+   elicitation, an accepted confirmation request carrying the same digest.
 
 The ack and reason rules are enforced by the CLI command on every write; this tool additionally requires both on every call and previews until `apply: true`.
 
