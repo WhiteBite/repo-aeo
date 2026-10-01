@@ -10,3 +10,6 @@
 *.woff binary
 *.woff2 binary
 *.pdf binary
+
+# CRLF fixture must survive checkout on every platform
+fixtures/demo-repo-crlf/** text eol=crlf

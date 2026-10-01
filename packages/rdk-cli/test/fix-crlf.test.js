@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fixCommand } from '../src/commands/fix.js';
@@ -8,6 +8,11 @@ import { fixCommand } from '../src/commands/fix.js';
 function copyCrlfFixture() {
   const dir = mkdtempSync(join(tmpdir(), 'rdk-crlf-'));
   cpSync(join(process.cwd(), 'fixtures', 'demo-repo-crlf'), dir, { recursive: true });
+  // git EOL normalisation may hand us LF; the fixture's CRLF-ness is the test input
+  for (const name of ['README.md', 'package.json']) {
+    const path = join(dir, name);
+    writeFileSync(path, readFileSync(path, 'utf8').replace(/\r\n/g, '\n').replace(/\n/g, '\r\n'));
+  }
   return dir;
 }
 
