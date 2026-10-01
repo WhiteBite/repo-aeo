@@ -26,6 +26,16 @@ export function isSkip(result) {
 
 const HEADING_RE = /^(#{1,6})\s+(.*?)\s*#*$/;
 const FENCE_RE = /^(?:```|~~~)\s*([A-Za-z0-9_+-]*)\s*$/;
+const SETEXT_RE = /^(=+|-+)$/;
+const HTML_HEADING_RE = /^<h([1-6])(?:\s[^>]*)?>(.*?)<\/h\1>\s*$/i;
+
+function isParagraphLine(line) {
+  if (line === undefined) return false;
+  const trimmed = line.trim();
+  if (trimmed === '') return false;
+  if (FENCE_RE.test(line)) return false;
+  return !HEADING_RE.test(trimmed) && !SETEXT_RE.test(trimmed) && !HTML_HEADING_RE.test(trimmed);
+}
 
 /** Parses a Markdown document into headings, sections, fenced code blocks and links. */
 export function parseMarkdown(text) {
@@ -56,6 +66,21 @@ export function parseMarkdown(text) {
     const headingMatch = HEADING_RE.exec(line);
     if (headingMatch) {
       const heading = { level: headingMatch[1].length, text: headingMatch[2].trim(), line: i + 1 };
+      headings.push(heading);
+      current = { heading, lines: [] };
+      continue;
+    }
+    const trimmed = line.trim();
+    if (SETEXT_RE.test(trimmed) && isParagraphLine(lines[i - 1])) {
+      // heading.line anchors on the underline: section bodies and patch splices start after the heading
+      const heading = { level: trimmed[0] === '=' ? 1 : 2, text: lines[i - 1].trim(), line: i + 1 };
+      headings.push(heading);
+      current = { heading, lines: [] };
+      continue;
+    }
+    const htmlMatch = HTML_HEADING_RE.exec(trimmed);
+    if (htmlMatch) {
+      const heading = { level: Number(htmlMatch[1]), text: htmlMatch[2].replace(/<[^>]*>/g, '').trim(), line: i + 1 };
       headings.push(heading);
       current = { heading, lines: [] };
       continue;

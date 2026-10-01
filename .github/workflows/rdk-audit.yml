@@ -62,27 +62,16 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Resolve the rdk CLI
-        id: cli
-        run: |
-          # Prefer the published package, fall back to the in-repo copy so the
-          # workflow also works before the first release.
-          if npx --yes repo-aeo@^0.3.0 --version >/dev/null 2>&1; then
-            echo "command=npx --yes repo-aeo@^0.3.0" >> "$GITHUB_OUTPUT"
-          else
-            echo "command=node packages/rdk-cli/bin/rdk.js" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Run discoverability audit
-        id: audit
+      # Same in-repo CLI as the guard and autofix jobs: the PR is gated by its own code.
+      - name: Run discoverability audit (PR comment)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set +e
-          MIN_SCORE="${{ github.event.inputs.min_score || vars.RDK_MIN_SCORE || 0 }}"
-          ${{ steps.cli.outputs.command }} audit --format github-comment --online --out rdk-comment.md
-          ${{ steps.cli.outputs.command }} audit --format json --online --out rdk-report.json --min-score "$MIN_SCORE"
-          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+        run: node action/run-audit.mjs node packages/rdk-cli/bin/rdk.js audit --format github-comment --online --out rdk-comment.md
+
+      - name: Run discoverability audit (min-score gate)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node action/run-audit.mjs node packages/rdk-cli/bin/rdk.js audit --format json --online --out rdk-report.json --min-score "${{ github.event.inputs.min_score || vars.RDK_MIN_SCORE || 0 }}"
 
       - name: Publish PR comment
         if: always() && github.event_name == 'pull_request'
@@ -120,13 +109,6 @@ jobs:
                 body,
               });
             }
-
-      - name: Fail when the score is below the threshold
-        if: steps.audit.outputs.exit_code == '2'
-        run: |
-          echo "::error::Discoverability score is below the configured minimum."
-          node -e "const r=require('./rdk-report.json');console.log('score:',r.score.total,'grade:',r.score.grade)"
-          exit 1
 
       - name: Upload the JSON report
         if: always()

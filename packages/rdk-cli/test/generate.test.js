@@ -11,6 +11,8 @@ import {
   renderCitationCff,
   renderProjectYml,
   renderReadme,
+  renderAgentsMd,
+  renderLlmsTxt,
   renderJsonLd,
 } from '../src/generate/index.js';
 import { parse } from '../src/yaml.js';
@@ -100,6 +102,34 @@ test('generated README links only to URLs that exist in the config', () => {
   const readme = renderReadme({ project: { name: 'links-check', one_liner: 'Check the links' }, links: {} });
   const urls = [...readme.matchAll(/\]\((https?:\/\/[^)]+)\)/g)].map((m) => m[1]);
   assert.deepEqual(urls, []);
+});
+
+test('renderReadme renders only commands the package actually has', () => {
+  const readme = renderReadme({ project: { name: 'no-scripts', one_liner: 'No scripts' } }, { name: 'no-scripts' });
+  assert.match(readme, /npm install no-scripts/);
+  assert.doesNotMatch(readme, /npm (start|test|start --help)/);
+  assert.doesNotMatch(readme, /Run the tests:/);
+});
+
+test('renderReadme omits the Quickstart section when no real command exists', () => {
+  const readme = renderReadme({ project: { name: 'nothing-real' } }, null);
+  assert.doesNotMatch(readme, /## Quickstart/);
+  assert.doesNotMatch(readme, /```bash/);
+});
+
+test('renderAgentsMd omits the commands block when nothing real exists', () => {
+  const agents = renderAgentsMd({ project: { name: 'no-scripts' } }, { name: 'no-scripts' });
+  assert.doesNotMatch(agents, /```bash/);
+  assert.doesNotMatch(agents, /npm (start|test)/);
+});
+
+test('renderLlmsTxt omits the Key facts section when the config has none', () => {
+  const llms = renderLlmsTxt({ project: { name: 'bare-facts', one_liner: 'Bare' } }, null, '# bare-facts\n');
+  assert.doesNotMatch(llms, /## Key facts/);
+  assert.match(llms, /## Optional/);
+
+  const withFacts = renderLlmsTxt({ project: { name: 'facts', one_liner: 'Facts' }, quickstart: { install: 'npm i facts' }, use_cases: ['a'] }, null, '# facts\n');
+  assert.match(withFacts, /## Key facts\n\n- Install: `npm i facts`\n- Use cases: a\n/);
 });
 
 test('generated CODEOWNERS names the audited repository owner, not ours', () => {

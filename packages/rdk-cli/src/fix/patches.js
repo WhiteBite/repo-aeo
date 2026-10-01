@@ -8,7 +8,7 @@
  */
 import { join } from 'node:path';
 import { exists, readTextIfExists, writeText, readJsonIfExists } from '../util/fs.js';
-import { parseMarkdown, slugifyTopic, uniq } from '../audit/checks/_shared.js';
+import { parseMarkdown, slugifyTopic, uniq, normalizeHeading } from '../audit/checks/_shared.js';
 import {
   renderProjectYml,
   renderReadme,
@@ -27,6 +27,7 @@ import {
   renderContributingMd,
   mergeGenerated,
   repositoryUrl,
+  deriveQuickstartCommands,
 } from '../generate/index.js';
 
 const GITIGNORE_DEFAULTS = ['node_modules/', 'dist/', 'build/', '*.log', '.DS_Store', '.env'];
@@ -95,6 +96,32 @@ function readmeBase(ctx) {
   return { path, onDisk, before };
 }
 
+function dominantEol(text) {
+  const value = String(text);
+  const crlf = (value.match(/\r\n/g) || []).length;
+  const lf = (value.match(/(?<!\r)\n/g) || []).length;
+  return crlf > lf ? '\r\n' : '\n';
+}
+
+function withEol(text, eol) {
+  return eol === '\n' ? text : text.replace(/\r?\n/g, '\r\n');
+}
+
+function h2Sections(text) {
+  const sections = [];
+  let current = null;
+  for (const line of String(text).split('\n')) {
+    if (/^##\s/.test(line)) {
+      if (current) sections.push(current);
+      current = [line];
+    } else if (current) {
+      current.push(line);
+    }
+  }
+  if (current) sections.push(current);
+  return sections;
+}
+
 /** Returns the body of the section that should hold examples. */
 function exampleSectionBody(doc) {
   const key = ['examples', 'usage', 'example', 'quickstart', 'getting started'].find((candidate) => doc.sections.has(candidate));
@@ -149,16 +176,28 @@ export const PATCHES = [
   {
     id: 'readme.generate',
     title: 'Generate README.md from the config',
-    description: 'Creates a structured README scaffold (quickstart, audiences, use cases, examples, why, status).',
+    description: 'Creates the README scaffold; a README under 200 chars (the readme.exists threshold) keeps every hand-written line and gets the missing scaffold sections appended.',
     risk: 'safe',
     applies(ctx) {
       const path = join(ctx.cwd, 'README.md');
-      return !exists(path) || readTextIfExists(path).trim().length < 40;
+      if (!exists(path)) return true;
+      return readTextIfExists(path).trim().length < 200;
     },
     mutations(ctx) {
       const path = join(ctx.cwd, 'README.md');
       const before = exists(path) ? readTextIfExists(path) : null;
-      return [mutation(path, before, renderReadme(ctx.config, ctx.pkg))];
+      if (before === null) return [mutation(path, null, renderReadme(ctx.config, ctx.pkg))];
+      const existing = parseMarkdown(before);
+      const additions = [];
+      for (const sectionLines of h2Sections(renderReadme(ctx.config, ctx.pkg))) {
+        const heading = /^##\s+(.*?)\s*$/.exec(sectionLines[0])[1];
+        if (existing.sections.has(normalizeHeading(heading))) continue;
+        additions.push(sectionLines.join('\n').replace(/\s*$/, ''));
+      }
+      if (additions.length === 0) return [];
+      const eol = dominantEol(before);
+      const after = `${before.replace(/\s*$/, '')}${eol}${eol}${withEol(additions.join('\n\n'), eol)}${eol}`;
+      return [mutation(path, before, after)];
     },
   },
 
@@ -187,7 +226,9 @@ export const PATCHES = [
           additions.push(`## ${section.heading}`, '', (ctx.config.differentiators || []).map((d) => `- ${d}`).join('\n') || '<!-- TODO: 2-4 differentiators, with numbers -->', '');
         }
       }
-      const after = `${before.replace(/\s*$/, '')}\n\n${additions.join('\n').trim()}\n`;
+      if (additions.length === 0) return [];
+      const eol = dominantEol(before);
+      const after = `${before.replace(/\s*$/, '')}${eol}${eol}${withEol(additions.join('\n').trim(), eol)}${eol}`;
       return [mutation(path, before, after)];
     },
   },
@@ -208,7 +249,10 @@ export const PATCHES = [
     mutations(ctx) {
       const path = join(ctx.cwd, 'README.md');
       const before = readTextIfExists(path);
-      const lines = before.split('\n');
+      const doc = parseMarkdown(before);
+      if (doc.sections.has('quickstart') || doc.sections.has('getting started')) return [];
+      const eol = dominantEol(before);
+      const lines = before.split(/\r?\n/);
       const quickstart = ctx.config.quickstart || {};
       const block = [
         '## Quickstart',
@@ -225,7 +269,7 @@ export const PATCHES = [
       if (insertAt === -1) insertAt = 0;
       else insertAt += 1;
       lines.splice(insertAt, 0, ...block);
-      return [mutation(path, before, lines.join('\n'))];
+      return [mutation(path, before, lines.join(eol))];
     },
   },
 
@@ -420,39 +464,37 @@ export const PATCHES = [
   {
     id: 'readme.examples_stub',
     title: 'Add example stubs to the README',
-    description: 'Inserts a runnable-looking example stub when the examples/usage section has fewer than two code blocks.',
+    description: 'Inserts a runnable-looking example stub when the examples/usage section has no code block.',
     risk: 'safe',
     applies(ctx) {
+      if (!deriveQuickstartCommands(ctx.config, ctx.pkg).run) return false;
       const doc = parseMarkdown(readmeBase(ctx).before);
       const body = exampleSectionBody(doc);
       const blocks = (body.match(/^(?:```|~~~)/gm) || []).length / 2;
-      return blocks < 2;
+      return blocks < 1;
     },
     mutations(ctx) {
       const { path, before } = readmeBase(ctx);
-      const quickstart = ctx.config.quickstart || {};
-      const run = quickstart.run || 'npm start';
-      const stub = [
-        '',
-        '### Example (replace with a real one)',
-        '',
-        '```bash',
-        run,
-        '```',
-        '',
-      ].join('\n');
+      const run = deriveQuickstartCommands(ctx.config, ctx.pkg).run;
+      if (!run) return [];
       const doc = parseMarkdown(before);
       const sectionKey = ['examples', 'usage', 'example'].find((key) => doc.sections.has(key));
+      if (sectionKey) {
+        const blocks = (doc.sections.get(sectionKey).body.match(/^(?:```|~~~)/gm) || []).length / 2;
+        if (blocks >= 1) return [];
+      }
+      const eol = dominantEol(before);
+      const stubLines = ['', '### Example (replace with a real one)', '', '```bash', run, '```', ''];
       let after;
       if (sectionKey) {
         // insert the stub right after the section heading
         const heading = doc.sections.get(sectionKey).heading;
-        const lines = before.split('\n');
-        lines.splice(heading.line, 0, ...stub.split('\n'));
-        after = lines.join('\n');
+        const lines = before.split(/\r?\n/);
+        lines.splice(heading.line, 0, ...stubLines);
+        after = lines.join(eol);
       } else {
         // no examples section: append one instead of polluting the quickstart
-        after = `${before.replace(/\s*$/, '')}\n\n## Examples${stub}`;
+        after = `${before.replace(/\s*$/, '')}${eol}${eol}## Examples${stubLines.join(eol)}`;
       }
       return [mutation(path, before, after)];
     },

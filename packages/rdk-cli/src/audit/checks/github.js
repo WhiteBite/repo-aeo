@@ -115,13 +115,16 @@ export const githubChecks = [
         });
       }
       if (count < 8) {
+        const invalid = topics.filter((t) => slugifyTopic(t) !== t).length;
         return finding({
           id: 'github.topics_count',
           axis: 'github',
           severity: 'warn',
           title: `Only ${count} GitHub topics (target 8–20)`,
           why: this.why,
-          fix: `Add ${8 - count} more topics. Mix category terms (e.g. "cli", "developer-tools") with capability terms ("llms-txt", "agents-md").`,
+          fix: invalid > 0
+            ? `Add ${8 - count} more topics and replace the ${invalid} non-canonical one(s) flagged by the topics format check — their canonical forms count toward the total.`
+            : `Add ${8 - count} more topics. Mix category terms (e.g. "cli", "developer-tools") with capability terms ("llms-txt", "agents-md").`,
           effort: 'M',
           weight: this.weight,
         });

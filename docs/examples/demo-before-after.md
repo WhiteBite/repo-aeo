@@ -18,26 +18,26 @@ npx repo-aeo audit            # after
 ```text
 # Discoverability audit — demo-widget
 
-**Score: 29/100 (grade F)** — generated 2026-10-01T11:39:26.287Z
+**Score: 51/100 (grade F)** — generated 2026-10-01T14:24:16.040Z
 
-██████░░░░░░░░░░░░░░ 29/100
+██████████░░░░░░░░░░ 51/100
 
 | Axis | Score | Weight | Status |
 | --- | --- | --- | --- |
-| GitHub metadata | 50/100 | 20 | 2/4 checks passed |
-| README primitives | 14/100 | 25 | 1/7 checks passed |
+| GitHub metadata | 100/100 | 20 | complete |
+| README primitives | 29/100 | 25 | 2/7 checks passed |
 | Agent readiness | 60/100 | 15 | 3/5 checks passed |
-| npm readiness | 20/100 | 20 | 2/10 checks passed |
-| Docs readiness | 17/100 | 12 | 1/6 checks passed |
-| Trust & hygiene | 11/100 | 8 | 1/9 checks passed |
+| npm readiness | 40/100 | 20 | 4/10 checks passed |
+| Docs readiness | 33/100 | 12 | 2/6 checks passed |
+| Trust & hygiene | 33/100 | 8 | 3/9 checks passed |
 
-Checks: 10/41 passed · errors 12 · warnings 13 · info 6 · autofixable 20
+Checks: 18/41 passed · errors 10 · warnings 13 · info 8 · autofixable 20
 ```
 
 ## Step 1 — `rdk init --apply`
 
 ```text
-Applied 14 patch group(s), wrote 16 file(s):
+Applied 15 patch group(s), wrote 16 file(s):
   + .discoverability/project.yml
   + README.md
   + AGENTS.md
@@ -59,21 +59,15 @@ Applied 14 patch group(s), wrote 16 file(s):
 ## Step 2 — `rdk fix --apply`
 
 ```text
-Applied 6 patch group(s) in 2 passes:
-  - llms.generate: Generate llms.txt and llms-full.txt
+Applied 3 patch group(s):
   - package.metadata: Seed package.json metadata from the config
   - package.keywords: Top up package.json keywords from the config
   - package.engines: Declare engines.node
-  - readme.examples_stub: Add example stubs to the README
-  - llms.generate: Generate llms.txt and llms-full.txt
 
-Wrote 6 file(s):
-  + llms-full.txt
+Wrote 3 file(s):
   + package.json
   + package.json
   + package.json
-  + README.md
-  + llms-full.txt
 
 Reminder: AGENTS.md and README stubs are drafts — review them by hand before committing.
 Never publish, tag or force-push from an autofix branch without an explicit ACK.
@@ -84,20 +78,20 @@ Never publish, tag or force-push from an autofix branch without an explicit ACK.
 ```text
 # Discoverability audit — demo-widget
 
-**Score: 73/100 (grade C)** — generated 2026-10-01T11:39:26.796Z
+**Score: 83/100 (grade B)** — generated 2026-10-01T14:30:30.143Z
 
-███████████████░░░░░ 73/100
+█████████████████░░░ 83/100
 
 | Axis | Score | Weight | Status |
 | --- | --- | --- | --- |
 | GitHub metadata | 75/100 | 20 | 3/4 checks passed |
-| README primitives | 71/100 | 25 | 5/7 checks passed |
+| README primitives | 86/100 | 25 | 6/7 checks passed |
 | Agent readiness | 80/100 | 15 | 4/5 checks passed |
-| npm readiness | 50/100 | 20 | 5/10 checks passed |
-| Docs readiness | 83/100 | 12 | 5/6 checks passed |
+| npm readiness | 70/100 | 20 | 7/10 checks passed |
+| Docs readiness | 100/100 | 12 | complete |
 | Trust & hygiene | 100/100 | 8 | complete |
 
-Checks: 31/41 passed · errors 0 · warnings 6 · info 4 · autofixable 3
+Checks: 35/41 passed · errors 0 · warnings 6 · info 4 · autofixable 2
 ```
 
 ## What the generated files look like
@@ -115,31 +109,34 @@ project:
 audiences: []
 ```
 
-`README.md` after autofix (scaffolded quickstart + sections + example stub):
+`README.md` after autofix (hand-written lines preserved verbatim, scaffold
+sections appended):
 
 ```markdown
 # demo-widget
+
+A small demo package used to show what the Repo Discoverability Kit changes.
+
+Install it and look at the source.
+
 ## Quickstart
+
+**Prerequisites:** Node.js >= 18
 
 ```bash
 npm install demo-widget
 npm run start
 ```
 
-
-A small demo package used to show what the Repo Discoverability Kit changes.
-
-Install it and look at the source.
-
 ## Who is it for
 
-<!-- TODO: who is this for? -->
+<!-- TODO: describe the primary audiences (1-3 bullets) -->
 
 ## Use cases
 
-<!-- TODO: 3-7 concrete use cases -->
+<!-- TODO: list 3-7 concrete use cases -->
 
-## Why choose this
+## Examples
 ```
 
 The findings that remain after autofix are the honest, manual ones: a real

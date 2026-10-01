@@ -36,6 +36,17 @@ function commandFor(pkg, candidates, fallback) {
   return fallback;
 }
 
+// Real quickstart commands only: configured in project.yml or backed by an existing package.json script.
+export function deriveQuickstartCommands(config, pkg) {
+  const quickstart = (config && config.quickstart) || {};
+  const scripts = scriptsOf(pkg);
+  return {
+    install: quickstart.install || (pkg && pkg.name ? `npm install ${pkg.name}` : null),
+    run: quickstart.run || (scripts.start ? 'npm run start' : scripts.dev ? 'npm run dev' : null),
+    test: quickstart.test || (scripts.test ? 'npm run test' : scripts['test:unit'] ? 'npm run test:unit' : null),
+  };
+}
+
 /** Markers that separate generated content from hand-written content. */
 export const GENERATED_START = '<!-- rdk:generated:start -->';
 export const GENERATED_END = '<!-- rdk:generated:end -->';
@@ -153,9 +164,7 @@ export function renderReadme(config, pkg, options = {}) {
   const name = project.name || (pkg && pkg.name) || 'project';
   const oneLiner = project.one_liner || project.description || 'One-line description goes here.';
   const quickstart = config.quickstart || {};
-  const install = quickstart.install || `npm install ${name}`;
-  const run = quickstart.run || 'npm start';
-  const test = quickstart.test || 'npm test';
+  const { install, run, test } = deriveQuickstartCommands(config, pkg);
   const prerequisites = Array.isArray(quickstart.prerequisites) ? quickstart.prerequisites : [];
 
   const lines = [];
@@ -163,23 +172,29 @@ export function renderReadme(config, pkg, options = {}) {
   lines.push('');
   lines.push(oneLiner);
   lines.push('');
-  lines.push('## Quickstart');
-  lines.push('');
-  if (prerequisites.length > 0) {
-    lines.push(`**Prerequisites:** ${prerequisites.join(', ')}`);
+  if (install || run || test) {
+    lines.push('## Quickstart');
     lines.push('');
+    if (prerequisites.length > 0) {
+      lines.push(`**Prerequisites:** ${prerequisites.join(', ')}`);
+      lines.push('');
+    }
+    if (install || run) {
+      lines.push('```bash');
+      if (install) lines.push(install);
+      if (run) lines.push(run);
+      lines.push('```');
+      lines.push('');
+    }
+    if (test) {
+      lines.push('Run the tests:');
+      lines.push('');
+      lines.push('```bash');
+      lines.push(test);
+      lines.push('```');
+      lines.push('');
+    }
   }
-  lines.push('```bash');
-  lines.push(install);
-  lines.push(run);
-  lines.push('```');
-  lines.push('');
-  lines.push('Run the tests:');
-  lines.push('');
-  lines.push('```bash');
-  lines.push(test);
-  lines.push('```');
-  lines.push('');
   lines.push('## Who is it for');
   lines.push('');
   if (Array.isArray(config.audiences) && config.audiences.length > 0) {
@@ -200,10 +215,12 @@ export function renderReadme(config, pkg, options = {}) {
   lines.push('');
   lines.push('<!-- TODO: add 2-5 short, runnable examples -->');
   lines.push('');
-  lines.push('```bash');
-  lines.push(`${run} --help`);
-  lines.push('```');
-  lines.push('');
+  if (run) {
+    lines.push('```bash');
+    lines.push(`${run} --help`);
+    lines.push('```');
+    lines.push('');
+  }
   lines.push('## Why choose this');
   lines.push('');
   if (Array.isArray(config.differentiators) && config.differentiators.length > 0) {
@@ -230,10 +247,9 @@ export function renderReadme(config, pkg, options = {}) {
 }
 
 export function renderAgentsMd(config, pkg) {
-  const scripts = scriptsOf(pkg);
   const project = config.project || {};
   const quickstart = config.quickstart || {};
-  const test = quickstart.test || commandFor(pkg, ['test', 'test:unit'], 'npm test');
+  const { test } = deriveQuickstartCommands(config, pkg);
   const lint = commandFor(pkg, ['lint', 'format'], null);
   const build = commandFor(pkg, ['build', 'compile'], null);
 
@@ -249,25 +265,20 @@ export function renderAgentsMd(config, pkg) {
   lines.push('');
   lines.push('## Commands');
   lines.push('');
-  lines.push('```bash');
-  lines.push(`# run the test suite`);
-  lines.push(test);
-  if (lint) {
-    lines.push('');
-    lines.push('# lint / format');
-    lines.push(lint);
+  const commandGroups = [];
+  if (test) commandGroups.push(['# run the test suite', test]);
+  if (lint) commandGroups.push(['# lint / format', lint]);
+  if (build) commandGroups.push(['# build', build]);
+  if (quickstart.install) commandGroups.push(['# install dependencies', quickstart.install]);
+  if (commandGroups.length > 0) {
+    lines.push('```bash');
+    commandGroups.forEach(([comment, command], index) => {
+      if (index > 0) lines.push('');
+      lines.push(comment);
+      lines.push(command);
+    });
+    lines.push('```');
   }
-  if (build) {
-    lines.push('');
-    lines.push('# build');
-    lines.push(build);
-  }
-  if (quickstart.install) {
-    lines.push('');
-    lines.push('# install dependencies');
-    lines.push(quickstart.install);
-  }
-  lines.push('```');
   lines.push('');
   lines.push('## Repository map');
   lines.push('');
@@ -319,18 +330,22 @@ export function renderLlmsTxt(config, pkg, readmeText) {
     lines.push('- [README.md](./README.md): install, run and test instructions');
   }
   lines.push('');
-  lines.push('## Key facts');
-  lines.push('');
   const quickstart = config.quickstart || {};
-  if (quickstart.install) lines.push(`- Install: \`${quickstart.install}\``);
-  if (quickstart.run) lines.push(`- Run: \`${quickstart.run}\``);
-  if (quickstart.test) lines.push(`- Test: \`${quickstart.test}\``);
+  const facts = [];
+  if (quickstart.install) facts.push(`- Install: \`${quickstart.install}\``);
+  if (quickstart.run) facts.push(`- Run: \`${quickstart.run}\``);
+  if (quickstart.test) facts.push(`- Test: \`${quickstart.test}\``);
   if (Array.isArray(config.use_cases) && config.use_cases.length > 0) {
     // No slice here: silently dropping a configured use case from an
     // AI-facing index is exactly the kind of drift this tool exists to prevent.
-    lines.push(`- Use cases: ${config.use_cases.join('; ')}`);
+    facts.push(`- Use cases: ${config.use_cases.join('; ')}`);
   }
-  lines.push('');
+  if (facts.length > 0) {
+    lines.push('## Key facts');
+    lines.push('');
+    lines.push(...facts);
+    lines.push('');
+  }
   lines.push('## Optional');
   lines.push('');
   lines.push('- [llms-full.txt](./llms-full.txt): the full documentation in a single file');
@@ -354,7 +369,8 @@ export function renderLlmsFullTxt(config, pkg, readmeText, extraDocs = []) {
     parts.push('');
     parts.push('# README');
     parts.push('');
-    parts.push(readmeText.trim());
+    // a CRLF README must not leak \r\n into the LF body: mergeGenerated would double it
+    parts.push(String(readmeText).trim().replace(/\r\n/g, '\n'));
     parts.push('');
   }
   for (const doc of extraDocs) {

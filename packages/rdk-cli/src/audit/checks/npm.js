@@ -126,6 +126,7 @@ export const npmChecks = [
         return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No "exports" map (library consumers need it)', why: this.why, fix: this.fix, effort: 'M', weight: this.weight });
       }
       if (typeof pkg.exports === 'string') return null;
+      if (Array.isArray(pkg.exports) && pkg.exports.length > 0) return null;
       const conditions = exportsConditions(pkg);
       const hasImport = conditions.includes('import') || conditions.includes('default');
       const hasRequire = conditions.includes('require') || conditions.includes('default');
@@ -258,9 +259,6 @@ export const npmChecks = [
       const pkg = ctx.pkg;
       if (!pkg) return skip('package.json is missing or unparsable');
       if (!pkg.version) return null;
-      if (String(pkg.deprecated || '').length > 0) {
-        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'Package is marked deprecated', why: this.why, fix: 'Remove the "deprecated" field.', effort: 'S', weight: this.weight });
-      }
       const major = Number.parseInt(String(pkg.version).split('.')[0], 10);
       if (Number.isFinite(major) && major < 1) {
         return finding({ id: this.id, axis: this.axis, severity: 'info', title: `Version ${pkg.version} is pre-1.0 (npms.io completeness bonus needs >= 1.0.0)`, why: this.why, fix: this.fix, effort: 'M', weight: this.weight });

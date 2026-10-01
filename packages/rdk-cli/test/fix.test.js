@@ -5,6 +5,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { loadConfig, buildSeedConfig } from '../src/config.js';
 import { planPatches, applyPatches, PATCHES } from '../src/fix/patches.js';
+import { fixCommand } from '../src/commands/fix.js';
+import { initCommand } from '../src/commands/init.js';
 import { makeRepo, removeRepo } from './helpers.js';
 
 function contextFor(dir) {
@@ -131,6 +133,89 @@ test('package metadata patch never overwrites existing values', () => {
     assert.equal(pkg.homepage, 'https://configured.example');
     assert.deepEqual(pkg.bugs, { url: 'https://github.com/o/r/issues' });
     assert.deepEqual(pkg.keywords.sort(), ['existing', 'from-config']);
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('readme.examples_stub inserts exactly one stub per fix run and stays idempotent', () => {
+  const intro = 'A hand-written introduction that is deliberately long enough to keep readme.generate away from this file, because the regression under test is the example stub inserted into the Usage section, not the scaffold.';
+  const dir = makeRepo({
+    'package.json': JSON.stringify({ name: 'stub-once', scripts: { start: 'node index.js' } }),
+    'README.md': `# stub-once\n\n${intro}\n\n## Usage\n\nWords, no code blocks.\n`,
+  });
+  try {
+    fixCommand({ cwd: dir, options: { apply: true } });
+    const readme = readFileSync(join(dir, 'README.md'), 'utf8');
+    assert.equal((readme.match(/### Example \(replace with a real one\)/g) || []).length, 1);
+    const second = fixCommand({ cwd: dir, options: { apply: true } });
+    assert.equal(second.written.length, 0, `second apply must write nothing, wrote: ${second.written.join(', ')}`);
+    assert.equal(readFileSync(join(dir, 'README.md'), 'utf8'), readme);
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('readme.generate preserves hand-written prose and appends the scaffold around it', () => {
+  const dir = makeRepo({
+    'package.json': JSON.stringify({ name: 'keep-prose', scripts: { start: 'node index.js' } }),
+    'README.md': '# t\n\nHand-written intro.\n',
+  });
+  try {
+    fixCommand({ cwd: dir, options: { apply: true } });
+    const readme = readFileSync(join(dir, 'README.md'), 'utf8');
+    assert.ok(readme.startsWith('# t\n\nHand-written intro.\n'), 'hand-written lines must survive verbatim at the top');
+    assert.match(readme, /## Quickstart/);
+    assert.match(readme, /## Who is it for/);
+    assert.match(readme, /## Status/);
+    const second = fixCommand({ cwd: dir, options: { apply: true } });
+    assert.equal(second.written.length, 0, `second apply must write nothing, wrote: ${second.written.join(', ')}`);
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('fix invents no commands when package.json has no scripts', () => {
+  const dir = makeRepo({ 'package.json': JSON.stringify({ name: 'no-scripts', description: 'No scripts here' }) });
+  try {
+    fixCommand({ cwd: dir, options: { apply: true } });
+    const readme = readFileSync(join(dir, 'README.md'), 'utf8');
+    assert.doesNotMatch(readme, /npm (start|test|start --help)/);
+    assert.match(readme, /npm install no-scripts/);
+    const agents = readFileSync(join(dir, 'AGENTS.md'), 'utf8');
+    assert.doesNotMatch(agents, /npm (start|test)/);
+    assert.doesNotMatch(agents, /```bash/);
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('readme.sections_stub writes in the dominant EOL style of the file', () => {
+  const dir = makeRepo({
+    'package.json': JSON.stringify({ name: 'eol-check' }),
+    'README.md': '# eol-check\r\n\r\nIntro.\r\n',
+  });
+  try {
+    applyPatches(planPatches(contextFor(dir), { only: ['readme.sections_stub'] }));
+    const readme = readFileSync(join(dir, 'README.md'), 'utf8');
+    assert.equal((readme.match(/(?<!\r)\n/g) || []).length, 0, 'a CRLF README must stay pure CRLF');
+    assert.match(readme, /## Who is it for/);
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('init inserts exactly one Quickstart when readme.generate and quickstart_stub both plan', () => {
+  const dir = makeRepo({
+    'package.json': JSON.stringify({ name: 'qs', version: '1.0.0', description: 'qs demo', scripts: { start: 'node index.js' } }),
+    'README.md': '# qs\n\nA short hand-written intro under the two hundred character scaffold threshold, kept verbatim by the preserve mode.\n',
+  });
+  try {
+    const result = initCommand({ cwd: dir, options: { apply: true } });
+    assert.equal(result.ok, true);
+    const readme = readFileSync(join(dir, 'README.md'), 'utf8');
+    assert.equal((readme.match(/^## Quickstart/gm) || []).length, 1, 'readme.generate appends the scaffold Quickstart, so quickstart_stub must stand down at apply time');
+    assert.match(readme, /A short hand-written intro/);
   } finally {
     removeRepo(dir);
   }

@@ -14,7 +14,7 @@ inputs:
     required: false
     default: 'true'
   cli:
-    description: "Command used to invoke the CLI; this repository's own workflow falls back to the in-repo CLI when the published package is unavailable"
+    description: 'Command used to invoke the CLI (e.g. npx --yes repo-aeo@^0.3.0, or node path/to/bin/rdk.js for an in-repo copy)'
     required: false
     default: 'npx --yes repo-aeo@^0.3.0'
   comment:
@@ -30,17 +30,16 @@ runs:
       with:
         node-version: '22'
 
-    - name: Run the audit
-      id: audit
+    - name: Run the audit (PR comment)
       shell: bash
-      run: |
-        set +e
-        ${{ inputs.cli }} audit --format github-comment ${{ inputs.online == 'true' && '--online' || '' }} --out rdk-comment.md
-        ${{ inputs.cli }} audit --format json ${{ inputs.online == 'true' && '--online' || '' }} --out rdk-report.json --min-score "${{ inputs.min_score }}"
-        echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+      run: node "${{ github.action_path }}/run-audit.mjs" ${{ inputs.cli }} audit --format github-comment ${{ inputs.online == 'true' && '--online' || '' }} --out rdk-comment.md
+
+    - name: Run the audit (min-score gate)
+      shell: bash
+      run: node "${{ github.action_path }}/run-audit.mjs" ${{ inputs.cli }} audit --format json ${{ inputs.online == 'true' && '--online' || '' }} --out rdk-report.json --min-score "${{ inputs.min_score }}"
 
     - name: Publish the PR comment
-      if: inputs.comment == 'true' && github.event_name == 'pull_request'
+      if: always() && inputs.comment == 'true' && github.event_name == 'pull_request'
       uses: actions/github-script@v7
       with:
         script: |
@@ -64,10 +63,3 @@ runs:
           } else {
             await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
           }
-
-    - name: Fail below the minimum score
-      if: steps.audit.outputs.exit_code == '2'
-      shell: bash
-      run: |
-        echo "::error::Discoverability score is below ${{ inputs.min_score }}."
-        exit 1

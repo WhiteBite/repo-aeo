@@ -111,8 +111,12 @@ export const hygieneChecks = [
         return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No .gitignore', why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'gitignore.entries', weight: this.weight });
       }
       const text = readTextIfExists(path);
+      const entries = text.split(/\r?\n/).map((line) => line.trim());
       const required = ['node_modules/', 'dist/'];
-      const missing = required.filter((entry) => !text.includes(entry));
+      const missing = required.filter((entry) => {
+        const bare = entry.replace(/\/$/, '');
+        return !entries.some((line) => line === entry || line === bare);
+      });
       if (missing.length > 0) {
         return finding({ id: this.id, axis: this.axis, severity: 'info', title: `.gitignore is missing: ${missing.join(', ')}`, why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'gitignore.entries', weight: this.weight });
       }

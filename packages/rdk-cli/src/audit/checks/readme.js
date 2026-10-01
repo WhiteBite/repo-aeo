@@ -200,7 +200,13 @@ export const readmeChecks = [
         if (!url || /^[a-z]+:/i.test(url) || url.startsWith('//')) continue;
         const target = url.replace(/^\.?\//, '');
         if (target === '') continue;
-        const path = join(ctx.cwd, decodeURIComponent(target));
+        let decoded = target;
+        try {
+          decoded = decodeURIComponent(target);
+        } catch {
+          decoded = target;
+        }
+        const path = join(ctx.cwd, decoded);
         if (!exists(path)) broken.push(link.url);
       }
       if (broken.length > 0) {
