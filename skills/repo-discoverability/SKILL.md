@@ -7,8 +7,9 @@ description: >-
   "prepare npm metadata", "generate AGENTS.md", "why is my package not
   recommended", "optimize for AI search", "GEO/AEO for my repo", "add llms.txt",
   "audit repo discoverability", or before publishing/releasing a package.
-  Produces an audit, a plan and small verified patches; never publishes, tags or
-  force-pushes without an explicit ACK.
+  Only activate on an explicit user request; do not use for routine code edits,
+  commits or PRs. Produces an audit, a plan and small verified patches; never
+  publishes, tags or force-pushes without an explicit ACK.
 ---
 
 # Repo discoverability (RDK)
