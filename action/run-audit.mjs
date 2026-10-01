@@ -19,7 +19,7 @@ function runAudit(argv) {
   const stdio = ['inherit', 'inherit', 'pipe'];
   // win32: npx is npx.cmd and Node refuses to spawn .cmd shims without a shell
   const child = process.platform === 'win32'
-    ? spawn([command, ...args].join(' '), { stdio, shell: true })
+    ? spawn([command, ...args].map(shellArg).join(' '), { stdio, shell: true })
     : spawn(command, args, { stdio });
 
   let tail = '';
@@ -77,6 +77,10 @@ function runAudit(argv) {
       finish(1);
     }
   });
+}
+
+function shellArg(value) {
+  return /\s/.test(value) ? `"${value}"` : value;
 }
 
 function minScoreOf(argv) {

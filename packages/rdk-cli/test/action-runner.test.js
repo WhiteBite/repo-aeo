@@ -34,3 +34,10 @@ test('runner exits 1 when the audit command cannot be spawned', () => {
   assert.equal(result.status, 1);
   assert.match(result.stderr, /::error::/);
 });
+
+test('runner passes an argument containing spaces intact to the child', () => {
+  const code = 'console.log(JSON.stringify(process.argv.slice(1)));process.exit(0)';
+  const result = runRunner([process.execPath, '-e', code, 'two words']);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout.trim()), ['two words']);
+});

@@ -33,6 +33,31 @@ test('report footers link to the tool, never to the audited repository', () => {
   assert.ok(!comment.includes(audited));
 });
 
+test('github-comment escapes HTML in finding text; the markdown renderer does not', () => {
+  const report = {
+    project: { name: 'x' },
+    generated_at: '2026-01-01T00:00:00.000Z',
+    score: { total: 50, grade: 'F', axes: {} },
+    summary: { passedChecks: 1, checks: 2, errors: 2, warnings: 0, info: 0, autofixable: 0 },
+    findings: [
+      { id: 'readme.quickstart', axis: 'readme', severity: 'error', weight: 5, effort: 'S', title: '<script>alert(1)</script> in README', why: 'why <b>bold</b> & more', fix: 'fix <i>it</i> & that', autoFixable: false },
+      { id: 'docs.llms', axis: 'docs', severity: 'warn', weight: 3, effort: 'S', title: 'llms.txt drift <img src=x>', why: 'stale', fix: 'regenerate', autoFixable: false },
+    ],
+  };
+
+  const comment = renderGithubComment(report, { maxFindings: 1 });
+  assert.ok(comment.includes('&lt;script&gt;alert(1)&lt;/script&gt;'), 'the title must be fully escaped');
+  assert.ok(!comment.includes('<script>'), 'raw <script> must not survive');
+  assert.ok(!comment.includes('<b>'), 'raw <b> must not survive');
+  assert.ok(!comment.includes('<img src=x>'), 'the details-section title must be escaped too');
+  assert.ok(comment.includes('&lt;img src=x&gt;'));
+  assert.ok(comment.includes('&amp; more'));
+  assert.ok(comment.includes('&amp; that'));
+
+  const md = renderMarkdownReport(report);
+  assert.ok(md.includes('<script>alert(1)</script>'), 'markdown is not HTML and must stay unescaped');
+});
+
 test('a rate-limited link (429) is a warning, not a broken link', () => {
   const result = runLinkHealth([{ url: 'https://deepwiki.com', status: 429, ok: false, error: null }]);
   assert.equal(result.severity, 'warn');

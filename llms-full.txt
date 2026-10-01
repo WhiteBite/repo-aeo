@@ -91,7 +91,7 @@ offline; `--online` adds link checks and live GitHub metadata.
 
 ```bash
 $ npx repo-aeo audit            # measured on fixtures/demo-repo, offline
-score: 51/100 (grade F) · checks: 18/41 passed · findings: 10 error, 13 warn, 8 info (20 autofixable) · mode: offline (use --online for link + GitHub checks)
+score: 51/100 (grade F) · checks: 18/41 passed · findings: 10 error, 13 warn, 8 info (17 autofixable) · mode: offline (use --online for link + GitHub checks)
 ```
 
 ### 2. Fix what is safe to fix

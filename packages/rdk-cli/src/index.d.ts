@@ -110,7 +110,7 @@ export interface PlannedPatch {
 /** Returns the patches that would change something right now. */
 export declare function planPatches(
   ctx: unknown,
-  options?: { only?: string[] | null; skip?: string[] },
+  options?: { only?: string[] | null; skip?: string[]; checkMutations?: boolean },
 ): PlannedPatch[];
 
 /** Applies planned mutations to disk and returns the written paths. */

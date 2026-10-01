@@ -62,6 +62,17 @@ function packDryRun(cwd, packageDir) {
 }
 
 export function npmSurfaceCommand({ cwd, options = {} }) {
+  const format = options.format === undefined || options.format === null ? 'markdown' : options.format;
+  if (typeof format !== 'string' || !['json', 'markdown'].includes(format)) {
+    return {
+      ok: false,
+      output: '',
+      exitCode: 1,
+      report: null,
+      summary: `rdk: --format must be one of json|markdown, got ${JSON.stringify(String(options.format))}`,
+    };
+  }
+
   const resolved = resolvePackage(cwd);
   const pkg = resolved.pkg;
   const lines = [];

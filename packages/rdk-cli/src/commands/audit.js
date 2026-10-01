@@ -17,6 +17,17 @@ export async function auditCommand({ cwd, options = {} }) {
     };
   }
 
+  const format = options.format === undefined || options.format === null ? 'markdown' : options.format;
+  if (typeof format !== 'string' || !['json', 'markdown', 'github-comment', 'both'].includes(format)) {
+    return {
+      ok: false,
+      report: null,
+      output: '',
+      summary: `rdk: --format must be one of json|markdown|github-comment|both, got ${JSON.stringify(String(options.format))}`,
+      exitCode: 1,
+    };
+  }
+
   const report = await audit(cwd, {
     online: Boolean(options.online),
     secretsDepth: options.secretsDepth,
@@ -24,7 +35,6 @@ export async function auditCommand({ cwd, options = {} }) {
     linkTimeout: options.linkTimeout,
   });
 
-  const format = options.format || 'markdown';
   let output;
   if (format === 'json') {
     output = `${JSON.stringify(report, null, 2)}\n`;

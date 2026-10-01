@@ -10,6 +10,10 @@ function checkbox(finding) {
   return finding.autoFixable ? `- [ ] **autofix available** \`rdk fix\`` : null;
 }
 
+function escapeHtml(text) {
+  return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 export function renderGithubComment(report, { maxFindings = 8 } = {}) {
   const { score, summary, findings } = report;
   const lines = [];
@@ -34,16 +38,16 @@ export function renderGithubComment(report, { maxFindings = 8 } = {}) {
     lines.push('### Top findings');
     lines.push('');
     for (const finding of findings.slice(0, maxFindings)) {
-      lines.push(`${SEVERITY_ICON[finding.severity]} **${finding.title}**`);
-      lines.push(`   - why: ${truncate(finding.why, 180)}`);
-      lines.push(`   - fix: ${truncate(finding.fix, 180)}${finding.autoFixable ? ' _(autofixable)_' : ''}`);
+      lines.push(`${SEVERITY_ICON[finding.severity]} **${escapeHtml(finding.title)}**`);
+      lines.push(`   - why: ${escapeHtml(truncate(finding.why, 180))}`);
+      lines.push(`   - fix: ${escapeHtml(truncate(finding.fix, 180))}${finding.autoFixable ? ' _(autofixable)_' : ''}`);
       lines.push('');
     }
     if (findings.length > maxFindings) {
       lines.push(`<details><summary>${findings.length - maxFindings} more findings</summary>`);
       lines.push('');
       for (const finding of findings.slice(maxFindings)) {
-        lines.push(`- ${SEVERITY_ICON[finding.severity]} \`${finding.id}\` — ${truncate(finding.title, 120)}`);
+        lines.push(`- ${SEVERITY_ICON[finding.severity]} \`${finding.id}\` — ${escapeHtml(truncate(finding.title, 120))}`);
       }
       lines.push('');
       lines.push('</details>');

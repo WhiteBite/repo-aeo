@@ -102,6 +102,10 @@ export async function main(argv = process.argv.slice(2), io = {}) {
     log(version());
     return 0;
   }
+  if (positional.length === 0) {
+    log(USAGE);
+    return 0;
+  }
 
   try {
     switch (command) {
@@ -128,6 +132,7 @@ export async function main(argv = process.argv.slice(2), io = {}) {
       }
       case 'npm-surface': {
         const result = npmSurfaceCommand({ cwd, options: { ...flags, pack: flags.noPack ? false : flags.pack } });
+        if (result.summary) error(result.summary);
         if (!flags.quiet) log(result.output);
         else log(`npm-surface: ${result.report ? `${result.report.name}@${result.report.version}` : 'no package'}`);
         return result.exitCode;

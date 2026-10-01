@@ -595,15 +595,18 @@ export const PATCHES = [
   },
 ];
 
-/** Returns the patches that currently change something, with their mutations. */
-export function planPatches(ctx, { only = null, skip = [] } = {}) {
+/**
+ * Returns the patches that currently change something, with their mutations.
+ * With checkMutations: false only applies() is probed — for callers that must
+ * not pay for mutation computation.
+ */
+export function planPatches(ctx, { only = null, skip = [], checkMutations = true } = {}) {
   const planned = [];
   for (const patch of PATCHES) {
     if (only && !only.includes(patch.id)) continue;
     if (skip.includes(patch.id)) continue;
     if (!patch.applies(ctx)) continue;
-    const mutations = patch.mutations(ctx);
-    if (mutations.length === 0) continue;
+    if (checkMutations && patch.mutations(ctx).length === 0) continue;
     planned.push({ ...patch, compute: () => patch.mutations(ctx) });
   }
   return planned;

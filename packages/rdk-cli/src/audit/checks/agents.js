@@ -3,7 +3,7 @@
  * Coding agents (Codex, Cursor, OpenCode, Claude Code) read AGENTS.md as the
  * project instruction file, so it must contain commands that actually work.
  */
-import { check, finding, normalizeHeading } from './_shared.js';
+import { check, finding, skip, normalizeHeading } from './_shared.js';
 import { exists, readTextIfExists } from '../../util/fs.js';
 import { join } from 'node:path';
 
@@ -12,6 +12,19 @@ const COMMAND_RE = /\b(test|lint|format|build|typecheck|dev|start|install|ci)\b/
 function scriptsOf(pkg) {
   if (!pkg || typeof pkg.scripts !== 'object' || pkg.scripts === null) return {};
   return pkg.scripts;
+}
+
+function hasScriptFamily(scripts, family) {
+  return Object.keys(scripts).some((name) => name === family || name.startsWith(`${family}:`));
+}
+
+function requiredCommandWords(pkg, quickstart) {
+  const scripts = scriptsOf(pkg);
+  const required = [];
+  if (hasScriptFamily(scripts, 'test') || (quickstart && quickstart.test)) required.push('test');
+  if (hasScriptFamily(scripts, 'lint')) required.push('lint');
+  if (hasScriptFamily(scripts, 'build')) required.push('build');
+  return required;
 }
 
 export const agentsChecks = [
@@ -52,10 +65,12 @@ export const agentsChecks = [
       if (text === null) {
         return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'AGENTS.md is missing, so agents have no verified commands', why: this.why, fix: 'Run `rdk init`.', effort: 'S', autoFixable: true, patchId: 'agents.stub', weight: this.weight });
       }
+      const required = requiredCommandWords(ctx.pkg, ctx.config.quickstart);
+      if (required.length === 0) return skip('no test/lint/build scripts or quickstart commands to document');
       const lower = text.toLowerCase();
-      const missing = ['test', 'lint', 'build'].filter((word) => !lower.includes(word));
-      if (missing.length === 3) {
-        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'AGENTS.md does not document test/lint/build commands', why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'agents.stub', weight: this.weight });
+      const missing = required.filter((word) => !lower.includes(word));
+      if (missing.length === required.length) {
+        return finding({ id: this.id, axis: this.axis, severity: 'error', title: `AGENTS.md does not document: ${required.join(', ')}`, why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'agents.stub', weight: this.weight });
       }
       if (missing.length > 0) {
         return finding({ id: this.id, axis: this.axis, severity: 'warn', title: `AGENTS.md does not mention: ${missing.join(', ')}`, why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'agents.stub', weight: this.weight });

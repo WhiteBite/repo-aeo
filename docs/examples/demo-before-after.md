@@ -18,7 +18,7 @@ npx repo-aeo audit            # after
 ```text
 # Discoverability audit — demo-widget
 
-**Score: 51/100 (grade F)** — generated 2026-10-01T14:24:16.040Z
+**Score: 51/100 (grade F)** — generated 2026-10-01T16:48:59.613Z
 
 ██████████░░░░░░░░░░ 51/100
 
@@ -31,7 +31,7 @@ npx repo-aeo audit            # after
 | Docs readiness | 33/100 | 12 | 2/6 checks passed |
 | Trust & hygiene | 33/100 | 8 | 3/9 checks passed |
 
-Checks: 18/41 passed · errors 10 · warnings 13 · info 8 · autofixable 20
+Checks: 18/41 passed · errors 10 · warnings 13 · info 8 · autofixable 17
 ```
 
 ## Step 1 — `rdk init --apply`
@@ -78,20 +78,20 @@ Never publish, tag or force-push from an autofix branch without an explicit ACK.
 ```text
 # Discoverability audit — demo-widget
 
-**Score: 83/100 (grade B)** — generated 2026-10-01T14:30:30.143Z
+**Score: 86/100 (grade B)** — generated 2026-10-01T16:49:02.431Z
 
-█████████████████░░░ 83/100
+█████████████████░░░ 86/100
 
 | Axis | Score | Weight | Status |
 | --- | --- | --- | --- |
 | GitHub metadata | 75/100 | 20 | 3/4 checks passed |
 | README primitives | 86/100 | 25 | 6/7 checks passed |
-| Agent readiness | 80/100 | 15 | 4/5 checks passed |
+| Agent readiness | 100/100 | 15 | complete |
 | npm readiness | 70/100 | 20 | 7/10 checks passed |
 | Docs readiness | 100/100 | 12 | complete |
 | Trust & hygiene | 100/100 | 8 | complete |
 
-Checks: 35/41 passed · errors 0 · warnings 6 · info 4 · autofixable 2
+Checks: 35/40 passed · errors 0 · warnings 5 · info 4 · autofixable 0
 ```
 
 ## What the generated files look like

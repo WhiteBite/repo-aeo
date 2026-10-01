@@ -17,6 +17,7 @@ import { npmChecks, npmPackageInvalidCheck } from './checks/npm.js';
 import { docsChecks } from './checks/docs.js';
 import { hygieneChecks } from './checks/hygiene.js';
 import { AXIS_WEIGHTS, computeScore } from './score.js';
+import { planPatches } from '../fix/patches.js';
 
 const SEVERITY_ORDER = { error: 0, warn: 1, info: 2 };
 const MAX_PROBED_LINKS = 25;
@@ -133,6 +134,14 @@ export async function audit(cwd = process.cwd(), options = {}) {
     if (result !== null && result !== undefined) findings.push(result);
     if (result === null || result === undefined || result.severity === 'info') tally.passed += 1;
     perAxis[definition.axis] = tally;
+  }
+
+  // autoFixable may only promise patches the fixer would actually run
+  const plannedPatchIds = new Set(planPatches(ctx, { checkMutations: false }).map((patch) => patch.id));
+  for (const finding of findings) {
+    if (finding.autoFixable && finding.patchId != null && !plannedPatchIds.has(finding.patchId)) {
+      finding.autoFixable = false;
+    }
   }
 
   const applicableAxes = Object.keys(AXIS_WEIGHTS).filter((axis) => {

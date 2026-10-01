@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { audit } from '../src/audit/index.js';
 import { AXIS_WEIGHTS } from '../src/audit/score.js';
 import { buildSeedConfig, loadConfig } from '../src/config.js';
+import { planPatches } from '../src/fix/patches.js';
 import { isSkip } from '../src/audit/checks/_shared.js';
 import { githubChecks } from '../src/audit/checks/github.js';
 import { readmeChecks } from '../src/audit/checks/readme.js';
@@ -165,6 +166,40 @@ test('full-audit tallies stay consistent on scratch repos', async () => {
           `${dir} ${axis}: applicable ${entry.applicable} must mirror tally total ${entry.total}`,
         );
       }
+    }
+  } finally {
+    removeRepo(bare);
+    removeRepo(docsRepo);
+  }
+});
+
+test('every autofixable finding maps to a patch the fixer would plan', async () => {
+  const bare = makeRepo({ 'package.json': JSON.stringify(PKG) });
+  const docsRepo = makeRepo({
+    'package.json': JSON.stringify(PKG),
+    'README.md': `# Gate demo\n\nA readme with enough body text to count as a real readme for the tally invariants.\n\n## Quickstart\n\n\`\`\`bash\nnpm install gate-demo\n\`\`\`\n`,
+    'AGENTS.md': `# Agents\n\n## Commands\n\n- npm test\n- npm run lint\n- npm run build\n\n## Do / Don't\n\nDo run the tests. Don't bump versions.\n`,
+    'llms.txt': `# Gate demo\n\n> A demo project exercising the docs axis of the audit.\n\n- [README](README.md)\n`,
+    '.discoverability/project.yml': 'project:\n  name: gate-demo\nartifacts:\n  has_docs_site: true\n',
+  });
+  try {
+    for (const dir of [bare, docsRepo]) {
+      const report = await audit(dir, { online: false });
+      const loaded = loadConfig(dir);
+      const ctx = {
+        cwd: dir,
+        options: {},
+        config: loaded.config,
+        configExists: loaded.exists,
+        pkg: loaded.publishable.pkg,
+        publishable: loaded.publishable,
+        git: loaded.git,
+      };
+      const planned = new Set(planPatches(ctx).map((patch) => patch.id));
+      const unplanned = report.findings
+        .filter((f) => f.autoFixable && !planned.has(f.patchId))
+        .map((f) => `${f.id} -> ${f.patchId}`);
+      assert.deepEqual(unplanned, [], `${dir}: autofixable findings whose patch planPatches would not plan`);
     }
   } finally {
     removeRepo(bare);

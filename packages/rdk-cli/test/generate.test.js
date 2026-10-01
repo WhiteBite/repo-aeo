@@ -123,6 +123,18 @@ test('renderAgentsMd omits the commands block when nothing real exists', () => {
   assert.doesNotMatch(agents, /npm (start|test)/);
 });
 
+test('renderAgentsMd header omits the separator when no one_liner or description exists', () => {
+  const bare = renderAgentsMd({ project: { name: 'my-lib' } }, null);
+  assert.match(bare, /^Project: my-lib$/m);
+  assert.doesNotMatch(bare, /Project: my-lib —/);
+
+  const withDescription = renderAgentsMd({ project: { name: 'd-lib', description: 'Does things' } }, null);
+  assert.match(withDescription, /^Project: d-lib — Does things$/m);
+
+  const withOneLiner = renderAgentsMd({ project: { name: 'o-lib', one_liner: 'One line' } }, null);
+  assert.match(withOneLiner, /^Project: o-lib — One line$/m);
+});
+
 test('renderLlmsTxt omits the Key facts section when the config has none', () => {
   const llms = renderLlmsTxt({ project: { name: 'bare-facts', one_liner: 'Bare' } }, null, '# bare-facts\n');
   assert.doesNotMatch(llms, /## Key facts/);
@@ -130,6 +142,16 @@ test('renderLlmsTxt omits the Key facts section when the config has none', () =>
 
   const withFacts = renderLlmsTxt({ project: { name: 'facts', one_liner: 'Facts' }, quickstart: { install: 'npm i facts' }, use_cases: ['a'] }, null, '# facts\n');
   assert.match(withFacts, /## Key facts\n\n- Install: `npm i facts`\n- Use cases: a\n/);
+});
+
+test('renderLlmsTxt omits Key facts when quickstart values and use_cases are present but empty', () => {
+  const llms = renderLlmsTxt(
+    { project: { name: 'zero-facts', one_liner: 'Zero' }, quickstart: { install: '', run: '', test: '' }, use_cases: [] },
+    null,
+    '# zero-facts\n',
+  );
+  assert.doesNotMatch(llms, /## Key facts/);
+  assert.match(llms, /## Optional/);
 });
 
 test('generated CODEOWNERS names the audited repository owner, not ours', () => {

@@ -60,6 +60,88 @@ test('audit --format json emits pure JSON on stdout', () => {
   assert.equal(report.schema, 'rdk-audit/1');
 });
 
+test('audit --format rejects invalid and valueless values with exit 1', () => {
+  const bogus = rdk(['audit', '--format', 'bogus'], process.cwd());
+  assert.equal(bogus.status, 1);
+  assert.match(bogus.stderr, /--format must be one of json\|markdown\|github-comment\|both/);
+  assert.match(bogus.stderr, /got "bogus"/);
+
+  const bare = rdk(['audit', '--format'], process.cwd());
+  assert.equal(bare.status, 1);
+  assert.match(bare.stderr, /--format must be one of json\|markdown\|github-comment\|both/);
+  assert.match(bare.stderr, /got "true"/);
+});
+
+test('auditCommand accepts every documented format and rejects a valueless --format', async () => {
+  const dir = makeRepo({ 'package.json': JSON.stringify({ name: 'fmt-demo', description: 'Format demo' }) });
+  try {
+    const outputs = {};
+    for (const format of ['json', 'markdown', 'github-comment', 'both']) {
+      const result = await auditCommand({ cwd: dir, options: { format } });
+      assert.equal(result.ok, true, format);
+      assert.equal(result.exitCode, 0, format);
+      outputs[format] = result.output;
+    }
+    assert.ok(outputs.json.trimStart().startsWith('{'));
+    assert.ok(outputs.markdown.includes('# Discoverability audit'));
+    assert.ok(outputs['github-comment'].includes('<!-- rdk-discoverability-audit -->'));
+    assert.ok(outputs.both.includes('# Discoverability audit'));
+    assert.ok(outputs.both.includes('<!-- rdk-discoverability-audit -->'));
+
+    const valueless = await auditCommand({ cwd: dir, options: { format: true } });
+    assert.equal(valueless.ok, false);
+    assert.equal(valueless.exitCode, 1);
+    assert.equal(valueless.report, null);
+    assert.match(valueless.summary, /--format must be one of json\|markdown\|github-comment\|both, got "true"/);
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('npm-surface --format rejects invalid values with exit 1', () => {
+  const dir = makeRepo({
+    'package.json': JSON.stringify({
+      name: 'ns-fmt',
+      version: '0.0.1',
+      description: 'format gate demo',
+      main: 'index.js',
+      repository: { type: 'git', url: 'git+https://example.com/ns-fmt.git' },
+      keywords: ['a', 'b', 'c', 'd', 'e'],
+      engines: { node: '>=18' },
+      files: ['index.js'],
+      scripts: { test: 'node --test' },
+    }),
+  });
+  try {
+    const bogus = rdk(['npm-surface', '--format', 'bogus', '--no-pack'], dir);
+    assert.equal(bogus.status, 1);
+    assert.match(bogus.stderr, /--format must be one of json\|markdown/);
+    assert.match(bogus.stderr, /got "bogus"/);
+
+    const json = rdk(['npm-surface', '--format', 'json', '--no-pack'], dir);
+    assert.equal(json.status, 0, json.stdout + json.stderr);
+    assert.equal(JSON.parse(json.stdout).name, 'ns-fmt');
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('bare rdk with no command prints usage and exits 0', () => {
+  const bare = rdk([], process.cwd());
+  assert.equal(bare.status, 0);
+  assert.match(bare.stdout, /rdk — Repo Discoverability Kit/);
+  assert.doesNotMatch(bare.stdout, /# Discoverability audit/);
+  assert.doesNotMatch(bare.stderr, /score: \d+\/100/);
+
+  const cwdOnly = rdk(['--cwd', process.cwd()], process.cwd());
+  assert.equal(cwdOnly.status, 0);
+  assert.match(cwdOnly.stdout, /Usage:/);
+
+  const flagOnly = rdk(['--quiet'], process.cwd());
+  assert.equal(flagOnly.status, 0);
+  assert.match(flagOnly.stdout, /Usage:/);
+});
+
 test('init --apply then fix --apply raises the score on a bare repo', () => {
   const dir = makeRepo({ 'package.json': JSON.stringify({ name: 'cli-demo', description: 'CLI demo project', scripts: { test: 'node --test', start: 'node .' } }) });
   try {
