@@ -12,7 +12,8 @@ import { callTool, toolDescriptors } from './tools.js';
 
 export const SERVER_NAME = 'repo-aeo-mcp';
 export const SERVER_VERSION = '0.1.0';
-export const PROTOCOL_VERSION = '2024-11-05';
+export const PROTOCOL_VERSION = '2025-11-25';
+const SUPPORTED_PROTOCOL_VERSIONS = new Set(['2024-11-05', '2025-03-26', '2025-06-18', '2025-11-25']);
 
 const JSON_RPC_ERRORS = {
   parse: -32700,
@@ -55,7 +56,7 @@ export async function handleMessage(message, context = {}) {
   switch (method) {
     case 'initialize':
       return jsonRpcResult(id, {
-        protocolVersion: PROTOCOL_VERSION,
+        protocolVersion: params && SUPPORTED_PROTOCOL_VERSIONS.has(params.protocolVersion) ? params.protocolVersion : PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: SERVER_NAME, version: SERVER_VERSION, title: 'Repo Discoverability Kit MCP server' },
         instructions:

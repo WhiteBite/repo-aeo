@@ -95,6 +95,7 @@ function packageNameFor(args, cwd) {
 export const TOOLS = [
   {
     name: 'npm_get_search_score',
+    title: 'npm search score',
     description:
       'Get the current npms.io search score for an npm package (final, quality, popularity, maintenance) plus the concrete gaps that block the completeness bonus. Omit package_name to score the package in the current repository.',
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
@@ -203,6 +204,7 @@ export const TOOLS = [
 
   {
     name: 'github_audit_visibility_signals',
+    title: 'GitHub visibility signals',
     description:
       'Audit the live GitHub visibility signals of a repository: stars, forks, topics, open issues, release freshness, wiki and discussions, with the same thresholds the CLI audit uses.',
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
@@ -312,6 +314,7 @@ export const TOOLS = [
 
   {
     name: 'llms_txt_check_freshness',
+    title: 'llms.txt freshness',
     description:
       'Check whether llms.txt still matches its sources: marker-managed files are compared against the rendered output, hand-written files against source modification times; drift is reported because a stale llms.txt actively misleads agents.',
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -386,6 +389,7 @@ export const TOOLS = [
 
   {
     name: 'site_check_llms_txt',
+    title: 'Site llms.txt probe',
     description:
       'Check that a project website serves /llms.txt at its domain root and report status, size and the first heading so an agent can decide whether to fetch it.',
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
@@ -446,6 +450,7 @@ export const TOOLS = [
 
   {
     name: 'repo_get_discoverability_score',
+    title: 'Discoverability score',
     description:
       'Run the same discoverability audit engine as the CLI against a repository and return the full 0-100 score, per-axis breakdown and every finding.',
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -468,6 +473,7 @@ export const TOOLS = [
 
   {
     name: 'repo_list_findings',
+    title: 'Findings list',
     description:
       'List the audit findings for a repository, filtered by severity, effort or autofixability, so an agent can work through them one at a time.',
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -515,6 +521,7 @@ export const TOOLS = [
 
   {
     name: 'competitor_scan_list_articles',
+    title: 'Listicle mention scan',
     description:
       'Scan a configured search endpoint for "top N tools" list articles in the project niche and report which competitors are mentioned, because appearing in those lists is how chat assistants pick recommendations.',
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
@@ -561,6 +568,7 @@ export const TOOLS = [
 
   {
     name: 'github_sync_metadata',
+    title: 'Sync metadata to GitHub',
     description:
       'Write the description, homepage and topics from .discoverability/project.yml to GitHub. This is the only write tool: it requires the acknowledgement string and a reason, both of which are logged to the local history.',
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
@@ -667,6 +675,7 @@ export function toolDescriptors(options = {}) {
   const readOnly = options && options.readOnly === true;
   return TOOLS.filter((tool) => !(readOnly && tool.annotations && tool.annotations.readOnlyHint === false)).map((tool) => ({
     name: tool.name,
+    title: tool.title,
     description: tool.description,
     inputSchema: tool.inputSchema,
     annotations: tool.annotations,

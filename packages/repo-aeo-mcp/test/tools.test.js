@@ -65,6 +65,7 @@ test('every tool definition is JSON-serialisable and the write tool declares its
     const serialized = JSON.parse(JSON.stringify(toolDescriptors().find((entry) => entry.name === tool.name)));
     assert.deepEqual(serialized, {
       name: tool.name,
+      title: tool.title,
       description: tool.description,
       inputSchema: tool.inputSchema,
       annotations: tool.annotations,
@@ -325,6 +326,12 @@ test('history records metrics, series and trends in a disposable directory', () 
     assert.equal(listMetrics(join(box.dir, 'other')).length, 0);
   } finally {
     box.cleanup();
+  }
+});
+
+test('every tool descriptor carries a human-readable title', () => {
+  for (const descriptor of toolDescriptors()) {
+    assert.ok(typeof descriptor.title === 'string' && descriptor.title.length > 3, `${descriptor.name} must declare a title`);
   }
 });
 

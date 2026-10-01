@@ -12,7 +12,14 @@ test('initialize answers with the protocol version and server info', async () =>
   });
   assert.equal(response.jsonrpc, '2.0');
   assert.equal(response.id, 1);
-  assert.equal(response.result.protocolVersion, PROTOCOL_VERSION);
+  assert.equal(response.result.protocolVersion, '2024-11-05', 'a supported client version is echoed back');
+  const modern = await handleMessage({
+    jsonrpc: '2.0',
+    id: 2,
+    method: 'initialize',
+    params: { protocolVersion: '1999-01-01', capabilities: {}, clientInfo: { name: 'test', version: '0' } },
+  });
+  assert.equal(modern.result.protocolVersion, PROTOCOL_VERSION, 'an unknown client version falls back to the server latest');
   assert.equal(response.result.serverInfo.name, SERVER_NAME);
   assert.equal(response.result.serverInfo.version, SERVER_VERSION);
   assert.ok(response.result.instructions.length > 20, 'the server must tell agents how to behave');

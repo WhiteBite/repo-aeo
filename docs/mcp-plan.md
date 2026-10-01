@@ -15,7 +15,9 @@ The skill stays offline-first; the server is the always-on monitor.
 - History: `.discoverability/cache/metrics.json` (git-ignored), appended on
   every call, so the server reports trends ("npm quality score went
   0.62 → 0.81 over the last month").
-- Protocol: newline-delimited JSON-RPC 2.0, `2024-11-05`. `initialize`,
+- Protocol: newline-delimited JSON-RPC 2.0. `initialize` negotiates: a client
+  version the server knows (`2024-11-05` … `2025-11-25`) is echoed back,
+  anything else falls back to the server's latest (`2025-11-25`). `initialize`,
   `notifications/initialized`, `ping`, `tools/list`, `tools/call`, plus empty
   `resources/list` and `prompts/list` answers so probing clients do not see
   `method not found`.

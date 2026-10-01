@@ -1,0 +1,25 @@
+name: skill-evals
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 7 * * 2'
+
+permissions:
+  contents: read
+
+jobs:
+  evals:
+    if: ${{ vars.RDK_EVAL_MODEL != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run the skill trigger evals
+        run: node skills/repo-discoverability/evals/run.mjs
+        env:
+          RDK_EVAL_MODEL: ${{ vars.RDK_EVAL_MODEL }}
+          RDK_EVAL_BASE_URL: ${{ vars.RDK_EVAL_BASE_URL }}
+          RDK_EVAL_API_KEY: ${{ secrets.RDK_EVAL_API_KEY }}

@@ -1,0 +1,25 @@
+{
+  "method": "Each query is presented to a model with only the skill name+description; the model answers YES/NO whether it would load the skill. Three runs per query; a should-trigger query must trigger at rate >= 0.5, a should-not query must stay below 0.5.",
+  "queries": [
+    { "text": "Make this repository discoverable to AI agents and search engines", "should_trigger": true },
+    { "text": "Add GitHub topics and a proper description to my repo", "should_trigger": true },
+    { "text": "Why is my npm package never recommended by ChatGPT or Perplexity?", "should_trigger": true },
+    { "text": "Generate an AGENTS.md for this project", "should_trigger": true },
+    { "text": "Add llms.txt and llms-full.txt to the repository", "should_trigger": true },
+    { "text": "Audit repo discoverability before we cut the release", "should_trigger": true },
+    { "text": "Restructure the README so coding agents find the install and run commands", "should_trigger": true },
+    { "text": "Prepare package.json metadata (keywords, exports, files) for publishing", "should_trigger": true },
+    { "text": "GEO/AEO optimization for our open source repo", "should_trigger": true },
+    { "text": "Check that our docs site actually serves llms.txt", "should_trigger": true },
+    { "text": "Pack the whole repository into one file so an LLM can read it", "should_trigger": false },
+    { "text": "Scan my dependencies for security vulnerabilities", "should_trigger": false },
+    { "text": "Generate an explanatory wiki with diagrams for this codebase", "should_trigger": false },
+    { "text": "Fix the failing unit test in src/parser.js", "should_trigger": false },
+    { "text": "Rename the variable userData to accountData everywhere", "should_trigger": false },
+    { "text": "Set up ESLint with type-aware rules for this TypeScript project", "should_trigger": false },
+    { "text": "Write a blog post announcing the 1.0 release", "should_trigger": false },
+    { "text": "Translate the README into German", "should_trigger": false },
+    { "text": "Run npm publish with provenance right now", "should_trigger": false },
+    { "text": "Set up pre-commit hooks that run black and ruff", "should_trigger": false }
+  ]
+}
