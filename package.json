@@ -20,9 +20,9 @@
     "fix": "node packages/rdk-cli/bin/rdk.js fix --apply",
     "npm-surface": "node packages/rdk-cli/bin/rdk.js npm-surface",
     "github-sync": "node packages/rdk-cli/bin/rdk.js github-sync",
-    "test": "node --test \"packages/*/test/*.test.js\"",
-    "test:cli": "node --test \"packages/rdk-cli/test/*.test.js\"",
-    "test:mcp": "node --test \"packages/repo-aeo-mcp/test/*.test.js\""
+    "test": "node scripts/run-tests.mjs",
+    "test:cli": "node scripts/run-tests.mjs packages/rdk-cli/test",
+    "test:mcp": "node scripts/run-tests.mjs packages/repo-aeo-mcp/test"
   },
   "keywords": [
     "discoverability",
