@@ -7,7 +7,7 @@ headings and the commentary.
 Reproduce:
 
 ```bash
-npm test                                                             # 111 tests
+npm test                                                             # 121 tests
 node packages/rdk-cli/bin/rdk.js audit                               # section 1
 node packages/rdk-cli/bin/rdk.js audit --online                      # adds link + GitHub checks
 node packages/rdk-cli/bin/rdk.js npm-surface                         # section 4
@@ -28,7 +28,7 @@ node packages/rdk-cli/bin/rdk.js audit                            # section 3
 
 # Discoverability audit — repo-aeo
 
-**Score: 96/100 (grade A)** — generated 2026-09-28T23:50:27.423Z
+**Score: 96/100 (grade A)** — generated 2026-10-01T11:36:13.805Z
 
 ███████████████████░ 96/100
 
@@ -43,6 +43,10 @@ node packages/rdk-cli/bin/rdk.js audit                            # section 3
 
 Checks: 39/41 passed · errors 0 · warnings 0 · info 2 · autofixable 0
 
+## Config warnings
+
+- links.homepage/links.docs imply a docs presence: the docs axis stays enabled even though artifacts.has_docs_site is false.
+
 ## INFO (2)
 
 ### Link health not checked (offline mode)
@@ -51,7 +55,7 @@ Checks: 39/41 passed · errors 0 · warnings 0 · info 2 · autofixable 0
 - **why:** A dead docs link is a dead end for crawlers and agents; stale llms.txt with broken links actively misleads agents.
 - **fix:** Run `rdk audit --online` to probe outbound links.
 
-### Version 0.1.0 is pre-1.0 (npms.io completeness bonus needs >= 1.0.0)
+### Version 0.3.1 is pre-1.0 (npms.io completeness bonus needs >= 1.0.0)
 
 - **id:** `npm.version_stability` · **axis:** npm readiness · **effort:** M
 - **why:** npms.io awards a completeness bonus when a package is >= 1.0.0, not deprecated, has README, has tests and few open issues. Staying on 0.x caps your registry score.
@@ -71,7 +75,7 @@ score: 96/100 (grade A) · checks: 39/41 passed · findings: 0 error, 0 warn, 2 
 The two remaining findings are informational and honest: link health is not
 probed offline, and the packages are pre-1.0 (the npms.io completeness bonus
 needs >= 1.0.0). Both are decisions for a human, not something a tool should
-fake. The offline audit of all 41 checks completes in under 200 ms on the
+fake. The offline audit of all 41 checks completes in under 300 ms on the
 reference run (`duration_ms` in the JSON report; the exact value varies by
 machine).
 
@@ -84,9 +88,9 @@ machine).
 
 ```markdown
 <!-- rdk-discoverability-audit -->
-## Discoverability audit — 29/100 (grade F)
+## Discoverability audit тАФ 29/100 (grade F)
 
-`demo-widget` · 10/41 checks passed · 12 errors · 13 warnings · 6 info
+`demo-widget` ┬╖ 10/41 checks passed ┬╖ 12 errors ┬╖ 13 warnings ┬╖ 6 info
 
 | Axis | Score |
 | --- | --- |
@@ -99,63 +103,63 @@ machine).
 
 ### Top findings
 
-🔴 **llms.txt is missing**
-   - why: llms.txt is the AI-friendly table of contents: when an agent asks about the project, a single small file delivers 2–10k tokens of clean context instead of parsing hundreds of kilo…
+ЁЯФ┤ **llms.txt is missing**
+   - why: llms.txt is the AI-friendly table of contents: when an agent asks about the project, a single small file delivers 2тАУ10k tokens of clean context instead of parsing hundreds of kiloтАж
    - fix: Run `rdk fix` to generate llms.txt from .discoverability/project.yml + README, then edit the summary by hand. _(autofixable)_
 
-🔴 **No install/run commands in the first 60 lines**
-   - why: Readers (and agents summarising the repo) decide within seconds whether the project works for them. A first success path in the top of the README is the single highest-leverage RE…
+ЁЯФ┤ **No install/run commands in the first 60 lines**
+   - why: Readers (and agents summarising the repo) decide within seconds whether the project works for them. A first success path in the top of the README is the single highest-leverage REтАж
    - fix: Move a copy-pasteable install + run block above the fold. Use the quickstart section of .discoverability/project.yml as the source of truth. _(autofixable)_
 
-🔴 **AGENTS.md is missing**
+ЁЯФ┤ **AGENTS.md is missing**
    - why: AGENTS.md is the operational instruction file that coding agents load automatically. Without it, agents guess how to run tests and lint, and usually guess wrong.
    - fix: Run `rdk init` (or `rdk fix`) to create a draft AGENTS.md, then review it by hand. _(autofixable)_
 
-🔴 **AGENTS.md is missing, so agents have no verified commands**
+ЁЯФ┤ **AGENTS.md is missing, so agents have no verified commands**
    - why: An agent that cannot run the project checks cannot verify its own changes, which is exactly how hallucinated "fixes" get committed.
    - fix: Run `rdk init`. _(autofixable)_
 
-🔴 **No LICENSE file**
+ЁЯФ┤ **No LICENSE file**
    - why: Without a license the project legally cannot be reused, and agents that check reuse permissions skip it entirely.
-   - fix: Add a LICENSE file (MIT/Apache-2.0 are the safest defaults for tooling).
+   - fix: Run `rdk fix` to add an MIT LICENSE stub, or add a LICENSE file by hand (MIT/Apache-2.0 are the safest defaults for tooling). _(autofixable)_
 
-🔴 **No GitHub topics configured**
-   - why: Topics are a first-class search key on GitHub and a discovery surface for crawlers. Repositories with no topics are effectively invisible in topic browse and in "similar repositor…
-   - fix: Fill keywords.github_topics in .discoverability/project.yml with 8–20 lowercase, hyphenated terms, then run `rdk github-sync --apply`.
+ЁЯФ┤ **No GitHub topics configured**
+   - why: Topics are a first-class search key on GitHub and a discovery surface for crawlers. Repositories with no topics are effectively invisible in topic browse and in "similar repositorтАж
+   - fix: Fill keywords.github_topics in .discoverability/project.yml with 8тАУ20 lowercase, hyphenated terms, then run `rdk github-sync --apply`.
 
-🔴 **No code examples in README**
+ЁЯФ┤ **No code examples in README**
    - why: Concrete examples are what agents copy into an answer ("here is how you use X"). Two to five focused examples beat one giant one.
-   - fix: Add a "## Usage" or "## Examples" section with 2–5 short, runnable snippets.
+   - fix: Add a "## Usage" or "## Examples" section with 2тАУ5 short, runnable snippets.
 
-🔴 **Missing README sections: Who is it for, Use cases, Why choose this, Status / Roadmap**
-   - why: These four sections are the retrieval hooks agents latch onto when matching a project to a user request ("who is it for" -> audience match, "why choose this" -> differentiation, "…
+ЁЯФ┤ **Missing README sections: Who is it for, Use cases, Why choose this, Status / Roadmap**
+   - why: These four sections are the retrieval hooks agents latch onto when matching a project to a user request ("who is it for" -> audience match, "why choose this" -> differentiation, "тАж
    - fix: Run `rdk fix` to insert section stubs, then fill them in. _(autofixable)_
 
 <details><summary>23 more findings</summary>
 
-- 🔴 `github.description` — No repository description found
-- 🔴 `readme.exists` — README.md is nearly empty
-- 🔴 `npm.metadata` — package.json is missing: description, keywords, repository, bugs
-- 🔴 `npm.keywords_quality` — No keywords in package.json
-- 🟡 `npm.exports` — package.json has "main" but no "exports" map
-- 🟡 `hygiene.security_policy` — No SECURITY.md
-- 🟡 `docs.structured_data` — No JSON-LD structured data found for the site/docs
-- 🟡 `hygiene.contributing` — No CONTRIBUTING.md
-- 🟡 `npm.files_hygiene` — No "files" array and no .npmignore — the tarball is guesswork
-- 🟡 `docs.llms_full` — llms-full.txt is missing
-- 🟡 `docs.quickstart_source` — quickstart is missing: install, run
-- 🟡 `readme.heading_structure` — README has only 0 H2 sections (target >= 4)
-- 🟡 `npm.test_script` — No test script in package.json
-- 🟡 `hygiene.gitignore` — No .gitignore
-- 🟡 `hygiene.citation` — No CITATION.cff
-- 🟡 `hygiene.issue_templates` — No issue or PR templates
-- 🟡 `npm.engines` — engines.node is not declared
-- 🔵 `npm.types` — No TypeScript types declared
-- 🔵 `docs.link_health` — Link health not checked (offline mode)
-- 🔵 `readme.verifiable_claims` — No quantified claims in README
-- 🔵 `npm.version_stability` — Version 0.0.1 is pre-1.0 (npms.io completeness bonus needs >= 1.0.0)
-- 🔵 `hygiene.codeowners` — No CODEOWNERS file
-- 🔵 `hygiene.gitattributes` — No .gitattributes
+- ЁЯФ┤ `github.description` тАФ No repository description found
+- ЁЯФ┤ `readme.exists` тАФ README.md is nearly empty
+- ЁЯФ┤ `npm.metadata` тАФ package.json is missing: description, keywords, repository, bugs
+- ЁЯФ┤ `npm.keywords_quality` тАФ No keywords in package.json
+- ЁЯЯб `npm.exports` тАФ package.json has "main" but no "exports" map
+- ЁЯЯб `hygiene.security_policy` тАФ No SECURITY.md
+- ЁЯЯб `docs.structured_data` тАФ No JSON-LD structured data found for the site/docs
+- ЁЯЯб `hygiene.contributing` тАФ No CONTRIBUTING.md
+- ЁЯЯб `npm.files_hygiene` тАФ No "files" array and no .npmignore тАФ the tarball is guesswork
+- ЁЯЯб `docs.llms_full` тАФ llms-full.txt is missing
+- ЁЯЯб `docs.quickstart_source` тАФ quickstart is missing: install, run
+- ЁЯЯб `readme.heading_structure` тАФ README has only 0 H2 sections (target >= 4)
+- ЁЯЯб `npm.test_script` тАФ No test script in package.json
+- ЁЯЯб `hygiene.gitignore` тАФ No .gitignore
+- ЁЯЯб `hygiene.citation` тАФ No CITATION.cff
+- ЁЯЯб `hygiene.issue_templates` тАФ No issue or PR templates
+- ЁЯЯб `npm.engines` тАФ engines.node is not declared
+- ЁЯФ╡ `npm.types` тАФ No TypeScript types declared
+- ЁЯФ╡ `docs.link_health` тАФ Link health not checked (offline mode)
+- ЁЯФ╡ `readme.verifiable_claims` тАФ No quantified claims in README
+- ЁЯФ╡ `npm.version_stability` тАФ Version 0.0.1 is pre-1.0 (npms.io completeness bonus needs >= 1.0.0)
+- ЁЯФ╡ `hygiene.codeowners` тАФ No CODEOWNERS file
+- ЁЯФ╡ `hygiene.gitattributes` тАФ No .gitattributes
 
 </details>
 
@@ -167,8 +171,7 @@ machine).
 - [ ] Resolve 12 error-level finding(s)
 - [ ] Re-run `rdk audit` and push the updated score
 
-<sub>Automated by <a href="https://github.com/WhiteBite/repo-aeo">Repo Discoverability Kit</a> · audit-only by default, no writes performed</sub>
-
+<sub>Automated by <a href="https://github.com/WhiteBite/repo-aeo">Repo Discoverability Kit</a> ┬╖ audit-only by default, no writes performed</sub>
 ```
 
 The comment starts with `<!-- rdk-discoverability-audit -->`, so repeated runs
@@ -182,15 +185,15 @@ Full transcript: [`docs/examples/demo-before-after.md`](./docs/examples/demo-bef
 
 | Stage | Score | Grade | Errors | Autofixable |
 | --- | --- | --- | --- | --- |
-| before | 29/100 | F | 12 | 16 |
-| after `rdk init --apply` | 67/100 | D | 6 | 4 |
-| after `rdk fix --apply` | 71/100 | C | 5 | 0 |
+| before | 29/100 | F | 12 | 20 |
+| after `rdk init --apply` | 61/100 | D | 2 | 7 |
+| after `rdk fix --apply` | 73/100 | C | 0 | 3 |
 
-The jump from 29 to 71 comes from files the tool can safely create: README
+The jump from 29 to 73 comes from files the tool can safely create: README
 sections, an `AGENTS.md` draft, `llms.txt`, `llms-full.txt`, `LICENSE`,
 `SECURITY.md`, `CONTRIBUTING.md`, `CITATION.cff`, `.gitignore`,
 `.gitattributes`, issue/PR templates, CODEOWNERS and a JSON-LD snippet. The
-remaining 29 points need a human: a real description, real examples, an
+remaining 27 points need a human: a real description, real examples, an
 `exports` map, types and benchmark numbers.
 
 ---
@@ -200,7 +203,7 @@ remaining 29 points need a human: a real description, real examples, an
 ```
 # rdk npm-surface
 
-**repo-aeo@0.1.0**
+**repo-aeo@0.3.1**
 
 | Field | Value |
 | --- | --- |
@@ -212,25 +215,20 @@ remaining 29 points need a human: a real description, real examples, an
 | types | ./src/index.d.ts |
 | sideEffects | false |
 | engines | {"node":">=18"} |
-| files | bin, src, README.md, llms.txt, llms-full.txt, AGENTS.md |
+| files | bin, src, README.md, llms.txt, llms-full.txt, AGENTS.md, skills |
 
 ## Tarball (npm pack --dry-run)
 
-32 files, 180 KB unpacked.
+42 files, 224 KB unpacked.
 
 ## Publishability
 
-✅ No blocking issues found.
+тЬЕ No blocking issues found.
 
 Note: `rdk npm-surface` never publishes. Publishing requires an explicit `npm publish` by a human.
-
----
-
-## 5. Test suite
-
 ```
-# tests 111
-# pass 111
+# tests 121
+# pass 121
 # fail 0
 ```
 
@@ -242,7 +240,7 @@ must write nothing, `github-sync` without `--ack` must refuse), the MCP tool
 registry contract (naming, annotations, JSON Schema, the write guard) and the
 JSON-RPC transport (handshake, notifications, error codes, junk input).
 
-Split: `npm run test:cli` (72 tests) and `npm run test:mcp` (39 tests).
+Split: `npm run test:cli` (80 tests) and `npm run test:mcp` (41 tests).
 
 ---
 
@@ -253,7 +251,7 @@ Split: `npm run test:cli` (72 tests) and `npm run test:mcp` (39 tests).
 ```
 Discoverability score: 96/100 (grade A)
 checks passed: 39/41 - errors 0 - warnings 0 - autofixable 0
-trend: no history yet
+trend: 96 -> 96 (flat)
 ```
 
 `node packages/repo-aeo-mcp/bin/repo-aeo-mcp.js tools` lists the eight tools,
@@ -278,13 +276,10 @@ Pass --apply --ack <ACK> --reason "<why>" to write.
 - Link health checks require `--online`; the offline audit never opens a socket.
   In a restricted network some hosts (nodejs.org, img.shields.io) are
   unreachable for reasons that have nothing to do with the links themselves —
-  the tool reports the probe result, it cannot tell the two apart.
+  the tool reports the probe result, it cannot tell the two apart. Persistent
+  rate-limiting (HTTP 429) is reported as a warning, not as a broken link.
 - `github-sync` write paths are exercised only through their refusal paths in
   CI (they need a real repository and a `gh` login). The same is true for the
   MCP write tool, which shares that implementation.
-- The GitHub repository description, homepage and topics are still unset; the
-  audit reads them as 100/100 because the local config is complete, and
-  `github-sync --apply` is the step that pushes them.
-- `tree/main/...` links 404 until this branch is merged into `main`.
-- The packages are 0.1.0, so the npms.io completeness bonus is not available
-  yet; bumping to 1.0.0 is a human decision.
+- The packages are 0.3.1 (engine) and 0.3.2 (MCP), so the npms.io completeness
+  bonus is not available yet; bumping to 1.0.0 is a human decision.

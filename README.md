@@ -10,7 +10,7 @@ RDK scores how discoverable your repository is, fixes the parts that can be fixe
 automatically, and keeps it from regressing in CI. It is the tool you point at a
 repo that is *good but invisible*.
 
-The audit runs **41 checks in under 200 ms offline** on this repository
+The audit runs **41 checks in under 300 ms offline** on this repository
 (measured with `rdk audit --format json`, `duration_ms` field) and carries **0
 runtime dependencies**, so `npx` stays fast and the supply chain stays small.
 
@@ -80,14 +80,14 @@ offline; `--online` adds link checks and live GitHub metadata.
 
 ```bash
 $ npx repo-aeo audit            # measured on fixtures/demo-repo, offline
-score: 29/100 (grade F) · checks: 10/41 passed · findings: 12 error, 13 warn, 6 info (16 autofixable) · mode: offline (use --online for link + GitHub checks)
+score: 29/100 (grade F) · checks: 10/41 passed · findings: 12 error, 13 warn, 6 info (20 autofixable) · mode: offline (use --online for link + GitHub checks)
 ```
 
 ### 2. Fix what is safe to fix
 
 ```bash
 $ npx repo-aeo fix --dry-run     # review the diff
-$ npx repo-aeo fix --apply       # 18 files: README sections, AGENTS.md draft, llms.txt, CITATION.cff, ...
+$ npx repo-aeo fix --apply       # 16 files: README sections, AGENTS.md draft, llms.txt, CITATION.cff, ...
 ```
 
 ### 3. Check the publish surface

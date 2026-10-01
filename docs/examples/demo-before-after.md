@@ -18,7 +18,7 @@ npx repo-aeo audit            # after
 ```text
 # Discoverability audit — demo-widget
 
-**Score: 29/100 (grade F)** — generated 2026-09-28T23:17:36.249Z
+**Score: 29/100 (grade F)** — generated 2026-10-01T11:39:26.287Z
 
 ██████░░░░░░░░░░░░░░ 29/100
 
@@ -30,14 +30,15 @@ npx repo-aeo audit            # after
 | npm readiness | 20/100 | 20 | 2/10 checks passed |
 | Docs readiness | 17/100 | 12 | 1/6 checks passed |
 | Trust & hygiene | 11/100 | 8 | 1/9 checks passed |
+
+Checks: 10/41 passed · errors 12 · warnings 13 · info 6 · autofixable 20
 ```
 
 ## Step 1 — `rdk init --apply`
 
 ```text
-Applied 14 patch group(s), wrote 18 file(s):
+Applied 14 patch group(s), wrote 16 file(s):
   + .discoverability/project.yml
-  + README.md
   + README.md
   + AGENTS.md
   + llms.txt
@@ -45,7 +46,6 @@ Applied 14 patch group(s), wrote 18 file(s):
   + LICENSE
   + SECURITY.md
   + CONTRIBUTING.md
-  + README.md
   + CITATION.cff
   + .gitignore
   + .gitattributes
@@ -59,12 +59,22 @@ Applied 14 patch group(s), wrote 18 file(s):
 ## Step 2 — `rdk fix --apply`
 
 ```text
-Applied 5 patch group(s):
+Applied 6 patch group(s) in 2 passes:
+  - llms.generate: Generate llms.txt and llms-full.txt
+  - package.metadata: Seed package.json metadata from the config
+  - package.keywords: Top up package.json keywords from the config
+  - package.engines: Declare engines.node
+  - readme.examples_stub: Add example stubs to the README
+  - llms.generate: Generate llms.txt and llms-full.txt
+
+Wrote 6 file(s):
   + llms-full.txt
   + package.json
   + package.json
   + package.json
   + README.md
+  + llms-full.txt
+
 Reminder: AGENTS.md and README stubs are drafts — review them by hand before committing.
 Never publish, tag or force-push from an autofix branch without an explicit ACK.
 ```
@@ -74,18 +84,20 @@ Never publish, tag or force-push from an autofix branch without an explicit ACK.
 ```text
 # Discoverability audit — demo-widget
 
-**Score: 71/100 (grade C)** — generated 2026-09-28T23:17:36.631Z
+**Score: 73/100 (grade C)** — generated 2026-10-01T11:39:26.796Z
 
-██████████████░░░░░░ 71/100
+███████████████░░░░░ 73/100
 
 | Axis | Score | Weight | Status |
 | --- | --- | --- | --- |
 | GitHub metadata | 75/100 | 20 | 3/4 checks passed |
 | README primitives | 71/100 | 25 | 5/7 checks passed |
 | Agent readiness | 80/100 | 15 | 4/5 checks passed |
-| npm readiness | 40/100 | 20 | 4/10 checks passed |
+| npm readiness | 50/100 | 20 | 5/10 checks passed |
 | Docs readiness | 83/100 | 12 | 5/6 checks passed |
 | Trust & hygiene | 100/100 | 8 | complete |
+
+Checks: 31/41 passed · errors 0 · warnings 6 · info 4 · autofixable 3
 ```
 
 ## What the generated files look like
