@@ -547,7 +547,7 @@ export const PATCHES = [
     mutations(ctx) {
       const path = join(ctx.cwd, 'docs', 'jsonld.jsonld');
       const before = exists(path) ? readTextIfExists(path) : null;
-      return [mutation(path, before, renderJsonLd(ctx.config, ctx.pkg))];
+      return [mutation(path, before, renderJsonLd(ctx.config, ctx.pkg, ctx.cwd))];
     },
   },
 ];

@@ -126,6 +126,29 @@ test('generated project.yml points at the tool documentation, not at the audited
   assert.ok(!docsLine.includes('someone-else'), 'the docs link belongs to the tool, not to the audited repo');
 });
 
+test('renderJsonLd derives programmingLanguage from repository markers', () => {
+  const py = makeRepo({ 'pyproject.toml': '[project]\nname = "pydemo"\n', 'main.py': 'print(1)\n' });
+  const poly = makeRepo({ 'package.json': JSON.stringify({ name: 'poly' }), 'main.py': 'print(1)\n' });
+  const bare = makeRepo({ 'README.md': '# bare\n' });
+  try {
+    const pyJson = JSON.parse(renderJsonLd({ project: { name: 'pydemo' } }, null, py));
+    assert.deepEqual(pyJson.programmingLanguage, ['Python']);
+    assert.equal(pyJson.runtimePlatform, undefined);
+
+    const polyJson = JSON.parse(renderJsonLd({ project: { name: 'poly' } }, { name: 'poly' }, poly));
+    assert.ok(polyJson.programmingLanguage.includes('JavaScript'));
+    assert.ok(polyJson.programmingLanguage.includes('Python'));
+    assert.equal(polyJson.runtimePlatform, 'Node.js');
+
+    const bareJson = JSON.parse(renderJsonLd({ project: { name: 'bare' } }, null, bare));
+    assert.equal(bareJson.programmingLanguage, undefined);
+  } finally {
+    removeRepo(py);
+    removeRepo(poly);
+    removeRepo(bare);
+  }
+});
+
 test('renderJsonLd emits author and sameAs from config and package facts', () => {
   const config = {
     project: { name: 'jsonld-demo', one_liner: 'Demo', copyright_holder: 'Ada Lovelace' },

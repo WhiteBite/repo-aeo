@@ -1,6 +1,6 @@
 {
   "name": "repo-aeo",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Audit and improve repository discoverability: GitHub metadata and topics, README structure, AGENTS.md, npm package surface, llms.txt and structured data.",
   "type": "module",
   "license": "MIT",

@@ -7,7 +7,7 @@ headings and the commentary.
 Reproduce:
 
 ```bash
-npm test                                                             # 106 tests
+npm test                                                             # 111 tests
 node packages/rdk-cli/bin/rdk.js audit                               # section 1
 node packages/rdk-cli/bin/rdk.js audit --online                      # adds link + GitHub checks
 node packages/rdk-cli/bin/rdk.js npm-surface                         # section 4
@@ -229,8 +229,8 @@ Note: `rdk npm-surface` never publishes. Publishing requires an explicit `npm pu
 ## 5. Test suite
 
 ```
-# tests 106
-# pass 106
+# tests 111
+# pass 111
 # fail 0
 ```
 
@@ -242,7 +242,7 @@ must write nothing, `github-sync` without `--ack` must refuse), the MCP tool
 registry contract (naming, annotations, JSON Schema, the write guard) and the
 JSON-RPC transport (handshake, notifications, error codes, junk input).
 
-Split: `npm run test:cli` (69 tests) and `npm run test:mcp` (37 tests).
+Split: `npm run test:cli` (72 tests) and `npm run test:mcp` (39 tests).
 
 ---
 

@@ -3,8 +3,8 @@
  * .discoverability/project.yml plus facts read from the repository — the
  * generator never invents claims it cannot source from the config.
  */
-import { join } from 'node:path';
-import { exists, readTextIfExists, mtimeMs } from '../util/fs.js';
+import { extname, join } from 'node:path';
+import { exists, listFiles, readTextIfExists, mtimeMs } from '../util/fs.js';
 import { repoOwner, toolDocUrl } from '../util/repo.js';
 
 function yamlList(items, indent = '  ') {
@@ -407,17 +407,72 @@ ${yamlBlock('keywords', (config.keywords && config.keywords.npm_keywords) || [])
 `;
 }
 
-export function renderJsonLd(config, pkg) {
+const MANIFEST_LANGUAGES = [
+  ['package.json', 'JavaScript'],
+  ['tsconfig.json', 'TypeScript'],
+  ['pyproject.toml', 'Python'],
+  ['setup.py', 'Python'],
+  ['go.mod', 'Go'],
+  ['Cargo.toml', 'Rust'],
+  ['pom.xml', 'Java'],
+  ['build.gradle', 'Java'],
+  ['build.gradle.kts', 'Kotlin'],
+  ['Gemfile', 'Ruby'],
+  ['composer.json', 'PHP'],
+  ['pubspec.yaml', 'Dart'],
+  ['mix.exs', 'Elixir'],
+  ['Package.swift', 'Swift'],
+  ['build.sbt', 'Scala'],
+  ['DESCRIPTION', 'R'],
+  ['stack.yaml', 'Haskell'],
+  ['cpanfile', 'Perl'],
+  ['CMakeLists.txt', 'C++'],
+];
+
+const EXTENSION_LANGUAGES = {
+  '.js': 'JavaScript', '.jsx': 'JavaScript', '.mjs': 'JavaScript', '.cjs': 'JavaScript', '.vue': 'JavaScript', '.svelte': 'JavaScript',
+  '.ts': 'TypeScript', '.tsx': 'TypeScript', '.mts': 'TypeScript', '.cts': 'TypeScript',
+  '.py': 'Python', '.pyi': 'Python',
+  '.go': 'Go', '.rs': 'Rust', '.java': 'Java', '.kt': 'Kotlin', '.kts': 'Kotlin', '.rb': 'Ruby', '.php': 'PHP',
+  '.cs': 'C#', '.cpp': 'C++', '.cc': 'C++', '.cxx': 'C++', '.hpp': 'C++', '.c': 'C', '.h': 'C',
+  '.swift': 'Swift', '.dart': 'Dart', '.ex': 'Elixir', '.exs': 'Elixir', '.erl': 'Erlang', '.hs': 'Haskell',
+  '.scala': 'Scala', '.clj': 'Clojure', '.lua': 'Lua', '.pl': 'Perl', '.pm': 'Perl', '.r': 'R',
+  '.sh': 'Shell', '.sql': 'SQL', '.zig': 'Zig', '.ml': 'OCaml', '.fs': 'F#', '.groovy': 'Groovy', '.tf': 'HCL',
+};
+
+// no recognizable marker means no programmingLanguage: a wrong language misleads crawlers more than none
+function detectLanguages(cwd, pkg) {
+  const counts = new Map();
+  const add = (lang, weight) => counts.set(lang, (counts.get(lang) || 0) + weight);
+  if (pkg) add('JavaScript', 100);
+  if (cwd) {
+    for (const [file, lang] of MANIFEST_LANGUAGES) {
+      if (exists(join(cwd, file))) add(lang, 100);
+    }
+    for (const file of listFiles(cwd, { recursive: true, maxDepth: 4 })) {
+      const lang = EXTENSION_LANGUAGES[extname(file).toLowerCase()];
+      if (lang) add(lang, 1);
+    }
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([lang]) => lang)
+    .slice(0, 5);
+}
+
+export function renderJsonLd(config, pkg, cwd) {
   const project = config.project || {};
   const name = project.name || (pkg && pkg.name) || 'project';
   const url = config.links && (config.links.homepage || config.links.docs);
+  const languages = detectLanguages(cwd, pkg);
+  const nodeRuntime = languages.includes('JavaScript') || languages.includes('TypeScript');
   const data = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareSourceCode',
     name,
     description: project.description || project.one_liner || '',
-    programmingLanguage: (pkg && pkg.type === 'module' && 'JavaScript') || 'JavaScript',
-    runtimePlatform: 'Node.js',
+    ...(languages.length > 0 ? { programmingLanguage: languages } : {}),
+    ...(nodeRuntime ? { runtimePlatform: 'Node.js' } : {}),
     license: 'https://opensource.org/licenses/MIT',
     keywords: ((config.keywords && config.keywords.npm_keywords) || []).join(', '),
   };
