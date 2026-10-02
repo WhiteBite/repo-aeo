@@ -17,6 +17,64 @@ export function isProbeable(url) {
   return !SKIP_EXTENSIONS.test(url);
 }
 
+/** Splits curl stdout (body plus the `-w '\n%{http_code}'` write-out) into body text and numeric status. */
+export function parseCurlStatus(stdout) {
+  const raw = String(stdout);
+  const split = raw.lastIndexOf('\n');
+  if (split !== -1) {
+    const status = Number.parseInt(raw.slice(split + 1).trim(), 10);
+    if (Number.isInteger(status) && status > 0) return { text: raw.slice(0, split), status };
+  }
+  return { text: raw, status: null };
+}
+
+/** GET a URL as text with retry on 429/5xx, a byte cap and a curl fallback for egress-filtered networks. */
+export async function httpGetText(url, { timeoutMs = 10000, maxBytes = 512 * 1024, userAgent = USER_AGENT, retries = 2, retryBaseMs = 500 } = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        const response = await fetch(url, {
+          redirect: 'follow',
+          signal: controller.signal,
+          headers: { 'user-agent': userAgent, accept: '*/*' },
+        });
+        const declared = Number(response.headers.get('content-length'));
+        if (Number.isFinite(declared) && declared > maxBytes) {
+          await response.body?.cancel().catch(() => {});
+          return { ok: false, status: response.status, text: '', bytes: 0, via: 'fetch', error: `response declares ${declared} bytes, over the ${maxBytes} byte cap` };
+        }
+        if (retryable(response.status) && attempt < retries) {
+          await response.body?.cancel().catch(() => {});
+          const wait = retryAfterMs(response) ?? retryBaseMs * 2 ** attempt;
+          if (wait > 0) await sleep(wait);
+          continue;
+        }
+        const text = await response.text();
+        const capped = text.slice(0, maxBytes);
+        return { ok: response.status < 400, status: response.status, text: capped, bytes: Buffer.byteLength(capped, 'utf8'), via: 'fetch', error: null };
+      } catch (fetchError) {
+        // a network-level failure is not proof the URL is unreachable: fall back to curl
+        try {
+          const { stdout } = await execFileAsync(
+            'curl',
+            ['-sS', '-L', '--max-time', String(Math.ceil(timeoutMs / 1000)), '-A', userAgent, '-w', '\\n%{http_code}', url],
+            { timeout: timeoutMs + 2000, maxBuffer: maxBytes * 2 },
+          );
+          const { text: rawText, status } = parseCurlStatus(stdout);
+          const capped = rawText.slice(0, maxBytes);
+          return { ok: status !== null && status < 400, status, text: capped, bytes: Buffer.byteLength(capped, 'utf8'), via: 'curl', error: status === null ? String((fetchError && fetchError.message) || fetchError) : null };
+        } catch {
+          return { ok: false, status: null, text: '', bytes: 0, via: 'none', error: String((fetchError && fetchError.message) || fetchError) };
+        }
+      }
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Fallback probe via curl, for environments where fetch() cannot reach the network. */
 async function curlProbe(url, timeoutMs) {
   const seconds = Math.max(1, Math.ceil(timeoutMs / 1000));
@@ -76,6 +134,7 @@ export async function probeUrl(url, { timeoutMs = 6000, retries = 2, retryBaseMs
         if (wait > 0) await sleep(wait);
         continue;
       }
+      await response.body?.cancel().catch(() => {});
       return { url, status: response.status, ok: response.status < 400, error: null };
     } catch (error) {
       // a network-level failure is not proof the link is dead: fall back to curl before reporting it

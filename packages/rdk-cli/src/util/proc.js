@@ -26,12 +26,6 @@ export function run(cmd, args = [], { cwd = process.cwd(), timeout = 20000, env 
   }
 }
 
-/** True when the binary exists on PATH. */
-export function hasBinary(name) {
-  const probe = process.platform === 'win32' ? 'where' : 'which';
-  return run(probe, [name]).ok;
-}
-
 // On Windows npm is npm.cmd; spawnSync does not apply PATHEXT without a shell.
 export function npmBinary() {
   return process.platform === 'win32' ? 'npm.cmd' : 'npm';

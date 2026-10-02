@@ -1,5 +1,8 @@
 /** Minimal line diff for dry-run previews (no external diff library). */
 
+// beyond this many changed lines on either side the LCS matrix is skipped for a whole-block diff
+const LCS_LINE_CAP = 2000;
+
 function lcsMatrix(a, b) {
   const matrix = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
   for (let i = a.length - 1; i >= 0; i -= 1) {
@@ -14,31 +17,49 @@ function lcsMatrix(a, b) {
 export function diffLines(beforeText, afterText) {
   const before = String(beforeText ?? '').split('\n');
   const after = String(afterText ?? '').split('\n');
-  const matrix = lcsMatrix(before, after);
+  // trim the common prefix and suffix so the quadratic matrix only sees the changed middle
+  let start = 0;
+  while (start < before.length && start < after.length && before[start] === after[start]) start += 1;
+  let endB = before.length;
+  let endA = after.length;
+  while (endB > start && endA > start && before[endB - 1] === after[endA - 1]) {
+    endB -= 1;
+    endA -= 1;
+  }
+  const midB = before.slice(start, endB);
+  const midA = after.slice(start, endA);
   const ops = [];
-  let i = 0;
-  let j = 0;
-  while (i < before.length && j < after.length) {
-    if (before[i] === after[j]) {
-      ops.push({ type: 'context', text: before[i] });
+  for (let i = 0; i < start; i += 1) ops.push({ type: 'context', text: before[i] });
+  if (midB.length > LCS_LINE_CAP || midA.length > LCS_LINE_CAP) {
+    for (const line of midB) ops.push({ type: 'del', text: line });
+    for (const line of midA) ops.push({ type: 'add', text: line });
+  } else {
+    const matrix = lcsMatrix(midB, midA);
+    let i = 0;
+    let j = 0;
+    while (i < midB.length && j < midA.length) {
+      if (midB[i] === midA[j]) {
+        ops.push({ type: 'context', text: midB[i] });
+        i += 1;
+        j += 1;
+      } else if (matrix[i + 1][j] >= matrix[i][j + 1]) {
+        ops.push({ type: 'del', text: midB[i] });
+        i += 1;
+      } else {
+        ops.push({ type: 'add', text: midA[j] });
+        j += 1;
+      }
+    }
+    while (i < midB.length) {
+      ops.push({ type: 'del', text: midB[i] });
       i += 1;
-      j += 1;
-    } else if (matrix[i + 1][j] >= matrix[i][j + 1]) {
-      ops.push({ type: 'del', text: before[i] });
-      i += 1;
-    } else {
-      ops.push({ type: 'add', text: after[j] });
+    }
+    while (j < midA.length) {
+      ops.push({ type: 'add', text: midA[j] });
       j += 1;
     }
   }
-  while (i < before.length) {
-    ops.push({ type: 'del', text: before[i] });
-    i += 1;
-  }
-  while (j < after.length) {
-    ops.push({ type: 'add', text: after[j] });
-    j += 1;
-  }
+  for (let i = endB; i < before.length; i += 1) ops.push({ type: 'context', text: before[i] });
   return ops;
 }
 
@@ -76,12 +97,4 @@ export function unifiedDiff(beforeText, afterText, { path = 'file', context = 2 
     index = stop;
   }
   return lines.join('\n');
-}
-
-export function countChanges(beforeText, afterText) {
-  const ops = diffLines(beforeText, afterText);
-  return {
-    added: ops.filter((op) => op.type === 'add').length,
-    removed: ops.filter((op) => op.type === 'del').length,
-  };
 }

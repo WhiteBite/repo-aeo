@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
+import { dirname, join } from 'node:path';
 
 export function exists(path) {
   return existsSync(path);
@@ -12,10 +12,6 @@ export function mtimeMs(path) {
   } catch {
     return null;
   }
-}
-
-export function readText(path) {
-  return readFileSync(path, 'utf8');
 }
 
 export function readTextIfExists(path) {
@@ -50,7 +46,7 @@ export function listFiles(dir, { recursive = false, maxDepth = 3 } = {}) {
       return;
     }
     for (const entry of entries) {
-      if (entry.name === 'node_modules' || entry.name === '.git') continue;
+      if (entry.name === 'node_modules' || (entry.isDirectory() && entry.name.startsWith('.'))) continue;
       const full = join(current, entry.name);
       if (entry.isDirectory()) {
         if (recursive && depth < maxDepth) walk(full, depth + 1);
@@ -71,6 +67,3 @@ export function isDirectory(path) {
   }
 }
 
-export function rel(from, to) {
-  return relative(from, to);
-}

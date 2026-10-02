@@ -3,8 +3,13 @@ import assert from 'node:assert/strict';
 import { renderMarkdownReport } from '../src/report/markdown.js';
 import { renderGithubComment } from '../src/report/githubComment.js';
 import { docsChecks } from '../src/audit/checks/docs.js';
-import { npmBinary, hasBinary, run } from '../src/util/proc.js';
+import { npmBinary, run } from '../src/util/proc.js';
 import { TOOL_HOME } from '../src/util/repo.js';
+
+function hasBinary(name) {
+  const probe = process.platform === 'win32' ? 'where' : 'which';
+  return run(probe, [name]).ok;
+}
 
 const linkHealth = docsChecks.find((c) => c.id === 'docs.link_health');
 

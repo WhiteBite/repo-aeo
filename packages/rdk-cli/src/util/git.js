@@ -50,8 +50,12 @@ export function parseRemote(url) {
   return { host: null, owner: null, repo: null };
 }
 
+let ghCliCache = null;
+
 export function hasGhCli() {
-  return run('gh', ['--version']).ok;
+  // cached per process: gitInfo runs on every audit and gh is never installed mid-run
+  if (ghCliCache === null) ghCliCache = run('gh', ['--version']).ok;
+  return ghCliCache;
 }
 
 /** Returns the last N commit subjects+bodies for the local secrets heuristic. */
