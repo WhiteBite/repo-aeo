@@ -3,10 +3,10 @@
  * applicable check, scores the result and returns a serialisable report.
  */
 import { join, relative } from 'node:path';
+import { readTextIfExists, exists } from '../util/fs.js';
 import { loadConfig } from '../config.js';
-import { readTextIfExists, exists, readJsonIfExists } from '../util/fs.js';
 import { gitInfo } from '../util/git.js';
-import { repoWebUrl } from '../util/repo.js';
+import { TOOL_HOME } from '../util/repo.js';
 import { run } from '../util/proc.js';
 import { probeUrls, isProbeable } from '../util/http.js';
 import { parseMarkdown, isSkip } from './checks/_shared.js';
@@ -43,7 +43,7 @@ export function collectGithub(cwd, config, git, { enabled = false } = {}) {
   }
 }
 
-function collectLinks(cwd) {
+function collectLinks(cwd, config) {
   const urls = new Set();
   for (const name of ['README.md', 'llms.txt', 'llms-full.txt']) {
     const path = join(cwd, name);
@@ -53,11 +53,10 @@ function collectLinks(cwd) {
       if (isProbeable(link.url)) urls.add(link.url);
     }
   }
-  const config = loadConfig(cwd).config;
-  for (const value of Object.values(config.links || {})) {
+  for (const value of Object.values((config && config.links) || {})) {
     if (isProbeable(value)) urls.add(value);
   }
-  return [...urls].slice(0, MAX_PROBED_LINKS);
+  return [...urls];
 }
 
 /** Runs the full audit. Returns a plain JSON-serialisable report object. */
@@ -67,13 +66,18 @@ export async function audit(cwd = process.cwd(), options = {}) {
   const { config, configPath, warnings, pkg, git } = loaded;
   const readmePath = join(cwd, 'README.md');
   const readme = exists(readmePath) ? readTextIfExists(readmePath) : null;
+  const readmeDoc = readme === null ? null : parseMarkdown(readme);
+  const agentsMd = exists(join(cwd, 'AGENTS.md')) ? readTextIfExists(join(cwd, 'AGENTS.md')) : null;
 
   const github = collectGithub(cwd, config, git, { enabled: Boolean(options.online && options.github !== false) });
 
   let linkResults = [];
+  let linksTotal = 0;
   if (options.online) {
-    const urls = collectLinks(cwd);
-    if (urls.length > 0) linkResults = await probeUrls(urls, { timeoutMs: options.linkTimeout || 6000 });
+    const urls = collectLinks(cwd, config);
+    linksTotal = urls.length;
+    const probed = urls.slice(0, MAX_PROBED_LINKS);
+    if (probed.length > 0) linkResults = await probeUrls(probed, { timeoutMs: options.linkTimeout || 6000 });
   }
 
   const publishable = loaded.publishable || { pkg, isPrivate: Boolean(pkg && pkg.private) };
@@ -90,8 +94,10 @@ export async function audit(cwd = process.cwd(), options = {}) {
     publishable,
     git,
     readme,
+    readmeDoc,
+    agentsMd,
     github,
-    online: options.online ? { linkResults } : null,
+    online: options.online ? { linkResults, linksTotal } : null,
   };
 
   const registry = [
@@ -174,7 +180,7 @@ export async function audit(cwd = process.cwd(), options = {}) {
       config_path: loaded.exists ? '.discoverability/project.yml' : null,
       // Derived from the audited repository's remote, so report footers never
       // point at the wrong project.
-      repo_url: repoWebUrl(cwd),
+      repo_url: git.host && git.owner && git.repo ? `https://${git.host}/${git.owner}/${git.repo}` : TOOL_HOME,
     },
     environment: {
       offline: !options.online,
@@ -194,5 +200,3 @@ export async function audit(cwd = process.cwd(), options = {}) {
     config_warnings: warnings,
   };
 }
-
-export { readJsonIfExists };

@@ -59,8 +59,9 @@ test('docs.readme_sync fires when llms.txt is older than README.md', async () =>
     const report = await audit(dir, {});
     const finding = report.findings.find((f) => f.id === 'docs.readme_sync');
     assert.ok(finding, 'expected docs.readme_sync to fire when README.md is newer than llms.txt');
-    assert.equal(finding.autoFixable, true);
-    assert.equal(finding.patchId, 'llms.generate');
+    // hand-written llms.txt without markers: rdk fix never overwrites it, so the finding must not promise an autofix
+    assert.equal(finding.autoFixable, false);
+    assert.equal(finding.patchId, null);
 
     const fresh = new Date();
     utimesSync(join(dir, 'llms.txt'), fresh, fresh);

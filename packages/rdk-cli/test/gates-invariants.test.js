@@ -200,6 +200,13 @@ test('every autofixable finding maps to a patch the fixer would plan', async () 
         .filter((f) => f.autoFixable && !planned.has(f.patchId))
         .map((f) => `${f.id} -> ${f.patchId}`);
       assert.deepEqual(unplanned, [], `${dir}: autofixable findings whose patch planPatches would not plan`);
+      for (const patch of planPatches(ctx)) {
+        const mutations = patch.compute();
+        assert.ok(mutations.length > 0, `${dir}: planned patch ${patch.id} must plan at least one mutation`);
+        for (const change of mutations) {
+          assert.notEqual(change.after, change.before, `${dir}: planned patch ${patch.id} must change bytes, got a no-op mutation`);
+        }
+      }
     }
   } finally {
     removeRepo(bare);
