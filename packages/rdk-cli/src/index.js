@@ -14,4 +14,5 @@ export { npmSurfaceCommand } from './commands/npmSurface.js';
 export { skillCommand, skillSourceDir, skillTargets } from './commands/skill.js';
 export { resolvePackage } from './config.js';
 export { TOOL_HOME, DEFAULT_OWNER, repoWebUrl, repoOwner, toolDocUrl } from './util/repo.js';
-export { generatedDrift, GENERATED_START, GENERATED_END, mergeGenerated } from './generate/index.js';
+export { generatedDrift, GENERATED_START, GENERATED_END, mergeGenerated, llmsFreshness } from './generate/index.js';
+export { httpGetText, parseCurlStatus, isProbeable, probeUrl, probeUrls } from './util/http.js';

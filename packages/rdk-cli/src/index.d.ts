@@ -20,7 +20,6 @@ export interface Finding {
   autoFixable: boolean;
   patchId: string | null;
   weight: number;
-  evidence?: string | null;
 }
 
 export interface AxisScore {
@@ -188,3 +187,99 @@ export declare function loadConfig(cwd?: string): {
 export declare function buildSeedConfig(cwd?: string): RdkConfig;
 export declare const CONFIG_RELATIVE_PATH: string;
 export declare function parseYaml(text: string): unknown;
+
+export declare function computeScore(
+  perAxis: Record<string, { passed: number; total: number }>,
+  applicableAxes: string[],
+): DiscoverabilityScore;
+
+export declare function resolvePackage(cwd?: string): {
+  pkg: Record<string, unknown> | null;
+  path: string | null;
+  isPrivate: boolean;
+  source: string;
+};
+
+export declare const DEFAULT_ACK: string;
+export declare function resolveRepo(cwd?: string, options?: { repo?: string }): string | null;
+export declare function effectiveAck(config: RdkConfig): string;
+export declare function planDigest(plan: unknown[]): string;
+
+export interface GithubSyncResult {
+  ok: boolean;
+  output: string;
+  error?: string | null;
+  code?: string | null;
+  exitCode: number;
+  applied: string[];
+  plan?: Array<{ field: string; from: unknown; to: unknown }>;
+  plan_digest?: string | null;
+}
+
+export declare function githubSyncCommand(args: {
+  cwd: string;
+  options: Record<string, unknown>;
+  config: RdkConfig;
+  ghRunner?: (args: string[], options: { cwd: string }) => Promise<{ ok: boolean; stdout?: string; stderr?: string }>;
+}): Promise<GithubSyncResult>;
+
+export interface CommandResult {
+  ok: boolean;
+  output: string;
+  exitCode?: number;
+  summary?: string;
+  error?: string | null;
+  written?: string[];
+  planned?: unknown[];
+  report?: unknown;
+}
+
+export declare function auditCommand(args: { cwd: string; options?: Record<string, unknown> }): Promise<CommandResult>;
+export declare function fixCommand(args: { cwd: string; options?: Record<string, unknown> }): CommandResult;
+export declare function initCommand(args: { cwd: string; options?: Record<string, unknown> }): CommandResult;
+export declare function npmSurfaceCommand(args: { cwd: string; options?: Record<string, unknown> }): CommandResult;
+
+export interface SkillTarget { harness: string; dir: string; }
+export declare function skillCommand(args: { cwd: string; options?: Record<string, unknown> }): CommandResult;
+export declare function skillSourceDir(): string | null;
+export declare function skillTargets(options?: { cwd?: string; project?: boolean }): SkillTarget[];
+
+export declare const GENERATED_START: string;
+export declare const GENERATED_END: string;
+export declare function mergeGenerated(existing: string | null, generated: string): string | null;
+export declare function generatedDrift(cwd: string, config: RdkConfig, pkg: Record<string, unknown> | null): string[];
+
+export interface LlmsFreshness {
+  exists: boolean;
+  managed: boolean;
+  fresh: boolean | null;
+  driftMs: number | null;
+  modified: number | null;
+  sources: string[];
+  newerSources: Array<{ path: string; mtime?: number; contentDrift?: boolean }>;
+}
+
+export declare function llmsFreshness(cwd: string, config: RdkConfig, pkg: Record<string, unknown> | null): LlmsFreshness;
+
+export interface HttpTextResult {
+  ok: boolean;
+  status: number | null;
+  text: string;
+  bytes: number;
+  via: 'fetch' | 'curl' | 'none';
+  error: string | null;
+}
+
+export declare function httpGetText(url: string, options?: { timeoutMs?: number; maxBytes?: number; userAgent?: string; retries?: number }): Promise<HttpTextResult>;
+export declare function parseCurlStatus(stdout: string): { text: string; status: number | null };
+export declare function isProbeable(url: string): boolean;
+
+export interface ProbeResult {
+  url: string;
+  status: number | null;
+  ok: boolean;
+  error: string | null;
+}
+
+export declare function probeUrl(url: string, options?: { timeoutMs?: number; retries?: number }): Promise<ProbeResult>;
+export declare function probeUrls(urls: string[], options?: { timeoutMs?: number; concurrency?: number }): Promise<ProbeResult[]>;
