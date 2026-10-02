@@ -367,3 +367,12 @@ test('license stub falls back to the authors without a copyright_holder', () => 
     removeRepo(dir);
   }
 });
+
+test('renderCitationCff derives the author before falling back to the TODO stub', () => {
+  const config = { project: { name: 'auth-demo' }, keywords: { npm_keywords: [] } };
+  const withHolder = { ...config, project: { ...config.project, copyright_holder: 'Jane Doe' } };
+  assert.match(renderCitationCff(withHolder, null), /- name: "Jane Doe"/);
+  assert.match(renderCitationCff(config, { author: 'Repo Owner' }), /- name: "Repo Owner"/);
+  assert.match(renderCitationCff(config, { author: { name: 'Obj Owner' } }), /- name: "Obj Owner"/);
+  assert.match(renderCitationCff(config, null), /- name: "TODO: maintainer name"/);
+});

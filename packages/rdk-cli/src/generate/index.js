@@ -4,13 +4,9 @@
  * generator never invents claims it cannot source from the config.
  */
 import { extname, join } from 'node:path';
+import { readdirSync } from 'node:fs';
 import { exists, listFiles, readTextIfExists, mtimeMs } from '../util/fs.js';
 import { repoOwnerStrict, toolDocUrl } from '../util/repo.js';
-
-function yamlList(items, indent = '  ') {
-  if (!Array.isArray(items) || items.length === 0) return `${indent}[]`;
-  return items.map((item) => `${indent}- ${JSON.stringify(String(item))}`).join('\n');
-}
 
 /** Renders `key:` (parses back as null) for empty values, `key: "value"` otherwise. */
 function yamlScalar(value) {
@@ -101,8 +97,10 @@ export function mergeGenerated(existing, generated) {
   let tail = tailRaw;
   let separated = middles.length > 0;
   if (!hasEnd) {
-    // orphan start: the region up to the heading is the old generated body
-    const heading = text.indexOf(HANDWRITTEN_HEADING, markers[markers.length - 1].index);
+    // no end marker: spans between markers are old generated body; only text after the last marker may be hand-written
+    middles.length = 0;
+    separated = false;
+    const heading = text.indexOf(HANDWRITTEN_HEADING, markers[0].index);
     if (heading !== -1) {
       tail = text.slice(heading);
       separated = true;
@@ -115,11 +113,55 @@ export function mergeGenerated(existing, generated) {
   return `${head}${GENERATED_START}${eol}${body}${eol}${GENERATED_END}${eol}${eol}${parts.join(eol + eol)}`;
 }
 
+/** Source files whose content feeds the generated llms files: README plus docs/*.md. */
+function llmsSourceFiles(cwd) {
+  const sources = [{ path: 'README.md', mtime: mtimeMs(join(cwd, 'README.md')) }];
+  const docsDir = join(cwd, 'docs');
+  if (exists(docsDir)) {
+    for (const entry of readdirSync(docsDir)) {
+      if (/\.md$/i.test(entry)) sources.push({ path: `docs/${entry}`, mtime: mtimeMs(join(docsDir, entry)) });
+    }
+  }
+  return sources;
+}
+
+/** One freshness predicate shared by the CLI audit and the MCP tool; managed files drift by content, hand-written by any newer source. */
+export function llmsFreshness(cwd, config, pkg) {
+  const llmsPath = join(cwd, 'llms.txt');
+  const text = readTextIfExists(llmsPath);
+  if (text === null) return { exists: false, managed: false, fresh: null };
+  const modified = mtimeMs(llmsPath);
+  if (text.includes(GENERATED_START) && text.includes(GENERATED_END)) {
+    const drifted = generatedDrift(cwd, config, pkg).includes('llms.txt');
+    return {
+      exists: true,
+      managed: true,
+      fresh: !drifted,
+      driftMs: null,
+      modified,
+      sources: ['rendered output'],
+      newerSources: drifted ? [{ path: 'rendered output', contentDrift: true }] : [],
+    };
+  }
+  const sources = llmsSourceFiles(cwd);
+  const newer = sources.filter((source) => source.mtime !== null && source.mtime > modified);
+  const driftMs = newer.length > 0 ? Math.max(...newer.map((source) => source.mtime - modified)) : 0;
+  return {
+    exists: true,
+    managed: false,
+    fresh: newer.length === 0,
+    driftMs,
+    modified,
+    sources: sources.map((source) => source.path),
+    newerSources: newer.map((source) => ({ path: source.path, mtime: source.mtime })),
+  };
+}
+
 /**
  * Names of the generated llms files whose on-disk content no longer matches the
  * rendered output. Marker-managed files are compared by content (so `rdk fix`
  * clearing the drift is guaranteed); hand-written files without markers fall
- * back to README mtime, which `rdk fix` never overwrites.
+ * back to source mtimes, which `rdk fix` never overwrites.
  */
 export function generatedDrift(cwd, config, pkg) {
   const readmePath = join(cwd, 'README.md');
@@ -137,8 +179,8 @@ export function generatedDrift(cwd, config, pkg) {
       if (mergeGenerated(text, generated) !== text) stale.push(relative);
     } else {
       const fileTime = mtimeMs(path);
-      const readmeTime = mtimeMs(readmePath);
-      if (fileTime !== null && readmeTime !== null && readmeTime - fileTime > 60 * 60 * 1000) stale.push(relative);
+      const newer = llmsSourceFiles(cwd).some((source) => source.mtime !== null && fileTime !== null && source.mtime > fileTime);
+      if (newer) stale.push(relative);
     }
   }
   return stale;
@@ -443,17 +485,82 @@ function normalizeRepoUrl(url) {
   return value;
 }
 
-export function renderCitationCff(config, pkg) {
+/** Version the generated metadata should carry: config override, then package, then the stub default. */
+export function expectedVersion(config, pkg) {
+  return String((config && config.version) || (pkg && pkg.version) || '0.1.0');
+}
+
+/** Author for the citation stub: configured holder, package author, repository owner, else an explicit TODO. */
+function citationAuthor(config, pkg, cwd) {
+  const holder = config && config.project && config.project.copyright_holder;
+  if (holder && String(holder).trim() !== '') return String(holder).trim();
+  const author = pkg && pkg.author;
+  if (typeof author === 'string' && author.trim() !== '') return author.trim();
+  if (author && typeof author === 'object' && typeof author.name === 'string' && author.name.trim() !== '') return author.name.trim();
+  const owner = cwd ? repoOwnerStrict(cwd) : null;
+  return owner || 'TODO: maintainer name';
+}
+
+const CITATION_VERSION_RE = /^version:[ \t]*("(?:[^"\\]|\\.)*"|'[^']*'|[^\s#]+)/m;
+
+function unquoteYamlScalar(raw) {
+  const value = String(raw).trim();
+  if (value.length >= 2 && ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))) {
+    return value.slice(1, -1);
+  }
+  return value;
+}
+
+/**
+ * Surgical CITATION.cff version drift. Non-null only when the file carries a
+ * `version:` key whose value differs from the expected one, so hand-written
+ * citation files without the key are never touched. `refreshed` replaces just
+ * the scalar, preserving every other line and any trailing inline comment.
+ */
+export function citationVersionDrift(cwd, config, pkg) {
+  const path = join(cwd, 'CITATION.cff');
+  const text = readTextIfExists(path);
+  if (text === null) return null;
+  const match = CITATION_VERSION_RE.exec(text);
+  if (!match) return null;
+  const current = unquoteYamlScalar(match[1]);
+  const expected = expectedVersion(config, pkg);
+  if (current === expected) return null;
+  return { path, current, expected, refreshed: text.replace(CITATION_VERSION_RE, `version: ${JSON.stringify(expected)}`) };
+}
+
+/**
+ * Surgical docs/jsonld.jsonld drift: refreshes only an existing
+ * `softwareVersion` key and never adds one to a hand-written snippet.
+ */
+export function jsonldVersionDrift(cwd, pkg) {
+  if (!pkg || !pkg.version) return null;
+  const path = join(cwd, 'docs', 'jsonld.jsonld');
+  const text = readTextIfExists(path);
+  if (text === null) return null;
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  if (!Object.prototype.hasOwnProperty.call(data, 'softwareVersion')) return null;
+  if (String(data.softwareVersion) === String(pkg.version)) return null;
+  return { path, data, current: String(data.softwareVersion), expected: String(pkg.version) };
+}
+
+export function renderCitationCff(config, pkg, cwd = null) {
   const project = config.project || {};
-  const message = 'CITATION.cff — generated by rdk. Verify authors and version before release.';
+  const message = 'CITATION.cff — generated by rdk. Verify authors, version and license before release.';
+  const licenseSpdx = detectLicenseSpdx(cwd);
   return `cff-version: 1.2.0
 message: "${message}"
 title: ${JSON.stringify(project.name || '')}
-version: ${JSON.stringify(String(config.version || (pkg && pkg.version) || '0.1.0'))}
-license: MIT
-type: software
+version: ${JSON.stringify(expectedVersion(config, pkg))}
+${licenseSpdx ? `license: ${licenseSpdx}\n` : ''}type: software
 authors:
-  - name: "TODO: maintainer name"
+  - name: ${JSON.stringify(citationAuthor(config, pkg, cwd))}
     # orcid / affiliation optional
 repository-code: ${JSON.stringify(repositoryUrl(config, pkg) || '')}
 abstract: ${JSON.stringify(project.description || project.one_liner || '')}
@@ -494,6 +601,37 @@ const EXTENSION_LANGUAGES = {
   '.sh': 'Shell', '.sql': 'SQL', '.zig': 'Zig', '.ml': 'OCaml', '.fs': 'F#', '.groovy': 'Groovy', '.tf': 'HCL',
 };
 
+const LICENSE_SPDX_DETECTORS = [
+  [/apache\s+license/i, /version\s+2/i, 'Apache-2.0'],
+  [/bsd\s+3[-\s]clause/i, /redistribution/i, 'BSD-3-Clause'],
+  [/bsd\s+2[-\s]clause/i, /redistribution/i, 'BSD-2-Clause'],
+  [/^MIT(\s|$)/im, /permission is hereby granted/i, 'MIT'],
+  [/^ISC(\s|$)/im, /permission to use, copy, modify/i, 'ISC'],
+  [/mozilla\s+public\s+license/i, /2\.0/i, 'MPL-2.0'],
+  [/GNU\s+AFFERO\s+GENERAL\s+PUBLIC\s+LICENSE/i, /Version\s+3/i, 'AGPL-3.0-only'],
+  [/GNU\s+GENERAL\s+PUBLIC\s+LICENSE/i, /Version\s+3/i, 'GPL-3.0-only'],
+  [/GNU\s+GENERAL\s+PUBLIC\s+LICENSE/i, /Version\s+2/i, 'GPL-2.0-only'],
+];
+
+// the generator must not claim a license it cannot see: SPDX from the LICENSE file, or nothing
+function detectLicenseSpdx(cwd) {
+  if (!cwd) return null;
+  const candidates = [join(cwd, 'LICENSE'), join(cwd, 'LICENSE.md'), join(cwd, 'LICENSE.txt'), join(cwd, 'COPYING'), join(cwd, '.github', 'LICENSE'), join(cwd, 'docs', 'LICENSE')];
+  let text = null;
+  for (const path of candidates) {
+    const value = readTextIfExists(path);
+    if (value !== null) {
+      text = value;
+      break;
+    }
+  }
+  if (text === null) return null;
+  for (const [first, second, spdx] of LICENSE_SPDX_DETECTORS) {
+    if (first.test(text) && second.test(text)) return spdx;
+  }
+  return null;
+}
+
 // no recognizable marker means no programmingLanguage: a wrong language misleads crawlers more than none
 function detectLanguages(cwd, pkg) {
   const counts = new Map();
@@ -520,6 +658,7 @@ export function renderJsonLd(config, pkg, cwd) {
   const url = config.links && (config.links.homepage || config.links.docs);
   const languages = detectLanguages(cwd, pkg);
   const nodeRuntime = languages.includes('JavaScript') || languages.includes('TypeScript');
+  const licenseSpdx = detectLicenseSpdx(cwd);
   const data = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareSourceCode',
@@ -527,7 +666,7 @@ export function renderJsonLd(config, pkg, cwd) {
     description: project.description || project.one_liner || '',
     ...(languages.length > 0 ? { programmingLanguage: languages } : {}),
     ...(nodeRuntime ? { runtimePlatform: 'Node.js' } : {}),
-    license: 'https://opensource.org/licenses/MIT',
+    ...(licenseSpdx ? { license: `https://opensource.org/licenses/${licenseSpdx}` } : {}),
     keywords: ((config.keywords && config.keywords.npm_keywords) || []).join(', '),
   };
   if (url) data.url = url;
@@ -559,6 +698,21 @@ export function renderGitattributes() {
 *.woff2 binary
 *.pdf binary
 `;
+}
+
+/** Package ecosystems dependabot should watch, derived from manifests present in the repository. */
+export function dependabotEcosystems(cwd, pkg) {
+  const ecosystems = [];
+  if (pkg || exists(join(cwd, 'package.json'))) ecosystems.push('npm');
+  if (exists(join(cwd, 'requirements.txt')) || exists(join(cwd, 'pyproject.toml')) || exists(join(cwd, 'setup.py'))) ecosystems.push('pip');
+  if (exists(join(cwd, '.github', 'workflows'))) ecosystems.push('github-actions');
+  return ecosystems;
+}
+
+/** dependabot config: weekly update blocks, one per detected ecosystem. */
+export function renderDependabotYml(ecosystems) {
+  const blocks = ecosystems.map((ecosystem) => `  - package-ecosystem: ${ecosystem}\n    directory: "/"\n    schedule:\n      interval: weekly`);
+  return `version: 2\nupdates:\n${blocks.join('\n')}\n`;
 }
 
 export function renderIssueTemplate() {
@@ -622,12 +776,9 @@ export function renderPrTemplate() {
  * remote, because `* @WhiteBite` in someone else's repository would silently
  * assign their code to us.
  */
-export function renderCodeowners(cwd = process.cwd()) {
-  const owner = repoOwnerStrict(cwd);
+export function renderCodeowners(cwd = process.cwd(), owner = repoOwnerStrict(cwd)) {
   if (!owner) return null;
-  return `# Default owners for everything
-* @${owner}
-`;
+  return `# Default owners for everything\n* @${owner}\n`;
 }
 
 
@@ -702,5 +853,143 @@ Thanks for taking the time to contribute.
 ## Code of conduct
 
 Be respectful. Maintainers may close issues that do not follow this guide.
+`;
+}
+
+/** CODE_OF_CONDUCT.md: Contributor Covenant 2.1 with the same private reporting channel as the SECURITY.md stub. */
+export function renderCodeOfConduct() {
+  return `# Contributor Covenant Code of Conduct
+
+## Our Pledge
+
+We as members, contributors, and leaders pledge to make participation in our
+community a harassment-free experience for everyone, regardless of age, body
+size, visible or invisible disability, ethnicity, sex characteristics, gender
+identity and expression, level of experience, education, socio-economic status,
+nationality, personal appearance, race, caste, color, religion, or sexual
+identity and orientation.
+
+We pledge to act and interact in ways that contribute to an open, welcoming,
+diverse, inclusive, and healthy community.
+
+## Our Standards
+
+Examples of behavior that contributes to a positive environment for our
+community include:
+
+- Demonstrating empathy and kindness toward other people
+- Being respectful of differing opinions, viewpoints, and experiences
+- Giving and gracefully accepting constructive feedback
+- Accepting responsibility and apologizing to those affected by our mistakes,
+  and learning from the experience
+- Focusing on what is best not just for us as individuals, but for the overall
+  community
+
+Examples of unacceptable behavior include:
+
+- The use of sexualized language or imagery, and sexual attention or advances of
+  any kind
+- Trolling, insulting or derogatory comments, and personal or political attacks
+- Public or private harassment
+- Publishing others' private information, such as a physical or email address,
+  without their explicit permission
+- Other conduct which could reasonably be considered inappropriate in a
+  professional setting
+
+## Enforcement Responsibilities
+
+Community leaders are responsible for clarifying and enforcing our standards of
+acceptable behavior and will take appropriate and fair corrective action in
+response to any behavior that they deem inappropriate, threatening, offensive,
+or harmful.
+
+Community leaders have the right and responsibility to remove, edit, or reject
+comments, commits, code, wiki edits, issues, and other contributions that are
+not aligned to this Code of Conduct, and will communicate reasons for moderation
+decisions when appropriate.
+
+## Scope
+
+This Code of Conduct applies within all community spaces, and also applies when
+an individual is officially representing the community in public spaces.
+Examples of representing our community include using an official email address,
+posting via an official social media account, or acting as an appointed
+representative at an online or offline event.
+
+## Enforcement
+
+Instances of abusive, harassing, or otherwise unacceptable behavior may be
+reported to the community leaders responsible for enforcement by opening a
+private security advisory on GitHub (Security -> Report a vulnerability) or
+emailing the maintainers.
+All complaints will be reviewed and investigated promptly and fairly.
+
+All community leaders are obligated to respect the privacy and security of the
+reporter of any incident.
+
+## Enforcement Guidelines
+
+Community leaders will follow these Community Impact Guidelines in determining
+the consequences for any action they deem in violation of this Code of Conduct:
+
+### 1. Correction
+
+**Community Impact**: Use of inappropriate language or other behavior deemed
+unprofessional or unwelcome in the community.
+
+**Consequence**: A private, written warning from community leaders, providing
+clarity around the nature of the violation and an explanation of why the
+behavior was inappropriate. A public apology may be requested.
+
+### 2. Warning
+
+**Community Impact**: A violation through a single incident or series of
+actions.
+
+**Consequence**: A warning with consequences for continued behavior. No
+interaction with the people involved, including unsolicited interaction with
+those enforcing the Code of Conduct, for a specified period of time. This
+includes avoiding interactions in community spaces as well as external channels
+like social media. Violating these terms may lead to a temporary or permanent
+ban.
+
+### 3. Temporary Ban
+
+**Community Impact**: A serious violation of community standards, including
+sustained inappropriate behavior.
+
+**Consequence**: A temporary ban from any sort of interaction or public
+communication with the community for a specified period of time. No public or
+private interaction with the people involved, including unsolicited interaction
+with those enforcing the Code of Conduct, is allowed during this period.
+Violating these terms may lead to a permanent ban.
+
+### 4. Permanent Ban
+
+**Community Impact**: Demonstrating a pattern of violation of community
+standards, including sustained inappropriate behavior, harassment of an
+individual, or aggression toward or disparagement of classes of individuals.
+
+**Consequence**: A permanent ban from any sort of public interaction within the
+community.
+
+## Attribution
+
+This Code of Conduct is adapted from the [Contributor Covenant][homepage],
+version 2.1, available at
+[https://www.contributor-covenant.org/version/2/1/code_of_conduct.html][v2.1].
+
+Community Impact Guidelines were inspired by
+[Mozilla's code of conduct enforcement ladder][Mozilla CoC].
+
+For answers to common questions about this code of conduct, see the FAQ at
+[https://www.contributor-covenant.org/faq][FAQ]. Translations are available at
+[https://www.contributor-covenant.org/translations][translations].
+
+[homepage]: https://www.contributor-covenant.org
+[v2.1]: https://www.contributor-covenant.org/version/2/1/code_of_conduct.html
+[Mozilla CoC]: https://github.com/mozilla-community-health/tooling/blob/main/code-of-conduct/Code_of_Conduct.md
+[FAQ]: https://www.contributor-covenant.org/faq
+[translations]: https://www.contributor-covenant.org/translations
 `;
 }
