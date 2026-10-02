@@ -7,7 +7,7 @@ headings and the commentary.
 Reproduce:
 
 ```bash
-npm test                                                             # 250 tests
+npm test                                                             # 252 tests
 node packages/rdk-cli/bin/rdk.js audit                               # section 1
 node packages/rdk-cli/bin/rdk.js audit --online                      # adds link + GitHub checks
 node packages/rdk-cli/bin/rdk.js npm-surface                         # section 4
@@ -228,8 +228,8 @@ remaining 16 points need a human: a real description, real examples, an
 
 Note: `rdk npm-surface` never publishes. Publishing requires an explicit `npm publish` by a human.
 ```
-# tests 250
-# pass 250
+# tests 252
+# pass 252
 # fail 0
 ```
 
@@ -245,7 +245,7 @@ finding shape, tally invariants, autofixable honesty — the report only
 promises patches that would actually run) and a USAGE-flag behaviour
 contract (every documented flag must have an observable-effect test).
 
-Split: `npm run test:cli` (206 tests) and `npm run test:mcp` (44 tests).
+Split: `npm run test:cli` (208 tests) and `npm run test:mcp` (44 tests).
 
 ---
 
