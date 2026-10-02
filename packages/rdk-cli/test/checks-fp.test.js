@@ -180,7 +180,9 @@ test('topics_count fix text stays coherent with topics_format when both fire', (
   };
   const result = check.run(ctx);
   assert.equal(result.severity, 'warn');
-  assert.match(result.fix, /replace the 1 non-canonical/);
+  // canonical forms count toward the total, so the count advice stays plain
+  assert.doesNotMatch(result.fix, /non-canonical/);
+  assert.match(result.fix, /Add 6 more topics/);
   const clean = check.run({
     config: { keywords: { github_topics: ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'] } },
     github: { available: false, reason: 'offline', description: null, topics: [], homepageUrl: null },
@@ -188,7 +190,7 @@ test('topics_count fix text stays coherent with topics_format when both fire', (
   assert.equal(clean, null);
 });
 
-test('every finding() call across the checks modules declares a weight', () => {
+test('finding() calls inherit declaration fields instead of duplicating literals', () => {
   const checksDir = new URL('../src/audit/checks/', import.meta.url);
   for (const file of readdirSync(checksDir).filter((name) => name.endsWith('.js') && name !== '_shared.js')) {
     const src = readFileSync(new URL(file, checksDir), 'utf8');
@@ -203,7 +205,9 @@ test('every finding() call across the checks modules declares a weight', () => {
         end += 1;
       }
       const body = src.slice(match.index, end);
-      assert.match(body, /weight\s*:/, `${file}: finding() without weight`);
+      assert.doesNotMatch(body, /autoFixable:\s*(?:true|false)\b/, `${file}: static autoFixable duplicates the declaration and can drift; omit it`);
+      assert.doesNotMatch(body, /patchId:\s*(?:'[^']*'|null)\s*[,}]/, `${file}: static patchId duplicates the declaration and can drift; omit it`);
+      assert.doesNotMatch(body, /weight:\s*this\.weight/, `${file}: weight is inherited from the declaration; omit it`);
     }
   }
 });

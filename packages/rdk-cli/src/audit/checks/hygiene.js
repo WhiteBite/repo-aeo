@@ -3,8 +3,9 @@
  * gitignore/gitattributes, CITATION.cff, issue templates and a local secrets
  * heuristic over the most recent commits.
  */
-import { check, finding } from './_shared.js';
-import { exists, listFiles, readTextIfExists } from '../../util/fs.js';
+import { check, finding, skip } from './_shared.js';
+import { exists, readTextIfExists } from '../../util/fs.js';
+import { citationVersionDrift, dependabotEcosystems } from '../../generate/index.js';
 import { join } from 'node:path';
 import { recentCommits } from '../../util/git.js';
 
@@ -33,7 +34,7 @@ export const hygieneChecks = [
       const dirs = [ctx.cwd, join(ctx.cwd, '.github'), join(ctx.cwd, 'docs')];
       const found = exists(join(ctx.cwd, 'COPYING')) || dirs.some((dir) => names.some((name) => exists(join(dir, name))));
       if (!found) {
-        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'No LICENSE file', why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'license.stub', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'No LICENSE file', why: this.why, fix: this.fix, effort: 'S' });
       }
       return null;
     },
@@ -52,7 +53,7 @@ export const hygieneChecks = [
     run(ctx) {
       const candidates = [join(ctx.cwd, 'SECURITY.md'), join(ctx.cwd, '.github', 'SECURITY.md'), join(ctx.cwd, 'docs', 'SECURITY.md')];
       if (!candidates.some((path) => exists(path))) {
-        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No SECURITY.md', why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'security.stub', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No SECURITY.md', why: this.why, fix: this.fix, effort: 'S' });
       }
       return null;
     },
@@ -70,9 +71,26 @@ export const hygieneChecks = [
     patchId: 'contributing.stub',
     run(ctx) {
       if (!exists(join(ctx.cwd, 'CONTRIBUTING.md')) && !exists(join(ctx.cwd, '.github', 'CONTRIBUTING.md')) && !exists(join(ctx.cwd, 'docs', 'CONTRIBUTING.md'))) {
-        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No CONTRIBUTING.md', why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'contributing.stub', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No CONTRIBUTING.md', why: this.why, fix: this.fix, effort: 'S' });
       }
       return null;
+    },
+  }),
+
+  check({
+    id: 'hygiene.code_of_conduct',
+    axis: 'hygiene',
+    weight: 4,
+    title: 'CODE_OF_CONDUCT.md present',
+    why: 'GitHub counts a code of conduct toward the community profile; it signals a moderated project that contributors and recommenders trust.',
+    fix: 'Run `rdk fix` to add the Contributor Covenant 2.1, then review the enforcement contact channel.',
+    effort: 'S',
+    autoFixable: true,
+    patchId: 'coc.stub',
+    run(ctx) {
+      const dirs = [ctx.cwd, join(ctx.cwd, '.github'), join(ctx.cwd, 'docs')];
+      if (dirs.some((dir) => exists(join(dir, 'CODE_OF_CONDUCT.md')))) return null;
+      return finding({ id: this.id, axis: this.axis, severity: 'info', title: 'No CODE_OF_CONDUCT.md', why: this.why, fix: this.fix, effort: 'S' });
     },
   }),
 
@@ -89,7 +107,7 @@ export const hygieneChecks = [
     run(ctx) {
       const candidates = [join(ctx.cwd, '.github', 'CODEOWNERS'), join(ctx.cwd, 'CODEOWNERS'), join(ctx.cwd, 'docs', 'CODEOWNERS')];
       if (!candidates.some((path) => exists(path))) {
-        return finding({ id: this.id, axis: this.axis, severity: 'info', title: 'No CODEOWNERS file', why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'github.templates', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'info', title: 'No CODEOWNERS file', why: this.why, fix: this.fix, effort: 'S' });
       }
       return null;
     },
@@ -108,7 +126,7 @@ export const hygieneChecks = [
     run(ctx) {
       const path = join(ctx.cwd, '.gitignore');
       if (!exists(path)) {
-        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No .gitignore', why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'gitignore.entries', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No .gitignore', why: this.why, fix: this.fix, effort: 'S' });
       }
       const text = readTextIfExists(path);
       const entries = text.split(/\r?\n/).map((line) => line.trim());
@@ -118,7 +136,7 @@ export const hygieneChecks = [
         return !entries.some((line) => line === entry || line === bare);
       });
       if (missing.length > 0) {
-        return finding({ id: this.id, axis: this.axis, severity: 'info', title: `.gitignore is missing: ${missing.join(', ')}`, why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'gitignore.entries', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'info', title: `.gitignore is missing: ${missing.join(', ')}`, why: this.why, fix: this.fix, effort: 'S' });
       }
       return null;
     },
@@ -136,9 +154,26 @@ export const hygieneChecks = [
     patchId: 'gitattributes.stub',
     run(ctx) {
       if (!exists(join(ctx.cwd, '.gitattributes'))) {
-        return finding({ id: this.id, axis: this.axis, severity: 'info', title: 'No .gitattributes', why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'gitattributes.stub', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'info', title: 'No .gitattributes', why: this.why, fix: this.fix, effort: 'S' });
       }
       return null;
+    },
+  }),
+
+  check({
+    id: 'hygiene.dependabot',
+    axis: 'hygiene',
+    weight: 4,
+    title: 'dependabot.yml present',
+    why: 'Automated dependency updates close known CVEs quickly; a stale dependency tree is a trust signal that scanners and reviewers notice.',
+    fix: 'Run `rdk fix` to create .github/dependabot.yml with weekly updates for the detected ecosystems.',
+    effort: 'S',
+    autoFixable: true,
+    patchId: 'dependabot.stub',
+    run(ctx) {
+      if (exists(join(ctx.cwd, '.github', 'dependabot.yml'))) return null;
+      if (dependabotEcosystems(ctx.cwd, ctx.pkg).length === 0) return skip('no package ecosystem or workflows directory detected');
+      return finding({ id: this.id, axis: this.axis, severity: 'info', title: 'No dependabot.yml', why: this.why, fix: this.fix, effort: 'S' });
     },
   }),
 
@@ -156,7 +191,11 @@ export const hygieneChecks = [
       const relevant = ['library', 'research', 'dataset', 'tool', 'app'].includes(String(ctx.config.project.category || '').toLowerCase());
       if (!relevant) return null;
       if (!exists(join(ctx.cwd, 'CITATION.cff'))) {
-        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No CITATION.cff', why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'citation.stub', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No CITATION.cff', why: this.why, fix: this.fix, effort: 'S' });
+      }
+      const drift = citationVersionDrift(ctx.cwd, ctx.config, ctx.pkg);
+      if (drift) {
+        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: `CITATION.cff version is stale: ${drift.current}, package is ${drift.expected}`, why: 'A citation pinned to an old version misleads readers and citation indexes about which release the metadata describes.', fix: 'Run `rdk fix` to refresh the version key from package.json; every other field is left untouched.', effort: 'S' });
       }
       return null;
     },
@@ -176,7 +215,7 @@ export const hygieneChecks = [
       const hasIssues = exists(join(ctx.cwd, '.github', 'ISSUE_TEMPLATE'));
       const hasPr = exists(join(ctx.cwd, '.github', 'PULL_REQUEST_TEMPLATE.md')) || exists(join(ctx.cwd, 'PULL_REQUEST_TEMPLATE.md'));
       if (!hasIssues && !hasPr) {
-        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No issue or PR templates', why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'github.templates', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No issue or PR templates', why: this.why, fix: this.fix, effort: 'S' });
       }
       return null;
     },
@@ -205,11 +244,9 @@ export const hygieneChecks = [
         }
       }
       if (hits.length > 0) {
-        return finding({ id: this.id, axis: this.axis, severity: 'error', title: `${hits.length} potential secret(s) in the last ${commits.length} commits`, why: this.why, fix: `First hit: ${hits[0].pattern} in ${hits[0].commit} ("${hits[0].subject}")`, effort: 'L', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'error', title: `${hits.length} potential secret(s) in the last ${commits.length} commits`, why: this.why, fix: `First hit: ${hits[0].pattern} in ${hits[0].commit} ("${hits[0].subject}")`, effort: 'L' });
       }
       return null;
     },
   }),
 ];
-
-export { SECRET_PATTERNS, listFiles };

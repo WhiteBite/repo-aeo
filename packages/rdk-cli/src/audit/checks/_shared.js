@@ -5,12 +5,23 @@
  * severity may be escalated per context.
  */
 
-export function finding({ id, axis, severity, title, why, fix, effort = 'S', autoFixable = false, patchId = null, weight, evidence = null }) {
-  return { id, axis, severity, title, why, fix, effort, autoFixable, patchId, weight, evidence };
+export function finding({ id, axis, severity, title, why, fix, effort = 'S', autoFixable, patchId, weight }) {
+  return { id, axis, severity, title, why, fix, effort, autoFixable, patchId, weight };
 }
 
 export function check({ id, axis, weight, title, why, fix, effort = 'S', autoFixable = false, patchId = null, run }) {
-  return { id, axis, weight, title, why, fix, effort, autoFixable, patchId, run };
+  const definition = { id, axis, weight, title, why, fix, effort, autoFixable, patchId };
+  definition.run = (ctx) => {
+    const result = run.call(definition, ctx);
+    // finding fields omitted by run() are inherited from the declaration: one source of truth
+    if (result && typeof result === 'object' && result[SKIP_MARKER] !== true) {
+      if (result.autoFixable === undefined) result.autoFixable = autoFixable;
+      if (result.patchId === undefined) result.patchId = patchId;
+      if (result.weight === undefined) result.weight = weight;
+    }
+    return result;
+  };
+  return definition;
 }
 
 const SKIP_MARKER = Symbol('rdk.audit.skip');
@@ -102,21 +113,20 @@ export function parseMarkdown(text) {
   for (const heading of headings) {
     const section = headings.find((h) => h.line > heading.line && h.level <= heading.level);
     const bodyLines = [];
-    let inFence = false;
     for (let i = heading.line; i < lines.length; i += 1) {
       if (section && i + 1 >= section.line) break;
-      if (FENCE_RE.test(lines[i])) {
-        inFence = !inFence;
-        bodyLines.push(lines[i]);
-        continue;
-      }
+      bodyLines.push(lines[i]);
     }
-    sections.set(normalizeHeading(heading.text), {
-      heading,
-      body: bodyLines.join('\n'),
-      startLine: heading.line,
-      endLine: section ? section.line - 1 : lines.length,
-    });
+    const key = normalizeHeading(heading.text);
+    // the FIRST occurrence of a duplicated heading wins: patches splice by the first section
+    if (!sections.has(key)) {
+      sections.set(key, {
+        heading,
+        body: bodyLines.join('\n'),
+        startLine: heading.line,
+        endLine: section ? section.line - 1 : lines.length,
+      });
+    }
   }
 
   return { lines, headings, codeBlocks, links, sections, raw: text };

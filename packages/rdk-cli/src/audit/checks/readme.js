@@ -6,6 +6,16 @@ import { check, finding, skip, parseMarkdown, hasFirstSuccessPath, countQuantifi
 import { exists, readTextIfExists } from '../../util/fs.js';
 import { join } from 'node:path';
 
+const README_PATH_KEY = 'README.md';
+
+function readmeText(ctx) {
+  return ctx.readme ?? readTextIfExists(join(ctx.cwd, README_PATH_KEY));
+}
+
+function readmeDoc(ctx, text) {
+  return ctx.readmeDoc ?? (text === null ? null : parseMarkdown(text));
+}
+
 const REQUIRED_SECTIONS = [
   { key: 'who is it for', label: 'Who is it for' },
   { key: 'use cases', label: 'Use cases' },
@@ -28,11 +38,11 @@ export const readmeChecks = [
     patchId: 'readme.generate',
     run(ctx) {
       if (!exists(join(ctx.cwd, 'README.md'))) {
-        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'README.md is missing', why: this.why, fix: this.fix, effort: this.effort, autoFixable: true, patchId: 'readme.generate', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'README.md is missing', why: this.why, fix: this.fix, effort: this.effort });
       }
-      const text = readTextIfExists(join(ctx.cwd, 'README.md'));
+      const text = readmeText(ctx);
       if (text.trim().length < 200) {
-        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'README.md is nearly empty', why: this.why, fix: this.fix, effort: this.effort, autoFixable: true, patchId: 'readme.generate', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'README.md is nearly empty', why: this.why, fix: this.fix, effort: this.effort });
       }
       return null;
     },
@@ -49,14 +59,14 @@ export const readmeChecks = [
     autoFixable: true,
     patchId: 'readme.quickstart_stub',
     run(ctx) {
-      const text = readTextIfExists(join(ctx.cwd, 'README.md'));
+      const text = readmeText(ctx);
       if (text === null) return skip('README.md is missing');
       const path = hasFirstSuccessPath(text, 60);
       if (!path.install && !path.run) {
-        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'No install/run commands in the first 60 lines', why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'readme.quickstart_stub', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'No install/run commands in the first 60 lines', why: this.why, fix: this.fix, effort: 'S' });
       }
       if (!path.both) {
-        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: path.install ? 'Run command missing near the top of README' : 'Install command missing near the top of README', why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'readme.quickstart_stub', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: path.install ? 'Run command missing near the top of README' : 'Install command missing near the top of README', why: this.why, fix: this.fix, effort: 'S' });
       }
       return null;
     },
@@ -73,20 +83,20 @@ export const readmeChecks = [
     autoFixable: false,
     patchId: null,
     run(ctx) {
-      const text = readTextIfExists(join(ctx.cwd, 'README.md'));
+      const text = readmeText(ctx);
       if (text === null) return skip('README.md is missing');
-      const doc = parseMarkdown(text);
+      const doc = readmeDoc(ctx, text);
       const exampleSection = ['usage', 'examples', 'example', 'quickstart', 'getting started'].map(normalizeHeading).find((key) => doc.sections.has(key));
       const blocks = exampleSection ? doc.sections.get(exampleSection).body.match(/^(?:```|~~~)/gm) : null;
       const exampleCount = blocks ? blocks.length / 2 : Math.min(doc.codeBlocks.length, 2);
       if (exampleCount === 0) {
-        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'No code examples in README', why: this.why, fix: this.fix, effort: 'M', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'No code examples in README', why: this.why, fix: this.fix, effort: 'M' });
       }
       if (exampleCount < 2) {
-        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'Only 1 example in README (target 2–5)', why: this.why, fix: this.fix, effort: 'M', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'Only 1 example in README (target 2–5)', why: this.why, fix: this.fix, effort: 'M' });
       }
       if (doc.codeBlocks.length > 8) {
-        return finding({ id: this.id, axis: this.axis, severity: 'info', title: `${doc.codeBlocks.length} code blocks — consider trimming to the 5 most useful`, why: 'Example density helps, example noise hurts.', fix: 'Keep 2–5 canonical examples; move the rest to docs.', effort: 'S', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'info', title: `${doc.codeBlocks.length} code blocks — consider trimming to the 5 most useful`, why: 'Example density helps, example noise hurts.', fix: 'Keep 2–5 canonical examples; move the rest to docs.', effort: 'S' });
       }
       return null;
     },
@@ -103,9 +113,9 @@ export const readmeChecks = [
     autoFixable: true,
     patchId: 'readme.sections_stub',
     run(ctx) {
-      const text = readTextIfExists(join(ctx.cwd, 'README.md'));
+      const text = readmeText(ctx);
       if (text === null) return skip('README.md is missing');
-      const doc = parseMarkdown(text);
+      const doc = readmeDoc(ctx, text);
       const present = REQUIRED_SECTIONS.filter((section) => {
         if (section.key === 'status') return STATUS_ALIASES.some((alias) => doc.sections.has(alias));
         return doc.sections.has(section.key);
@@ -121,9 +131,6 @@ export const readmeChecks = [
         why: this.why,
         fix: 'Run `rdk fix` to insert section stubs, then fill them in.',
         effort: 'M',
-        autoFixable: true,
-        patchId: 'readme.sections_stub',
-        weight: this.weight,
       });
     },
   }),
@@ -139,16 +146,16 @@ export const readmeChecks = [
     autoFixable: false,
     patchId: null,
     run(ctx) {
-      const text = readTextIfExists(join(ctx.cwd, 'README.md'));
+      const text = readmeText(ctx);
       if (text === null) return skip('README.md is missing');
-      const doc = parseMarkdown(text);
+      const doc = readmeDoc(ctx, text);
       const h2 = doc.headings.filter((h) => h.level === 2).length;
       const h1 = doc.headings.filter((h) => h.level === 1).length;
       if (h1 === 0) {
-        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'README has no H1 title', why: this.why, fix: 'Start the README with "# Project name".', effort: 'S', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'README has no H1 title', why: this.why, fix: 'Start the README with "# Project name".', effort: 'S' });
       }
       if (h2 < 4) {
-        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: `README has only ${h2} H2 sections (target >= 4)`, why: this.why, fix: this.fix, effort: 'S', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: `README has only ${h2} H2 sections (target >= 4)`, why: this.why, fix: this.fix, effort: 'S' });
       }
       return null;
     },
@@ -165,16 +172,16 @@ export const readmeChecks = [
     autoFixable: false,
     patchId: null,
     run(ctx) {
-      const text = readTextIfExists(join(ctx.cwd, 'README.md'));
+      const text = readmeText(ctx);
       if (text === null) return skip('README.md is missing');
-      const doc = parseMarkdown(text);
+      const doc = readmeDoc(ctx, text);
       const claims = countQuantifiedClaims(text);
       const hasSourceLink = doc.links.some((link) => /^https?:\/\//.test(link.url));
       if (claims === 0) {
-        return finding({ id: this.id, axis: this.axis, severity: 'info', title: 'No quantified claims in README', why: this.why, fix: this.fix, effort: 'M', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'info', title: 'No quantified claims in README', why: this.why, fix: this.fix, effort: 'M' });
       }
       if (!hasSourceLink) {
-        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'Quantified claims without any source link', why: this.why, fix: 'Link the benchmark, issue or docs page that backs each number.', effort: 'S', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'Quantified claims without any source link', why: this.why, fix: 'Link the benchmark, issue or docs page that backs each number.', effort: 'S' });
       }
       return null;
     },
@@ -191,9 +198,9 @@ export const readmeChecks = [
     autoFixable: false,
     patchId: null,
     run(ctx) {
-      const text = readTextIfExists(join(ctx.cwd, 'README.md'));
+      const text = readmeText(ctx);
       if (text === null) return skip('README.md is missing');
-      const doc = parseMarkdown(text);
+      const doc = readmeDoc(ctx, text);
       const broken = [];
       for (const link of doc.links) {
         const url = link.url.split('#')[0];
@@ -210,7 +217,7 @@ export const readmeChecks = [
         if (!exists(path)) broken.push(link.url);
       }
       if (broken.length > 0) {
-        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: `${broken.length} broken relative link(s) in README`, why: this.why, fix: `Broken: ${[...new Set(broken)].slice(0, 5).join(', ')}`, effort: 'S', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: `${broken.length} broken relative link(s) in README`, why: this.why, fix: `Broken: ${[...new Set(broken)].slice(0, 5).join(', ')}`, effort: 'S' });
       }
       return null;
     },

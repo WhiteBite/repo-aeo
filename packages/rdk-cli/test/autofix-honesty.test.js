@@ -72,10 +72,12 @@ function makeCompleteRepo() {
     'LICENSE': 'MIT License\n\nCopyright (c) 2026 the authors\n',
     'SECURITY.md': '# Security policy\n\nReport issues privately.\n',
     'CONTRIBUTING.md': '# Contributing\n\nRun the tests before pushing.\n',
+    'CODE_OF_CONDUCT.md': '# Code of Conduct\n\nBe respectful.\n',
     'CITATION.cff': 'cff-version: 1.2.0\n',
     '.gitignore': 'node_modules/\ndist/\nbuild/\n*.log\n.DS_Store\n.env\n',
     '.gitattributes': '* text=auto eol=lf\n',
     '.github/ISSUE_TEMPLATE/bug_report.md': '---\nname: Bug report\n---\n\n## What happened\n',
+    '.github/dependabot.yml': 'version: 2\nupdates:\n  - package-ecosystem: npm\n    directory: "/"\n    schedule:\n      interval: weekly\n',
   });
 }
 

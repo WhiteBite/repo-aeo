@@ -3,7 +3,7 @@
  * hygiene, dependency health. Only applied when the project ships a package.
  */
 import { check, finding, skip } from './_shared.js';
-import { exists, readJsonIfExists, readTextIfExists } from '../../util/fs.js';
+import { exists } from '../../util/fs.js';
 import { join, dirname } from 'node:path';
 
 function repositoryUrl(pkg) {
@@ -75,7 +75,7 @@ export const npmChecks = [
       if (!bugsUrl(pkg)) missing.push('bugs');
       if (missing.length === 0) return null;
       const severity = missing.length >= 3 ? 'error' : 'warn';
-      return finding({ id: this.id, axis: this.axis, severity, title: `package.json is missing: ${missing.join(', ')}`, why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'package.metadata', weight: this.weight });
+      return finding({ id: this.id, axis: this.axis, severity, title: `package.json is missing: ${missing.join(', ')}`, why: this.why, fix: this.fix, effort: 'S' });
     },
   }),
 
@@ -94,13 +94,13 @@ export const npmChecks = [
       if (!pkg) return skip('package.json is missing or unparsable');
       const keywords = Array.isArray(pkg.keywords) ? pkg.keywords.filter((k) => typeof k === 'string' && k.trim() !== '') : [];
       if (keywords.length === 0) {
-        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'No keywords in package.json', why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'package.keywords', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'No keywords in package.json', why: this.why, fix: this.fix, effort: 'S' });
       }
       if (keywords.length < 5) {
-        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: `Only ${keywords.length} keywords in package.json (target >= 5)`, why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'package.keywords', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: `Only ${keywords.length} keywords in package.json (target >= 5)`, why: this.why, fix: this.fix, effort: 'S' });
       }
       if (keywords.length > 20) {
-        return finding({ id: this.id, axis: this.axis, severity: 'info', title: `${keywords.length} keywords dilutes the search signal`, why: 'Keyword stuffing is filtered by registry search and looks like spam to reviewers.', fix: 'Trim to the 10–15 most specific terms.', effort: 'S', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'info', title: `${keywords.length} keywords dilutes the search signal`, why: 'Keyword stuffing is filtered by registry search and looks like spam to reviewers.', fix: 'Trim to the 10–15 most specific terms.', effort: 'S' });
       }
       return null;
     },
@@ -121,9 +121,9 @@ export const npmChecks = [
       if (!pkg) return skip('package.json is missing or unparsable');
       if (!pkg.exports) {
         if (pkg.main) {
-          return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'package.json has "main" but no "exports" map', why: this.why, fix: this.fix, effort: 'M', weight: this.weight });
+          return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'package.json has "main" but no "exports" map', why: this.why, fix: this.fix, effort: 'M' });
         }
-        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No "exports" map (library consumers need it)', why: this.why, fix: this.fix, effort: 'M', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No "exports" map (library consumers need it)', why: this.why, fix: this.fix, effort: 'M' });
       }
       if (typeof pkg.exports === 'string') return null;
       if (Array.isArray(pkg.exports) && pkg.exports.length > 0) return null;
@@ -131,13 +131,13 @@ export const npmChecks = [
       const hasImport = conditions.includes('import') || conditions.includes('default');
       const hasRequire = conditions.includes('require') || conditions.includes('default');
       if (!hasImport || !hasRequire) {
-        return finding({ id: this.id, axis: this.axis, severity: 'error', title: `exports map is missing the ${!hasImport ? '"import"' : '"require"'} condition`, why: this.why, fix: this.fix, effort: 'M', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'error', title: `exports map is missing the ${!hasImport ? '"import"' : '"require"'} condition`, why: this.why, fix: this.fix, effort: 'M' });
       }
       const subpaths = typeof pkg.exports === 'object' ? Object.keys(pkg.exports).filter((k) => k.startsWith('.')) : [];
       for (const subpath of subpaths) {
         const node = pkg.exports[subpath];
         if (node && typeof node === 'object' && !node.types && !node.import && !node.require && !node.default) {
-          return finding({ id: this.id, axis: this.axis, severity: 'warn', title: `exports["${subpath}"] has no types/import/require/default entry`, why: this.why, fix: this.fix, effort: 'M', weight: this.weight });
+          return finding({ id: this.id, axis: this.axis, severity: 'warn', title: `exports["${subpath}"] has no types/import/require/default entry`, why: this.why, fix: this.fix, effort: 'M' });
         }
       }
       return null;
@@ -162,9 +162,9 @@ export const npmChecks = [
       if (hasTypes) return null;
       const isTsProject = exists(join(ctx.cwd, 'tsconfig.json'));
       if (isTsProject) {
-        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'TypeScript project without a types entry in package.json', why: this.why, fix: this.fix, effort: 'M', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'TypeScript project without a types entry in package.json', why: this.why, fix: this.fix, effort: 'M' });
       }
-      return finding({ id: this.id, axis: this.axis, severity: 'info', title: 'No TypeScript types declared', why: this.why, fix: this.fix, effort: 'M', weight: this.weight });
+      return finding({ id: this.id, axis: this.axis, severity: 'info', title: 'No TypeScript types declared', why: this.why, fix: this.fix, effort: 'M' });
     },
   }),
 
@@ -183,7 +183,7 @@ export const npmChecks = [
       if (!pkg) return skip('package.json is missing or unparsable');
       if (!pkg.exports) return null;
       if (pkg.sideEffects === undefined) {
-        return finding({ id: this.id, axis: this.axis, severity: 'info', title: 'sideEffects is not declared', why: this.why, fix: this.fix, effort: 'S', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'info', title: 'sideEffects is not declared', why: this.why, fix: this.fix, effort: 'S' });
       }
       return null;
     },
@@ -203,22 +203,22 @@ export const npmChecks = [
       const pkg = ctx.pkg;
       if (!pkg) return skip('package.json is missing or unparsable');
       const files = Array.isArray(pkg.files) ? pkg.files : null;
-      const hasNpmignore = exists(join(ctx.cwd, '.npmignore'));
-      if (!files && !hasNpmignore) {
-        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No "files" array and no .npmignore — the tarball is guesswork', why: this.why, fix: 'Add an explicit "files" array.', effort: 'S', autoFixable: true, patchId: 'package.files', weight: this.weight });
-      }
       const packageDir = ctx.publishable && ctx.publishable.path ? dirname(ctx.publishable.path) : ctx.cwd;
+      const hasNpmignore = exists(join(packageDir, '.npmignore'));
+      if (!files && !hasNpmignore) {
+        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No "files" array and no .npmignore — the tarball is guesswork', why: this.why, fix: 'Add an explicit "files" array.', effort: 'S' });
+      }
       const wanted = ['llms.txt', 'llms-full.txt', 'AGENTS.md'].filter((name) => exists(join(packageDir, name)));
       if (files && wanted.length > 0) {
         const missing = wanted.filter((name) => !files.some((entry) => String(entry).replace(/^\.\//, '') === name));
         if (missing.length > 0) {
-          return finding({ id: this.id, axis: this.axis, severity: 'warn', title: `files array omits ${missing.join(', ')}`, why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'package.files', weight: this.weight });
+          return finding({ id: this.id, axis: this.axis, severity: 'warn', title: `files array omits ${missing.join(', ')}`, why: this.why, fix: this.fix, effort: 'S' });
         }
       }
       if (files) {
         const suspicious = files.filter((entry) => /(^|\/)(\.env|\.git|secrets?|id_rsa|\.npmrc)/i.test(String(entry)));
         if (suspicious.length > 0) {
-          return finding({ id: this.id, axis: this.axis, severity: 'error', title: `files array contains suspicious entries: ${suspicious.join(', ')}`, why: 'Publishing credentials or VCS metadata is a security incident.', fix: 'Remove those entries immediately.', effort: 'S', weight: this.weight });
+          return finding({ id: this.id, axis: this.axis, severity: 'error', title: `files array contains suspicious entries: ${suspicious.join(', ')}`, why: 'Publishing credentials or VCS metadata is a security incident.', fix: 'Remove those entries immediately.', effort: 'S' });
         }
       }
       return null;
@@ -239,7 +239,7 @@ export const npmChecks = [
       const pkg = ctx.pkg;
       if (!pkg) return skip('package.json is missing or unparsable');
       if (!pkg.engines || !pkg.engines.node) {
-        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'engines.node is not declared', why: this.why, fix: this.fix, effort: 'S', autoFixable: true, patchId: 'package.engines', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'engines.node is not declared', why: this.why, fix: this.fix, effort: 'S' });
       }
       return null;
     },
@@ -261,7 +261,7 @@ export const npmChecks = [
       if (!pkg.version) return null;
       const major = Number.parseInt(String(pkg.version).split('.')[0], 10);
       if (Number.isFinite(major) && major < 1) {
-        return finding({ id: this.id, axis: this.axis, severity: 'info', title: `Version ${pkg.version} is pre-1.0 (npms.io completeness bonus needs >= 1.0.0)`, why: this.why, fix: this.fix, effort: 'M', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'info', title: `Version ${pkg.version} is pre-1.0 (npms.io completeness bonus needs >= 1.0.0)`, why: this.why, fix: this.fix, effort: 'M' });
       }
       return null;
     },
@@ -282,13 +282,13 @@ export const npmChecks = [
       if (!pkg) return skip('package.json is missing or unparsable');
       const scripts = pkg.scripts || {};
       if (!scripts.test && !scripts['test:unit'] && !scripts.check) {
-        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No test script in package.json', why: this.why, fix: this.fix, effort: 'M', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No test script in package.json', why: this.why, fix: this.fix, effort: 'M' });
       }
       return null;
     },
   }),
 
-  check({
+  check(  {
     id: 'npm.dependency_ranges',
     axis: 'npm',
     weight: 5,
@@ -312,9 +312,38 @@ export const npmChecks = [
         }
       }
       if (problems.length > 0) {
-        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: `Unsafe dependency ranges: ${problems.slice(0, 4).join(', ')}`, why: this.why, fix: this.fix, effort: 'M', weight: this.weight });
+        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: `Unsafe dependency ranges: ${problems.slice(0, 4).join(', ')}`, why: this.why, fix: this.fix, effort: 'M' });
       }
       return null;
+    },
+  }),
+
+  check({
+    id: 'npm.config_sync',
+    axis: 'npm',
+    weight: 6,
+    title: 'package.json stays in sync with .discoverability/project.yml',
+    why: 'The config is the single source of truth that feeds the README, llms.txt and GitHub topics; a package.json that silently disagrees publishes different metadata than the one place you edit.',
+    fix: 'Align description, keywords, homepage and bugs between .discoverability/project.yml and the publishable package.json (`rdk fix` seeds missing fields; conflicting values need a human decision).',
+    effort: 'S',
+    autoFixable: false,
+    patchId: null,
+    run(ctx) {
+      const pkg = ctx.pkg;
+      if (!pkg) return skip('package.json is missing or unparsable');
+      if (!ctx.configExists) return skip('no .discoverability/project.yml to sync with');
+      const drifted = [];
+      const wantDescription = ctx.config.project.one_liner || ctx.config.project.description || null;
+      if (wantDescription && typeof pkg.description === 'string' && pkg.description !== wantDescription) drifted.push('description');
+      const wantKeywords = (ctx.config.keywords && ctx.config.keywords.npm_keywords) || [];
+      if (Array.isArray(pkg.keywords) && wantKeywords.length > 0) {
+        const missing = wantKeywords.filter((keyword) => !pkg.keywords.includes(keyword));
+        if (missing.length > 0) drifted.push(`keywords (${missing.length} in config not in package.json)`);
+      }
+      if (ctx.config.links.homepage && typeof pkg.homepage === 'string' && pkg.homepage !== ctx.config.links.homepage) drifted.push('homepage');
+      if (ctx.config.links.issues && pkg.bugs && typeof pkg.bugs === 'object' && typeof pkg.bugs.url === 'string' && pkg.bugs.url !== ctx.config.links.issues) drifted.push('bugs');
+      if (drifted.length === 0) return null;
+      return finding({ id: this.id, axis: this.axis, severity: 'warn', title: `package.json and .discoverability/project.yml disagree on: ${drifted.join(', ')}`, why: this.why, fix: this.fix, effort: 'S' });
     },
   }),
 ];
@@ -331,6 +360,6 @@ export const npmPackageInvalidCheck = check({
   patchId: null,
   run(ctx) {
     if (ctx.pkg) return null;
-    return finding({ id: this.id, axis: this.axis, severity: 'error', title: this.title, why: this.why, fix: this.fix, effort: 'S', weight: this.weight });
+    return finding({ id: this.id, axis: this.axis, severity: 'error', title: this.title, why: this.why, fix: this.fix, effort: 'S' });
   },
 });

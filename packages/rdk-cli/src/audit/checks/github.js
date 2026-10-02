@@ -32,7 +32,6 @@ export const githubChecks = [
             why: this.why,
             fix: 'Run `rdk audit --online` to read the live description, or set project.one_liner in .discoverability/project.yml.',
             effort: 'S',
-            weight: this.weight,
           });
         }
         return finding({
@@ -43,7 +42,6 @@ export const githubChecks = [
           why: this.why,
           fix: this.fix,
           effort: 'S',
-          weight: this.weight,
         });
       }
       const text = String(description).trim();
@@ -56,7 +54,6 @@ export const githubChecks = [
           why: this.why,
           fix: `Shorten to <=${DESCRIPTION_MAX} characters; keep the "what it is + who it is for" claim.`,
           effort: 'S',
-          weight: this.weight,
         });
       }
       if (text.split(/\s+/).length < 4) {
@@ -68,7 +65,6 @@ export const githubChecks = [
           why: this.why,
           fix: 'Expand to 1–2 sentences: what it does, for whom, and the differentiator.',
           effort: 'S',
-          weight: this.weight,
         });
       }
       return null;
@@ -86,9 +82,10 @@ export const githubChecks = [
     autoFixable: false,
     patchId: null,
     run(ctx) {
-      const live = ctx.github && ctx.github.available ? ctx.github.topics : null;
+      const live = ctx.github && ctx.github.available ? ctx.github.topics : [];
       const configured = Array.isArray(ctx.config.keywords.github_topics) ? ctx.config.keywords.github_topics : [];
-      const topics = uniq([...(live || []), ...configured].filter(Boolean)).map((t) => String(t));
+      // GitHub topics are slugs: case variants in the config collapse onto the same live topic
+      const topics = uniq([...live, ...configured].filter(Boolean).map((t) => slugifyTopic(String(t))).filter(Boolean));
       const count = topics.length;
       if (count === 0) {
         if (!ctx.github || !ctx.github.available) {
@@ -100,7 +97,6 @@ export const githubChecks = [
             why: this.why,
             fix: 'Run `rdk audit --online` to read live topics, or fill keywords.github_topics in .discoverability/project.yml.',
             effort: 'M',
-            weight: this.weight,
           });
         }
         return finding({
@@ -111,22 +107,17 @@ export const githubChecks = [
           why: this.why,
           fix: this.fix,
           effort: 'M',
-          weight: this.weight,
         });
       }
       if (count < 8) {
-        const invalid = topics.filter((t) => slugifyTopic(t) !== t).length;
         return finding({
           id: 'github.topics_count',
           axis: 'github',
           severity: 'warn',
           title: `Only ${count} GitHub topics (target 8–20)`,
           why: this.why,
-          fix: invalid > 0
-            ? `Add ${8 - count} more topics and replace the ${invalid} non-canonical one(s) flagged by the topics format check — their canonical forms count toward the total.`
-            : `Add ${8 - count} more topics. Mix category terms (e.g. "cli", "developer-tools") with capability terms ("llms-txt", "agents-md").`,
+          fix: `Add ${8 - count} more topics. Mix category terms (e.g. "cli", "developer-tools") with capability terms ("llms-txt", "agents-md").`,
           effort: 'M',
-          weight: this.weight,
         });
       }
       if (count > 20) {
@@ -138,7 +129,6 @@ export const githubChecks = [
           why: 'Beyond ~20 topics the signal dilutes and GitHub only surfaces a subset.',
           fix: 'Drop the weakest topics and keep the 8–20 most specific ones.',
           effort: 'S',
-          weight: this.weight,
         });
       }
       return null;
@@ -158,20 +148,17 @@ export const githubChecks = [
     run(ctx) {
       const live = ctx.github && ctx.github.available ? ctx.github.topics : [];
       const configured = Array.isArray(ctx.config.keywords.github_topics) ? ctx.config.keywords.github_topics : [];
-      const raw = uniq([...live, ...configured].filter(Boolean).map((t) => String(t)));
+      const raw = [...live, ...configured].filter(Boolean).map((t) => String(t));
       const invalid = raw.filter((t) => slugifyTopic(t) !== t);
       if (invalid.length > 0) {
         return finding({
           id: 'github.topics_format',
-          axis: 'github',
+          axis: this.axis,
           severity: 'warn',
           title: `${invalid.length} topic(s) are not in canonical form: ${invalid.slice(0, 5).join(', ')}`,
           why: this.why,
           fix: `Canonical forms: ${invalid.slice(0, 5).map((t) => `${t} -> ${slugifyTopic(t)}`).join(', ')}`,
           effort: 'S',
-          autoFixable: true,
-          patchId: 'project.topics_normalize',
-          weight: this.weight,
         });
       }
       const dupes = raw.filter((t, i) => raw.indexOf(t) !== i);
@@ -184,9 +171,6 @@ export const githubChecks = [
           why: this.why,
           fix: 'Run `rdk fix` to de-duplicate.',
           effort: 'S',
-          autoFixable: true,
-          patchId: 'project.topics_normalize',
-          weight: this.weight,
         });
       }
       return null;
@@ -215,7 +199,6 @@ export const githubChecks = [
           why: this.why,
           fix: this.fix,
           effort: 'S',
-          weight: this.weight,
         });
       }
       return null;
