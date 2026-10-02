@@ -20,6 +20,7 @@
   "files": [
     "bin",
     "src",
+    "vendor",
     "README.md",
     "llms.txt",
     "llms-full.txt",
