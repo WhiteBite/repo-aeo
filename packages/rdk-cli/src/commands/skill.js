@@ -1,8 +1,9 @@
 /** `rdk skill` — install, remove or inspect the agent skill in harness skill directories. */
-import { existsSync, lstatSync, mkdirSync, readlinkSync, rmSync, symlinkSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { linkDir, linkState, unlinkDir } from '../../vendor/harness-kit/src/symlink.mjs';
 
 export const SKILL_NAME = 'repo-discoverability';
 
@@ -29,62 +30,24 @@ export function skillTargets({ cwd = process.cwd(), project = false, targets = n
   ];
 }
 
-function stateOf(target, source) {
-  let stat = null;
-  try {
-    stat = lstatSync(target);
-  } catch {
-    return 'absent';
-  }
-  if (stat.isSymbolicLink()) {
-    let dest = null;
-    try {
-      dest = resolve(dirname(target), readlinkSync(target));
-    } catch {
-      dest = null;
-    }
-    return dest === source ? 'linked' : 'foreign-link';
-  }
-  return 'manual';
-}
-
 function act(action, targets, source) {
   const lines = [`# rdk skill ${action}`, ''];
   let ok = true;
   for (const { harness, dir } of targets) {
     const target = join(dir, SKILL_NAME);
-    const state = stateOf(target, source);
     if (action === 'status') {
-      lines.push(`- ${harness}: ${state} (${dir})`);
+      lines.push(`- ${harness}: ${linkState(target, source)} (${dir})`);
       continue;
     }
     if (action === 'uninstall') {
-      if (state === 'linked') {
-        rmSync(target, { recursive: true, force: true });
-        lines.push(`- ${harness}: removed`);
-      } else {
-        lines.push(`- ${harness}: skipped (${state})`);
-      }
+      const result = unlinkDir(source, target);
+      lines.push(`- ${harness}: ${result.action === 'already-absent' ? 'skipped (absent)' : result.action}`);
       continue;
     }
-    if (state === 'linked') {
-      lines.push(`- ${harness}: already linked`);
-      continue;
-    }
-    if (state === 'manual' || state === 'foreign-link') {
-      lines.push(`- ${harness}: skipped (${state} content present at ${target})`);
-      ok = false;
-      continue;
-    }
-    if (!existsSync(dir)) {
-      if (!existsSync(dirname(dir))) {
-        lines.push(`- ${harness}: skipped (harness not installed)`);
-        continue;
-      }
-      mkdirSync(dir, { recursive: true });
-    }
-    symlinkSync(source, target, process.platform === 'win32' ? 'junction' : 'dir');
-    lines.push(`- ${harness}: linked`);
+    const result = linkDir(source, target);
+    // legacy exit code: "harness not installed" (state absent) is not a failure, unlike other linkDir skips
+    if (!result.ok && result.state !== 'absent') ok = false;
+    lines.push(`- ${harness}: ${result.action === 'already-linked' ? 'already linked' : result.action}`);
   }
   if (action === 'install') {
     lines.push('');
