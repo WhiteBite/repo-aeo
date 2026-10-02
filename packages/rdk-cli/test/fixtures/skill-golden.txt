@@ -1,0 +1,121 @@
+# rdk skill golden transcript (paths tokenized, separators normalized)
+
+## command 1: install
+ok=false exitCode=1
+--- output ---
+# rdk skill install
+
+- alpha: linked
+- bravo: skipped (manual content present at <HOME>/h-b/skills/repo-discoverability)
+- charlie: skipped (foreign-link content present at <HOME>/h-c/skills/repo-discoverability)
+- delta: linked
+- echo: skipped (harness not installed)
+
+Source: <SOURCE>
+Restart the harness (or start a new session) to pick the skill up.
+--- end output ---
+
+## tree after command 1
+alpha: skills-dir=yes, target=link -> <SOURCE>
+bravo: skills-dir=yes, target=manual (SKILL.md sha256=49cf24c707d61fd324680bc9e7c5b08ab77c7dc9b9d229397b7844085379095f)
+charlie: skills-dir=yes, target=link -> <HOME>/foreign-skill
+delta: skills-dir=yes, target=link -> <SOURCE>
+echo: skills-dir=no, target=absent
+
+## command 2: status
+ok=true exitCode=0
+--- output ---
+# rdk skill status
+
+- alpha: linked (<HOME>/h-a/skills)
+- bravo: manual (<HOME>/h-b/skills)
+- charlie: foreign-link (<HOME>/h-c/skills)
+- delta: linked (<HOME>/h-d/skills)
+- echo: absent (<HOME>/h-e/skills)
+--- end output ---
+
+## tree after command 2
+alpha: skills-dir=yes, target=link -> <SOURCE>
+bravo: skills-dir=yes, target=manual (SKILL.md sha256=49cf24c707d61fd324680bc9e7c5b08ab77c7dc9b9d229397b7844085379095f)
+charlie: skills-dir=yes, target=link -> <HOME>/foreign-skill
+delta: skills-dir=yes, target=link -> <SOURCE>
+echo: skills-dir=no, target=absent
+
+## command 3: install
+ok=false exitCode=1
+--- output ---
+# rdk skill install
+
+- alpha: already linked
+- bravo: skipped (manual content present at <HOME>/h-b/skills/repo-discoverability)
+- charlie: skipped (foreign-link content present at <HOME>/h-c/skills/repo-discoverability)
+- delta: already linked
+- echo: skipped (harness not installed)
+
+Source: <SOURCE>
+Restart the harness (or start a new session) to pick the skill up.
+--- end output ---
+
+## tree after command 3
+alpha: skills-dir=yes, target=link -> <SOURCE>
+bravo: skills-dir=yes, target=manual (SKILL.md sha256=49cf24c707d61fd324680bc9e7c5b08ab77c7dc9b9d229397b7844085379095f)
+charlie: skills-dir=yes, target=link -> <HOME>/foreign-skill
+delta: skills-dir=yes, target=link -> <SOURCE>
+echo: skills-dir=no, target=absent
+
+## command 4: uninstall
+ok=true exitCode=0
+--- output ---
+# rdk skill uninstall
+
+- alpha: removed
+- bravo: skipped (manual)
+- charlie: skipped (foreign-link)
+- delta: removed
+- echo: skipped (absent)
+--- end output ---
+
+## tree after command 4
+alpha: skills-dir=yes, target=absent
+bravo: skills-dir=yes, target=manual (SKILL.md sha256=49cf24c707d61fd324680bc9e7c5b08ab77c7dc9b9d229397b7844085379095f)
+charlie: skills-dir=yes, target=link -> <HOME>/foreign-skill
+delta: skills-dir=yes, target=absent
+echo: skills-dir=no, target=absent
+
+## command 5: status
+ok=true exitCode=0
+--- output ---
+# rdk skill status
+
+- alpha: absent (<HOME>/h-a/skills)
+- bravo: manual (<HOME>/h-b/skills)
+- charlie: foreign-link (<HOME>/h-c/skills)
+- delta: absent (<HOME>/h-d/skills)
+- echo: absent (<HOME>/h-e/skills)
+--- end output ---
+
+## tree after command 5
+alpha: skills-dir=yes, target=absent
+bravo: skills-dir=yes, target=manual (SKILL.md sha256=49cf24c707d61fd324680bc9e7c5b08ab77c7dc9b9d229397b7844085379095f)
+charlie: skills-dir=yes, target=link -> <HOME>/foreign-skill
+delta: skills-dir=yes, target=absent
+echo: skills-dir=no, target=absent
+
+## command 6: uninstall
+ok=true exitCode=0
+--- output ---
+# rdk skill uninstall
+
+- alpha: skipped (absent)
+- bravo: skipped (manual)
+- charlie: skipped (foreign-link)
+- delta: skipped (absent)
+- echo: skipped (absent)
+--- end output ---
+
+## tree after command 6
+alpha: skills-dir=yes, target=absent
+bravo: skills-dir=yes, target=manual (SKILL.md sha256=49cf24c707d61fd324680bc9e7c5b08ab77c7dc9b9d229397b7844085379095f)
+charlie: skills-dir=yes, target=link -> <HOME>/foreign-skill
+delta: skills-dir=yes, target=absent
+echo: skills-dir=no, target=absent
