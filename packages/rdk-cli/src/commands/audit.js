@@ -1,9 +1,9 @@
 /** `rdk audit` — collect facts, run checks, render the report. */
-import { writeFileSync, mkdirSync } from 'node:fs';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { isAbsolute, resolve } from 'node:path';
 import { audit } from '../audit/index.js';
 import { renderMarkdownReport } from '../report/markdown.js';
 import { renderGithubComment } from '../report/githubComment.js';
+import { writeText } from '../util/fs.js';
 
 export async function auditCommand({ cwd, options = {} }) {
   const minScore = options.minScore === undefined || options.minScore === null ? undefined : Number(options.minScore);
@@ -13,6 +13,16 @@ export async function auditCommand({ cwd, options = {} }) {
       report: null,
       output: '',
       summary: `rdk: --min-score must be a number, got ${JSON.stringify(String(options.minScore))}`,
+      exitCode: 1,
+    };
+  }
+  const secretsDepth = options.secretsDepth === undefined || options.secretsDepth === null ? undefined : Number(options.secretsDepth);
+  if (secretsDepth !== undefined && (!Number.isFinite(secretsDepth) || secretsDepth < 1)) {
+    return {
+      ok: false,
+      report: null,
+      output: '',
+      summary: `rdk: --secrets-depth must be a positive number, got ${JSON.stringify(String(options.secretsDepth))}`,
       exitCode: 1,
     };
   }
@@ -48,8 +58,7 @@ export async function auditCommand({ cwd, options = {} }) {
 
   if (options.out) {
     const path = isAbsolute(options.out) ? options.out : resolve(cwd, options.out);
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, output, 'utf8');
+    writeText(path, output);
   }
 
   const summary = [

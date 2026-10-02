@@ -12,7 +12,7 @@ function exportsSummary(pkg) {
   if (!pkg.exports) return { present: false, conditions: [], subpaths: [], main: pkg.main || null };
   const conditions = new Set();
   const subpaths = [];
-  const walk = (node, path) => {
+  const walk = (node) => {
     if (typeof node === 'string') {
       conditions.add('default');
       return;
@@ -21,7 +21,7 @@ function exportsSummary(pkg) {
       for (const [key, value] of Object.entries(node)) {
         if (key.startsWith('.')) {
           subpaths.push(key);
-          walk(value, `${path}${key}`);
+          walk(value);
           continue;
         }
         if (key === 'default') {
@@ -29,11 +29,11 @@ function exportsSummary(pkg) {
           continue;
         }
         if (typeof value === 'string') conditions.add(key);
-        else walk(value, `${path}${key}/`);
+        else walk(value);
       }
     }
   };
-  walk(pkg.exports, '');
+  walk(pkg.exports);
   return { present: true, conditions: [...conditions], subpaths, main: pkg.main || null };
 }
 
@@ -84,6 +84,7 @@ export function npmSurfaceCommand({ cwd, options = {} }) {
     return { ok: false, output: `${lines.join('\n')}\n`, exitCode: 1, report: null };
   }
 
+  const packageDir = resolved.path ? dirname(resolved.path) : cwd;
   const ex = exportsSummary(pkg);
   const scripts = pkg.scripts || {};
   const files = Array.isArray(pkg.files) ? pkg.files : null;
@@ -104,7 +105,7 @@ export function npmSurfaceCommand({ cwd, options = {} }) {
     bin: pkg.bin || null,
     files,
     scripts: Object.keys(scripts),
-    hasNpmignore: exists(join(cwd, '.npmignore')),
+    hasNpmignore: exists(join(packageDir, '.npmignore')),
     publishability: [],
   };
 
@@ -186,5 +187,6 @@ export function npmSurfaceCommand({ cwd, options = {} }) {
   lines.push('');
 
   const output = options.format === 'json' ? `${JSON.stringify(report, null, 2)}\n` : `${lines.join('\n')}`;
-  return { ok: report.publishability.every((item) => item.level !== 'error'), output, report, exitCode: report.publishability.some((item) => item.level === 'error') ? 2 : 0 };
+  // exit 2 is reserved for the min-score gate; publishability problems are a plain error
+  return { ok: report.publishability.every((item) => item.level !== 'error'), output, report, exitCode: report.publishability.some((item) => item.level === 'error') ? 1 : 0 };
 }

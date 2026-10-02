@@ -122,8 +122,20 @@ export async function main(argv = process.argv.slice(2), io = {}) {
     return 0;
   }
   if (positional.length === 0) {
+    // a bare `rdk` is a help request; flags without a command are a typo that must not pass CI green
+    if (Object.keys(flags).length > 0) {
+      error('rdk: no command given (see --help)');
+      return 1;
+    }
     log(USAGE);
     return 0;
+  }
+
+  for (const key of ['minScore', 'secretsDepth']) {
+    if (flags[key] === true) {
+      error(`rdk: --${key.replace(/([A-Z])/g, '-$1').toLowerCase()} requires a number value (see --help)`);
+      return 1;
+    }
   }
 
   const stray = strayArgument(command, flags, positional);

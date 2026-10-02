@@ -252,11 +252,10 @@ const BEHAVIOUR = {
 
   '--project': async () => {
     await withRepo({ 'package.json': JSON.stringify(PKG) }, async (dir) => {
-      const env = { ...process.env, RDK_SKILL_TARGETS: '' };
-      const project = rdk(['skill', 'status', '--project'], dir, { env });
+      const project = rdk(['skill', 'status', '--project'], dir);
       assert.equal(project.status, 0, project.stdout + project.stderr);
       assert.ok(project.stdout.includes(join(dir, '.opencode', 'skills')), '--project must target repo-local skill dirs');
-      const global = rdk(['skill', 'status'], dir, { env });
+      const global = rdk(['skill', 'status'], dir);
       assert.ok(global.stdout.includes(join(homedir(), '.config', 'opencode', 'skills')));
       assert.ok(!global.stdout.includes(join(dir, '.opencode', 'skills')));
     });

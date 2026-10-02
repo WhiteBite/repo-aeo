@@ -126,20 +126,38 @@ test('npm-surface --format rejects invalid values with exit 1', () => {
   }
 });
 
-test('bare rdk with no command prints usage and exits 0', () => {
+test('bare rdk with no command prints usage and exits 0; flags without a command fail', () => {
   const bare = rdk([], process.cwd());
   assert.equal(bare.status, 0);
-  assert.match(bare.stdout, /rdk — Repo Discoverability Kit/);
+  assert.match(bare.stdout, /rdk . Repo Discoverability Kit/);
   assert.doesNotMatch(bare.stdout, /# Discoverability audit/);
   assert.doesNotMatch(bare.stderr, /score: \d+\/100/);
 
   const cwdOnly = rdk(['--cwd', process.cwd()], process.cwd());
-  assert.equal(cwdOnly.status, 0);
-  assert.match(cwdOnly.stdout, /Usage:/);
+  assert.equal(cwdOnly.status, 1);
+  assert.equal(cwdOnly.stdout, '');
+  assert.match(cwdOnly.stderr, /no command given/);
 
   const flagOnly = rdk(['--quiet'], process.cwd());
-  assert.equal(flagOnly.status, 0);
-  assert.match(flagOnly.stdout, /Usage:/);
+  assert.equal(flagOnly.status, 1);
+  assert.equal(flagOnly.stdout, '');
+  assert.match(flagOnly.stderr, /no command given/);
+});
+
+test('a valueless numeric flag refuses to run instead of silently becoming 1', () => {
+  const dir = makeRepo({ 'package.json': JSON.stringify({ name: 'flag-eat', version: '1.0.0' }) });
+  try {
+    const result = rdk(['audit', '--min-score', '--online', '--no-github'], dir);
+    assert.equal(result.status, 1);
+    assert.equal(result.stdout, '');
+    assert.match(result.stderr, /--min-score requires a number/);
+
+    const depth = rdk(['audit', '--secrets-depth'], dir);
+    assert.equal(depth.status, 1);
+    assert.match(depth.stderr, /--secrets-depth requires a number/);
+  } finally {
+    removeRepo(dir);
+  }
 });
 
 test('skill install --project with a stray path is rejected before anything is written', () => {
@@ -298,7 +316,7 @@ test('npm-surface reports a blocking issue for a bare package.json', () => {
   const dir = makeRepo({ 'package.json': JSON.stringify({ name: 'bare', version: '0.0.1' }, null, 2) });
   try {
     const result = rdk(['npm-surface', '--no-pack'], dir);
-    assert.equal(result.status, 2);
+    assert.equal(result.status, 1);
     assert.match(result.stdout, /missing description/);
     assert.match(result.stdout, /never publishes/);
   } finally {

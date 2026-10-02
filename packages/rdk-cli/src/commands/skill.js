@@ -13,10 +13,8 @@ export function skillSourceDir() {
   return candidates.find((path) => existsSync(join(path, 'SKILL.md'))) || null;
 }
 
-export function skillTargets({ cwd = process.cwd(), project = false } = {}) {
-  if (process.env.RDK_SKILL_TARGETS) {
-    return process.env.RDK_SKILL_TARGETS.split('|').filter(Boolean).map((dir) => ({ harness: 'custom', dir }));
-  }
+export function skillTargets({ cwd = process.cwd(), project = false, targets = null } = {}) {
+  if (Array.isArray(targets)) return targets;
   const home = homedir();
   if (project) {
     return [
@@ -105,7 +103,7 @@ export function skillCommand({ cwd, options = {} }) {
   if (!source) {
     return { ok: false, output: 'rdk skill: the skill directory is missing from this installation\n', exitCode: 1 };
   }
-  const targets = skillTargets({ cwd, project: Boolean(options.project) });
+  const targets = skillTargets({ cwd, project: Boolean(options.project), targets: Array.isArray(options.targets) ? options.targets : null });
   const { ok, output } = act(action, targets, source);
   return { ok, output, exitCode: ok ? 0 : 1 };
 }
