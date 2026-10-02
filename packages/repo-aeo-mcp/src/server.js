@@ -125,7 +125,17 @@ export async function serve({
       output.write(`${JSON.stringify({ jsonrpc: '2.0', id: requestId, method, params })}\n`);
     });
 
+  // settled entries are dropped so a long-lived serve does not accumulate them for the process lifetime
   const inFlight = [];
+  const track = (promise) => {
+    inFlight.push(promise);
+    promise.finally(() => {
+      const index = inFlight.indexOf(promise);
+      if (index >= 0) inFlight.splice(index, 1);
+    });
+    return promise;
+  };
+  // the loop must stay free to read client answers while a handler awaits elicitation
   for await (const line of rl) {
     const trimmed = line.trim();
     if (trimmed === '') continue;
@@ -144,8 +154,7 @@ export async function serve({
       else waiter.resolve(message.result);
       continue;
     }
-    // invariant: the loop must stay free to read client answers while a handler awaits elicitation
-    inFlight.push(
+    track(
       Promise.resolve()
         .then(async () => {
           const response = await handleMessage(message, context);

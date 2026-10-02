@@ -5,7 +5,8 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { TOOLS, callTool, toolDescriptors, firstHeadingOf, parseCurlStatus } from '../src/tools.js';
+import { TOOLS, callTool, toolDescriptors, firstHeadingOf } from '../src/tools.js';
+import { parseCurlStatus } from 'repo-aeo';
 import { record, series, trend, listMetrics, historyPath } from '../src/history.js';
 
 const HISTORY_MODULE_URL = pathToFileURL(join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'history.js')).href;
@@ -301,15 +302,15 @@ test('an unknown tool name is reported, not thrown', async () => {
   assert.match(payload.error, /unknown tool/);
 });
 
-test('history records metrics, series and trends in a disposable directory', () => {
+test('history records metrics, series and trends in a disposable directory', async () => {
   const box = sandbox();
   try {
     const key = 'discoverability_score';
     assert.equal(series(key, 10, box.dir).length, 0);
     assert.equal(trend(key, box.dir).points, 0);
 
-    record(key, 60, box.dir);
-    record(key, 80, box.dir);
+    await record(key, 60, box.dir);
+    await record(key, 80, box.dir);
     const points = series(key, 10, box.dir);
     assert.equal(points.length, 2);
     assert.equal(points[0].value, 60);
@@ -320,7 +321,7 @@ test('history records metrics, series and trends in a disposable directory', () 
     assert.equal(rising.direction, 'up');
     assert.equal(rising.delta, 20);
 
-    record(key, 40, box.dir);
+    await record(key, 40, box.dir);
     assert.equal(trend(key, box.dir).direction, 'down');
 
     // The window caps the series length and metrics never leak across projects.
@@ -376,24 +377,24 @@ test('the skill MCP manifest dogfood numbers match the live tool registry', () =
   assert.equal(Number(exact[1]), TOOLS.length, 'manifest exact-count row drifted from the registry');
 });
 
-test('history survives a corrupt cache file', () => {
+test('history survives a corrupt cache file', async () => {
   const box = sandbox();
   try {
     mkdirSync(join(box.dir, '.discoverability', 'cache'), { recursive: true });
     writeFileSync(historyPath(box.dir), '{ not json');
     assert.equal(series('discoverability_score', 10, box.dir).length, 0);
-    record('discoverability_score', 71, box.dir);
+    await record('discoverability_score', 71, box.dir);
     assert.equal(trend('discoverability_score', box.dir).last, 71);
   } finally {
     box.cleanup();
   }
 });
 
-test('record never throws when the cache location is unwritable', () => {
+test('record never throws when the cache location is unwritable', async () => {
   const box = sandbox();
   try {
     writeFileSync(join(box.dir, '.discoverability'), 'not a directory');
-    const point = record('discoverability_score', 50, box.dir);
+    const point = await record('discoverability_score', 50, box.dir);
     assert.equal(point.value, 50);
     assert.equal(series('discoverability_score', 10, box.dir).length, 0);
   } finally {
@@ -401,11 +402,11 @@ test('record never throws when the cache location is unwritable', () => {
   }
 });
 
-test('history writes are atomic and leave no temp files behind', () => {
+test('history writes are atomic and leave no temp files behind', async () => {
   const box = sandbox();
   try {
-    record('discoverability_score', 60, box.dir);
-    record('discoverability_score', 61, box.dir);
+    await record('discoverability_score', 60, box.dir);
+    await record('discoverability_score', 61, box.dir);
     const cacheDir = join(box.dir, '.discoverability', 'cache');
     assert.ok(existsSync(join(cacheDir, 'metrics.json')));
     assert.deepEqual(
@@ -431,12 +432,12 @@ test('parseCurlStatus splits the write-out status line off the body', () => {
   assert.deepEqual(parseCurlStatus(''), { text: '', status: null });
 });
 
-test('a corrupt cache file is rotated aside before history restarts empty', () => {
+test('a corrupt cache file is rotated aside before history restarts empty', async () => {
   const box = sandbox();
   try {
     mkdirSync(join(box.dir, '.discoverability', 'cache'), { recursive: true });
     writeFileSync(historyPath(box.dir), '{ not json');
-    record('discoverability_score', 71, box.dir);
+    await record('discoverability_score', 71, box.dir);
     const cacheDir = join(box.dir, '.discoverability', 'cache');
     const rotated = readdirSync(cacheDir).filter((name) => /^metrics\.json\.corrupt-\d+$/.test(name));
     assert.equal(rotated.length, 1, `expected one rotated corrupt file, got ${readdirSync(cacheDir).join(', ')}`);
@@ -450,7 +451,7 @@ test('a corrupt cache file is rotated aside before history restarts empty', () =
 const RECORDER_SCRIPT = `
 const { record } = await import(process.env.HISTORY_MODULE);
 while (Date.now() < Number(process.env.START_AT)) {}
-record('concurrency', Number(process.env.TEST_VALUE), process.env.TEST_CWD);
+await record('concurrency', Number(process.env.TEST_VALUE), process.env.TEST_CWD);
 `;
 
 function spawnRecorder(box, value, startAt) {

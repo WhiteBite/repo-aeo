@@ -16,6 +16,7 @@ export interface JsonRpcResponse {
 
 export interface ToolDescriptor {
   name: string;
+  title: string;
   description: string;
   inputSchema: Record<string, unknown>;
   annotations?: Record<string, boolean>;
@@ -45,4 +46,5 @@ export declare function serve(options?: {
   cwd?: string;
   input?: NodeJS.ReadableStream;
   output?: NodeJS.WritableStream;
+  readOnly?: boolean;
 }): Promise<void>;

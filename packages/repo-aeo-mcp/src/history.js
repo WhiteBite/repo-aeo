@@ -53,13 +53,10 @@ function lockDir(cwd = process.cwd()) {
   return `${historyPath(cwd)}.lock`;
 }
 
-function sleepSync(ms) {
-  const deadline = Date.now() + ms;
-  while (Date.now() < deadline) {}
-}
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // mkdir is atomic on every platform, so the lock directory is the cross-process mutex
-function acquireLock(cwd) {
+async function acquireLock(cwd) {
   const lock = lockDir(cwd);
   try {
     mkdirSync(dirname(lock), { recursive: true });
@@ -86,7 +83,7 @@ function acquireLock(cwd) {
         return false;
       }
     }
-    sleepSync(LOCK_RETRY_MS);
+    await sleep(LOCK_RETRY_MS);
   }
   return false;
 }
@@ -99,9 +96,10 @@ function releaseLock(cwd) {
   }
 }
 
-/** Appends one data point for a metric and returns the stored point. */
-export function record(metric, value, cwd = process.cwd()) {
-  const locked = acquireLock(cwd);
+/** Appends one data point for a metric and returns the stored point. Best-effort: skips the write when the lock cannot be taken. */
+export async function record(metric, value, cwd = process.cwd()) {
+  const locked = await acquireLock(cwd);
+  if (!locked) return { at: new Date().toISOString(), value, skipped: true };
   try {
     const history = readHistory(cwd);
     const point = { at: new Date().toISOString(), value };
@@ -115,7 +113,7 @@ export function record(metric, value, cwd = process.cwd()) {
     }
     return point;
   } finally {
-    if (locked) releaseLock(cwd);
+    releaseLock(cwd);
   }
 }
 

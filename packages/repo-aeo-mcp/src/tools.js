@@ -6,10 +6,8 @@
  * Every tool is read-only except `github_sync_metadata`, which requires an
  * acknowledgement string and an auditable reason.
  */
-import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { execFile } from 'node:child_process';
 import {
   audit,
   loadConfig,
@@ -17,53 +15,15 @@ import {
   githubSyncCommand,
   effectiveAck,
   TOOL_HOME,
-  generatedDrift,
-  GENERATED_START,
-  GENERATED_END,
+  llmsFreshness,
+  httpGetText,
 } from 'repo-aeo';
 import { record, trend, series } from './history.js';
 
 const execFileAsync = promisify(execFile);
 const USER_AGENT = `repo-aeo-mcp/0.1 (+${TOOL_HOME})`;
 
-/** Splits curl stdout (body plus the `-w '\n%{http_code}'` write-out) into body text and numeric status. */
-export function parseCurlStatus(stdout) {
-  const raw = String(stdout);
-  const split = raw.lastIndexOf('\n');
-  if (split !== -1) {
-    const status = Number.parseInt(raw.slice(split + 1).trim(), 10);
-    if (Number.isInteger(status) && status > 0) return { text: raw.slice(0, split), status };
-  }
-  return { text: raw, status: null };
-}
-
-/** GET a URL as text, falling back to curl when fetch() cannot reach the network. */
-async function httpGet(url, { timeoutMs = 10000, maxBytes = 512 * 1024 } = {}) {
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    const response = await fetch(url, {
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: { 'user-agent': USER_AGENT, accept: '*/*' },
-    });
-    const text = await response.text();
-    clearTimeout(timer);
-    return { ok: response.status < 400, status: response.status, text: text.slice(0, maxBytes), via: 'fetch' };
-  } catch (fetchError) {
-    try {
-      const { stdout } = await execFileAsync(
-        'curl',
-        ['-sS', '-L', '--max-time', String(Math.ceil(timeoutMs / 1000)), '-A', USER_AGENT, '-w', '\\n%{http_code}', url],
-        { timeout: timeoutMs + 2000, maxBuffer: maxBytes * 2 },
-      );
-      const { text, status } = parseCurlStatus(stdout);
-      return { ok: status !== null && status < 400, status, text: text.slice(0, maxBytes), via: 'curl' };
-    } catch {
-      return { ok: false, status: null, text: '', error: String(fetchError.message || fetchError), via: 'none' };
-    }
-  }
-}
+const httpGet = (url, options = {}) => httpGetText(url, { ...options, userAgent: USER_AGENT });
 
 function gh(args, cwd) {
   return execFileAsync('gh', args, { cwd, timeout: 20000 }).then(
@@ -76,6 +36,28 @@ function resolveCwd(args, context = {}) {
   if (typeof args.cwd === 'string' && args.cwd !== '') return args.cwd;
   if (typeof context.cwd === 'string' && context.cwd !== '') return context.cwd;
   return process.cwd();
+}
+
+// consecutive calls in one serve session share one audit run: the engine's spawn cost is per-audit
+const AUDIT_CACHE_TTL_MS = 5000;
+const auditCache = new Map();
+
+function cachedAudit(cwd, online) {
+  const key = `${cwd}|${online ? '1' : '0'}`;
+  const hit = auditCache.get(key);
+  if (hit && Date.now() < hit.expires) return hit.promise;
+  const promise = audit(cwd, { online }).then(
+    (report) => {
+      auditCache.set(key, { expires: Date.now() + AUDIT_CACHE_TTL_MS, promise });
+      return report;
+    },
+    (error) => {
+      auditCache.delete(key);
+      throw error;
+    },
+  );
+  auditCache.set(key, { expires: Number.POSITIVE_INFINITY, promise });
+  return promise;
 }
 
 /**
@@ -95,6 +77,12 @@ function firstReasonLine(output) {
 export function firstHeadingOf(text) {
   const body = String(text).charCodeAt(0) === 0xfeff ? String(text).slice(1) : String(text);
   return (/^#\s+(.+)$/m.exec(body) || [])[1] || null;
+}
+
+function driftMsRecommendation(driftMs) {
+  return driftMs < 3600000
+    ? 'sources changed within the last hour - regenerate llms.txt with `rdk fix` so the change is captured'
+    : 'regenerate llms.txt with `rdk fix` and commit it together with the docs change';
 }
 
 /** Resolves the npm package name from the arguments or the repository itself. */
@@ -208,7 +196,7 @@ export const TOOLS = [
       }
       if (!metadata.hasReadme) result.gaps.push('no README in the published tarball');
       if (!analyzed.evaluation || !analyzed.evaluation.quality?.hasTests) result.gaps.push('no tests detected');
-      record(`npm:${name}`, { final: score.final, quality: score.quality, popularity: score.popularity, maintenance: score.maintenance }, cwd);
+      await record(`npm:${name}`, { final: score.final, quality: score.quality, popularity: score.popularity, maintenance: score.maintenance }, cwd);
       result.trend = trend(`npm:${name}`, cwd);
       return result;
     },
@@ -315,7 +303,7 @@ export const TOOLS = [
       if (openIssues !== null && openIssues >= 15) signals.findings.push({ id: 'github.issues', severity: 'warn', fix: `${openIssues} open issues blocks the npms.io completeness bonus` });
       if (data.isArchived) signals.findings.push({ id: 'github.archived', severity: 'error', fix: 'the repository is archived' });
 
-      record(`github:${signals.repo}`, { stars: signals.stars, forks: signals.forks, topics: signals.topic_count, open_issues: openIssues }, cwd);
+      await record(`github:${signals.repo}`, { stars: signals.stars, forks: signals.forks, topics: signals.topic_count, open_issues: openIssues }, cwd);
       signals.history_points = series(`github:${signals.repo}`, 10, cwd).length;
       signals.trend = {
         stars: trend(`github:${signals.repo}`, cwd),
@@ -339,62 +327,30 @@ export const TOOLS = [
     },
     async run(args, context = {}) {
       const cwd = resolveCwd(args, context);
-      const llmsPath = join(cwd, 'llms.txt');
-      if (!existsSync(llmsPath)) {
+      const { config, publishable } = loadConfig(cwd);
+      const fresh = llmsFreshness(cwd, config, publishable.pkg);
+      if (!fresh.exists) {
         return { ok: false, cwd, error: 'llms.txt not found', fix: 'run `rdk fix` to generate it' };
       }
-      const mtime = (path) => {
-        try {
-          return statSync(path).mtimeMs;
-        } catch {
-          return null;
-        }
-      };
-      const llmsText = readFileSync(llmsPath, 'utf8');
-      const managed = llmsText.includes(GENERATED_START) && llmsText.includes(GENERATED_END);
-      if (managed) {
-        const { config, publishable } = loadConfig(cwd);
-        const drifted = generatedDrift(cwd, config, publishable.pkg).includes('llms.txt');
-        return {
-          ok: true,
-          cwd,
-          managed: true,
-          llms_txt_modified: new Date(mtime(llmsPath)).toISOString(),
-          sources_checked: ['rendered output'],
-          newer_sources: drifted ? [{ path: 'rendered output', content_drift: true }] : [],
-          drift_hours: 0,
-          drift_minutes: 0,
-          fresh: !drifted,
-          recommendation: drifted
-            ? 'llms.txt no longer matches the rendered output - regenerate with `rdk fix`'
-            : 'llms.txt is up to date',
-        };
-      }
-      const sources = [{ path: 'README.md', mtime: mtime(join(cwd, 'README.md')) }];
-      const docsDir = join(cwd, 'docs');
-      if (existsSync(docsDir)) {
-        for (const entry of readdirSync(docsDir)) {
-          if (/\.md$/i.test(entry)) sources.push({ path: `docs/${entry}`, mtime: mtime(join(docsDir, entry)) });
-        }
-      }
-      const llmsTime = mtime(llmsPath);
-      const newer = sources.filter((source) => source.mtime !== null && source.mtime > llmsTime);
-      const driftMs = newer.length > 0 ? Math.max(...newer.map((source) => source.mtime - llmsTime)) : 0;
+      const driftHours = fresh.driftMs === null ? null : Math.round(fresh.driftMs / 3600000);
+      const driftMinutes = fresh.driftMs === null ? null : Math.round(fresh.driftMs / 60000);
       return {
         ok: true,
         cwd,
-        llms_txt_modified: new Date(llmsTime).toISOString(),
-        sources_checked: sources.map((source) => source.path),
-        newer_sources: newer.map((source) => ({ path: source.path, hours_newer: Math.round((source.mtime - llmsTime) / 3600000) })),
-        drift_hours: Math.round(driftMs / 3600000),
-        drift_minutes: Math.round(driftMs / 60000),
-        fresh: newer.length === 0,
-        recommendation:
-          newer.length === 0
-            ? 'llms.txt is up to date'
-            : driftMs < 3600000
-              ? 'sources changed within the last hour - regenerate llms.txt with `rdk fix` so the change is captured'
-              : 'regenerate llms.txt with `rdk fix` and commit it together with the docs change',
+        managed: fresh.managed,
+        llms_txt_modified: fresh.modified !== null ? new Date(fresh.modified).toISOString() : null,
+        sources_checked: fresh.sources,
+        newer_sources: fresh.newerSources.map((source) => (source.contentDrift
+          ? { path: source.path, content_drift: true }
+          : { path: source.path, hours_newer: Math.round((source.mtime - fresh.modified) / 3600000) })),
+        drift_hours: driftHours,
+        drift_minutes: driftMinutes,
+        fresh: fresh.fresh,
+        recommendation: fresh.fresh
+          ? 'llms.txt is up to date'
+          : fresh.managed
+            ? 'llms.txt no longer matches the rendered output - regenerate with `rdk fix`'
+            : driftMsRecommendation(fresh.driftMs),
       };
     },
   },
@@ -476,8 +432,8 @@ export const TOOLS = [
     },
     async run(args, context = {}) {
       const cwd = resolveCwd(args, context);
-      const report = await audit(cwd, { online: Boolean(args.online) });
-      record('discoverability_score', report.score.total, cwd);
+      const report = await cachedAudit(cwd, Boolean(args.online));
+      await record('discoverability_score', report.score.total, cwd);
       const trendData = trend('discoverability_score', cwd);
       return { ok: true, ...report, history_points: trendData.points, trend: trendData };
     },
@@ -503,7 +459,7 @@ export const TOOLS = [
     },
     async run(args, context = {}) {
       const cwd = resolveCwd(args, context);
-      const report = await audit(cwd, {});
+      const report = await cachedAudit(cwd, false);
       let findings = report.findings;
       if (args.severity) findings = findings.filter((finding) => finding.severity === args.severity);
       if (args.axis) findings = findings.filter((finding) => finding.axis === args.axis);
@@ -682,7 +638,7 @@ export const TOOLS = [
         config,
       });
       const mutations = Array.isArray(result.applied) ? result.applied : [];
-      record('github_sync', { applied: mutations, reason: args.reason, apply }, cwd);
+      await record('github_sync', { applied: mutations, reason: args.reason, apply }, cwd);
       // The command explains itself in `output`; surface the same text as
       // `error` so an agent never receives a refusal it cannot act on.
       const error = result.error || (result.ok === false ? firstReasonLine(result.output) : null);

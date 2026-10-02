@@ -27,28 +27,51 @@ Flags: --cwd <path>  --json  --read-only (or RDK_READ_ONLY=1)
 function parseFlags(argv) {
   const flags = { json: false, cwd: process.cwd() };
   const positional = [];
+  // a leading `-` means the next token is another flag, never this flag's value
+  const valueAfter = (i) => {
+    const next = argv[i + 1];
+    return next !== undefined && !next.startsWith('-') ? next : null;
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--json') flags.json = true;
     else if (arg === '--online') flags.online = true;
     else if (arg === '--cwd') {
-      flags.cwd = argv[i + 1];
-      i += 1;
+      const value = valueAfter(i);
+      if (value !== null) {
+        flags.cwd = value;
+        i += 1;
+      }
     } else if (arg === '-n' || arg === '--limit') {
-      flags.limit = Number(argv[i + 1]);
-      i += 1;
+      const value = valueAfter(i);
+      if (value !== null) {
+        flags.limit = Number(value);
+        i += 1;
+      }
     } else if (arg === '--severity') {
-      flags.severity = argv[i + 1];
-      i += 1;
+      const value = valueAfter(i);
+      if (value !== null) {
+        flags.severity = value;
+        i += 1;
+      }
     } else if (arg === '--ack') {
-      flags.ack = argv[i + 1];
-      i += 1;
+      const value = valueAfter(i);
+      if (value !== null) {
+        flags.ack = value;
+        i += 1;
+      }
     } else if (arg === '--reason') {
-      flags.reason = argv[i + 1];
-      i += 1;
+      const value = valueAfter(i);
+      if (value !== null) {
+        flags.reason = value;
+        i += 1;
+      }
     } else if (arg === '--plan-digest') {
-      flags.planDigest = argv[i + 1];
-      i += 1;
+      const value = valueAfter(i);
+      if (value !== null) {
+        flags.planDigest = value;
+        i += 1;
+      }
     } else if (arg === '--apply') {
       flags.apply = true;
     } else if (arg === '--read-only') {
