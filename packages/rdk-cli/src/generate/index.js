@@ -700,13 +700,37 @@ export function renderGitattributes() {
 `;
 }
 
+const DEPENDABOT_ECOSYSTEMS = [
+  ['npm', (cwd, pkg) => Boolean(pkg) || exists(join(cwd, 'package.json'))],
+  ['pip', (cwd) => ['requirements.txt', 'pyproject.toml', 'setup.py'].some((file) => exists(join(cwd, file)))],
+  ['gomod', (cwd) => exists(join(cwd, 'go.mod'))],
+  ['cargo', (cwd) => exists(join(cwd, 'Cargo.toml'))],
+  ['maven', (cwd) => exists(join(cwd, 'pom.xml'))],
+  ['gradle', (cwd) => ['build.gradle', 'build.gradle.kts', 'settings.gradle', 'settings.gradle.kts'].some((file) => exists(join(cwd, file)))],
+  ['bundler', (cwd) => exists(join(cwd, 'Gemfile'))],
+  ['composer', (cwd) => exists(join(cwd, 'composer.json'))],
+  ['nuget', (cwd) => rootHasExtension(cwd, ['.csproj', '.fsproj', '.vbproj', '.sln'])],
+  ['pub', (cwd) => exists(join(cwd, 'pubspec.yaml'))],
+  ['mix', (cwd) => exists(join(cwd, 'mix.exs'))],
+  ['swift', (cwd) => exists(join(cwd, 'Package.swift'))],
+  ['docker', (cwd) => ['Dockerfile', 'Containerfile'].some((file) => exists(join(cwd, file)))],
+  ['terraform', (cwd) => rootHasExtension(cwd, ['.tf'])],
+  ['github-actions', (cwd) => exists(join(cwd, '.github', 'workflows'))],
+];
+
+function rootHasExtension(cwd, extensions) {
+  let entries;
+  try {
+    entries = readdirSync(cwd);
+  } catch {
+    return false;
+  }
+  return entries.some((entry) => extensions.some((extension) => entry.toLowerCase().endsWith(extension)));
+}
+
 /** Package ecosystems dependabot should watch, derived from manifests present in the repository. */
 export function dependabotEcosystems(cwd, pkg) {
-  const ecosystems = [];
-  if (pkg || exists(join(cwd, 'package.json'))) ecosystems.push('npm');
-  if (exists(join(cwd, 'requirements.txt')) || exists(join(cwd, 'pyproject.toml')) || exists(join(cwd, 'setup.py'))) ecosystems.push('pip');
-  if (exists(join(cwd, '.github', 'workflows'))) ecosystems.push('github-actions');
-  return ecosystems;
+  return DEPENDABOT_ECOSYSTEMS.filter(([, detect]) => detect(cwd, pkg)).map(([ecosystem]) => ecosystem);
 }
 
 /** dependabot config: weekly update blocks, one per detected ecosystem. */
@@ -825,8 +849,10 @@ Do not open a public issue for an unreported vulnerability.
 
 ## Scope
 
-${projectName} runs locally and does not transmit telemetry. Reports about
-dependency vulnerabilities are welcome and are treated as high priority.
+TODO: state what ${projectName} runs (local-only or server-side), what data it
+touches, and whether it sends telemetry, so reporters know what is in scope.
+Reports about dependency vulnerabilities are welcome and are treated as high
+priority.
 `;
 }
 

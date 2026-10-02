@@ -18,3 +18,8 @@ rdk-report.md
 .env
 
 packages/rdk-cli/skills/
+.omo/
+.opencode/
+.codegraph/
+.codenomad/
+.playwright-mcp/

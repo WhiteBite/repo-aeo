@@ -469,3 +469,80 @@ test('dry-run preview composes same-file patches within a pass exactly like appl
     removeRepo(dir);
   }
 });
+
+test('dependabot.stub detects ecosystems from non-JS/Python manifests', () => {
+  const dir = makeRepo({
+    'go.mod': 'module example.com/demo\n',
+    'Cargo.toml': '[package]\nname = "demo"\n',
+    'Dockerfile': 'FROM scratch\n',
+  });
+  try {
+    applyPatches(planPatches(contextFor(dir), { only: ['dependabot.stub'] }));
+    const yml = readFileSync(join(dir, '.github', 'dependabot.yml'), 'utf8');
+    assert.match(yml, /package-ecosystem: gomod/);
+    assert.match(yml, /package-ecosystem: cargo/);
+    assert.match(yml, /package-ecosystem: docker/);
+    assert.doesNotMatch(yml, /package-ecosystem: npm/);
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('dependabot.stub covers JVM, .NET, PHP, Ruby, Dart, Elixir and Terraform manifests', () => {
+  const dir = makeRepo({
+    'pom.xml': '<project/>\n',
+    'build.gradle.kts': '\n',
+    'App.csproj': '<Project/>\n',
+    'composer.json': '{}\n',
+    'Gemfile': "source 'https://rubygems.org'\n",
+    'pubspec.yaml': 'name: demo\n',
+    'mix.exs': 'defmodule Demo do\nend\n',
+    'main.tf': 'resource "null_resource" "x" {}\n',
+    'Package.swift': '// swift-tools-version:5.9\n',
+  });
+  try {
+    applyPatches(planPatches(contextFor(dir), { only: ['dependabot.stub'] }));
+    const yml = readFileSync(join(dir, '.github', 'dependabot.yml'), 'utf8');
+    for (const eco of ['maven', 'gradle', 'nuget', 'composer', 'bundler', 'pub', 'mix', 'terraform', 'swift']) {
+      assert.match(yml, new RegExp(`package-ecosystem: ${eco}`), `missing ecosystem ${eco}`);
+    }
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('dependabot ecosystems render in a stable table order', () => {
+  const dir = makeRepo({
+    'package.json': JSON.stringify({ name: 'ordered' }),
+    'go.mod': 'module example.com/ordered\n',
+    '.github/workflows/ci.yml': 'name: ci\non: push\njobs: {}\n',
+  });
+  try {
+    applyPatches(planPatches(contextFor(dir), { only: ['dependabot.stub'] }));
+    const yml = readFileSync(join(dir, '.github', 'dependabot.yml'), 'utf8');
+    const npmAt = yml.indexOf('package-ecosystem: npm');
+    const gomodAt = yml.indexOf('package-ecosystem: gomod');
+    const actionsAt = yml.indexOf('package-ecosystem: github-actions');
+    assert.ok(npmAt >= 0 && npmAt < gomodAt, 'npm must precede gomod');
+    assert.ok(gomodAt < actionsAt, 'gomod must precede github-actions');
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('gitignore.entries adds agent tooling state directories and stays idempotent', () => {
+  const dir = makeRepo({
+    'package.json': JSON.stringify({ name: 'agent-repo' }),
+    '.gitignore': 'node_modules/\ndist/\nbuild/\n*.log\n.DS_Store\n.env\n',
+  });
+  try {
+    applyPatches(planPatches(contextFor(dir), { only: ['gitignore.entries'] }));
+    const text = readFileSync(join(dir, '.gitignore'), 'utf8');
+    for (const entry of ['.omo/', '.opencode/', '.codegraph/', '.codenomad/', '.playwright-mcp/']) {
+      assert.ok(text.includes(entry), `missing ${entry}`);
+    }
+    assert.deepEqual(planPatches(contextFor(dir), { only: ['gitignore.entries'] }), []);
+  } finally {
+    removeRepo(dir);
+  }
+});

@@ -236,7 +236,7 @@ export function buildSeedConfig(cwd = process.cwd()) {
   if (!quickstart.install && pkg && pkg.name) quickstart.install = `npm install ${pkg.name}`;
   if (!quickstart.run && (scripts.start || scripts.dev)) quickstart.run = `npm run ${scripts.start ? 'start' : 'dev'}`;
   if (!quickstart.test && (scripts.test || scripts['test:unit'])) quickstart.test = `npm run ${scripts.test ? 'test' : 'test:unit'}`;
-  if (quickstart.prerequisites.length === 0) quickstart.prerequisites = ['Node.js >= 18'];
+  if (quickstart.prerequisites.length === 0 && pkg) quickstart.prerequisites = ['Node.js >= 18'];
 
   return {
     ...config,

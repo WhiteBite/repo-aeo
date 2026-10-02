@@ -15,6 +15,7 @@ import {
   renderAgentsMd,
   renderLlmsTxt,
   renderJsonLd,
+  renderSecurityMd,
 } from '../src/generate/index.js';
 import { parse } from '../src/yaml.js';
 import { makeRepo, removeRepo } from './helpers.js';
@@ -375,4 +376,11 @@ test('renderCitationCff derives the author before falling back to the TODO stub'
   assert.match(renderCitationCff(config, { author: 'Repo Owner' }), /- name: "Repo Owner"/);
   assert.match(renderCitationCff(config, { author: { name: 'Obj Owner' } }), /- name: "Obj Owner"/);
   assert.match(renderCitationCff(config, null), /- name: "TODO: maintainer name"/);
+});
+
+test('renderSecurityMd does not assert an unverified telemetry policy', () => {
+  const md = renderSecurityMd('demo-project');
+  assert.match(md, /demo-project/);
+  assert.doesNotMatch(md, /does not transmit telemetry/);
+  assert.match(md, /TODO/i);
 });

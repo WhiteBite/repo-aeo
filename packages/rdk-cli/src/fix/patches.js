@@ -35,7 +35,7 @@ import {
   deriveQuickstartCommands,
 } from '../generate/index.js';
 
-const GITIGNORE_DEFAULTS = ['node_modules/', 'dist/', 'build/', '*.log', '.DS_Store', '.env'];
+const GITIGNORE_DEFAULTS = ['node_modules/', 'dist/', 'build/', '*.log', '.DS_Store', '.env', '.omo/', '.opencode/', '.codegraph/', '.codenomad/', '.playwright-mcp/'];
 
 function mutation(path, before, after) {
   return { path, before, after, created: before === null };

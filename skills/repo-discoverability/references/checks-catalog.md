@@ -77,4 +77,3 @@ exists, docs only when a homepage/docs site is configured).
 | `hygiene.citation` | 6 | CITATION.cff |
 | `hygiene.issue_templates` | 5 | issue/PR templates |
 | `hygiene.gitattributes` | 4 | line-ending normalisation |
-| `hygiene.dependabot` | 4 | dependabot.yml present |

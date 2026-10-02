@@ -85,6 +85,16 @@ test('buildSeedConfig derives quickstart commands from package.json scripts', ()
   }
 });
 
+test('buildSeedConfig does not assume Node when there is no package.json', () => {
+  const dir = makeRepo({ 'pyproject.toml': '[project]\nname = "py-seed"\n' });
+  try {
+    const seed = buildSeedConfig(dir);
+    assert.deepEqual(seed.quickstart.prerequisites, []);
+  } finally {
+    removeRepo(dir);
+  }
+});
+
 test('suggestTopics produces canonical lowercase topics', () => {
   const topics = suggestTopics({ name: 'Demo Widget', category: 'library' }, { name: '@scope/demo-widget', keywords: ['LLMs', 'Agent Tools'] });
   assert.ok(topics.every((topic) => /^[a-z0-9-]+$/.test(topic)), `non-canonical topics: ${topics.join(', ')}`);
