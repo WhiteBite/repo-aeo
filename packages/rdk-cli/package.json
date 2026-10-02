@@ -1,7 +1,7 @@
 {
   "name": "repo-aeo",
   "version": "0.3.5",
-  "description": "Audit and improve repository discoverability: GitHub metadata and topics, README structure, AGENTS.md, npm package surface, llms.txt and structured data.",
+  "description": "Make any repository, npm package and docs site findable and recommendable to humans, AI agents and search engines.",
   "type": "module",
   "license": "MIT",
   "bin": {
@@ -51,7 +51,7 @@
     "url": "git+https://github.com/WhiteBite/repo-aeo.git",
     "directory": "packages/rdk-cli"
   },
-  "homepage": "https://github.com/WhiteBite/repo-aeo/tree/main/packages/rdk-cli#readme",
+  "homepage": "https://github.com/WhiteBite/repo-aeo#readme",
   "bugs": {
     "url": "https://github.com/WhiteBite/repo-aeo/issues"
   },
