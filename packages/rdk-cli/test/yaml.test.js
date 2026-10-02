@@ -117,3 +117,43 @@ test('renderProjectYml round-trips list items containing colons', () => {
   const rendered = renderProjectYml({ audiences: ['a: b', 'plain'] });
   assert.deepEqual(parse(rendered).audiences, ['a: b', 'plain']);
 });
+
+test('double-quoted escapes resolve left-to-right: `\\n` after a backslash stays literal', () => {
+  const result = parse('k: "a\\\\nb"');
+  assert.equal(result.k, 'a\\nb');
+  assert.equal(parse('k: "C:\\\\new\\\\test"').k, 'C:\\new\\test');
+  assert.equal(parse('k: "a\\nb"').k, 'a\nb');
+});
+
+test('block scalars keep blank lines, comments and chomping indicators', () => {
+  assert.equal(parse('d: |\n  a\n\n  b\n').d, 'a\n\nb\n');
+  assert.equal(parse('d: |\n  use this # one\n').d, 'use this # one\n');
+  assert.equal(parse('d: |-\n  a\n  b\n').d, 'a\nb');
+  assert.equal(parse('d: |+\n  a\n\n').d, 'a\n\n');
+  assert.equal(parse('d: |2\n    a\n').d, '  a\n');
+  assert.equal(parse('d: |\n  x\nother: 1\n').other, 1);
+  assert.equal(parse('d: |\n  ---\n').d, '---\n');
+});
+
+test('folded scalars break paragraphs on blank lines and keep indented lines literal', () => {
+  assert.equal(parse('d: >\n  a\n\n  b\n').d, 'a\nb\n');
+  assert.equal(parse('d: >\n  a\n  b\n').d, 'a b\n');
+  assert.equal(parse('d: >\n  a\n    code\n  b\n').d, 'a\n  code\nb\n');
+});
+
+test('unterminated or trailing flow content throws instead of parsing garbage', () => {
+  assert.throws(() => parse('k: [a, b'), (error) => error instanceof YamlError && /unterminated/.test(error.message));
+  assert.throws(() => parse('k: [a, b] oops'), (error) => error instanceof YamlError && /after flow/.test(error.message));
+  assert.throws(() => parse('k: {a}'), (error) => error instanceof YamlError && /without a colon/.test(error.message));
+});
+
+test('nested block lists and block scalars in list items fail loudly', () => {
+  assert.throws(() => parse('k:\n  - - a'), (error) => error instanceof YamlError && /nested block lists/.test(error.message));
+  assert.throws(() => parse('k:\n  - d: |\n      x\n'), (error) => error instanceof YamlError && /inside list items/.test(error.message));
+});
+
+test('a second document separator is rejected, `...` ends the document', () => {
+  assert.throws(() => parse('a: 1\n---\nb: 2'), (error) => error instanceof YamlError && /multiple documents/.test(error.message));
+  assert.deepEqual(parse('a: 1\n...\n'), { a: 1 });
+  assert.deepEqual(parse('---\na: 1\n'), { a: 1 });
+});
