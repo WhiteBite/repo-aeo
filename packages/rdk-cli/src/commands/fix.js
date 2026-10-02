@@ -71,11 +71,18 @@ function simulatePasses({ cwd, ctx, only, skip }) {
     for (let pass = 0; pass < MAX_PASSES; pass += 1) {
       const planned = planPatches(previewCtx, { only, skip }).filter(hasChange);
       if (planned.length === 0) break;
-      const snapshot = snapshotPass(planned, preview);
-      passes.push(snapshot);
-      for (const patch of snapshot) {
-        for (const change of patch.changes) writeText(join(preview, change.path), change.after);
+      const snapshot = [];
+      for (const patch of planned) {
+        // sequential compute+write so same-file patches compose exactly like applyPatches
+        const changes = patch.compute().map((change) => ({
+          path: relative(preview, change.path),
+          before: change.before,
+          after: change.after,
+        }));
+        snapshot.push({ id: patch.id, title: patch.title, description: patch.description, risk: patch.risk, changes });
+        for (const change of changes) writeText(join(preview, change.path), change.after);
       }
+      passes.push(snapshot);
     }
     return passes;
   } catch {

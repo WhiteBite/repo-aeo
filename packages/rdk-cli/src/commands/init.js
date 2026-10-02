@@ -16,10 +16,12 @@ const INIT_PATCHES = [
   'license.stub',
   'security.stub',
   'contributing.stub',
+  'coc.stub',
   'readme.examples_stub',
   'gitignore.entries',
   'gitattributes.stub',
   'github.templates',
+  'dependabot.stub',
   'jsonld.snippet',
 ];
 

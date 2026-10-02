@@ -6,8 +6,8 @@
  *
  * Patches never publish, tag, bump versions or force-push.
  */
-import { join } from 'node:path';
-import { exists, readTextIfExists, writeText, readJsonIfExists } from '../util/fs.js';
+import { dirname, join } from 'node:path';
+import { exists, readTextIfExists, writeText } from '../util/fs.js';
 import { parseMarkdown, slugifyTopic, uniq, normalizeHeading } from '../audit/checks/_shared.js';
 import {
   renderProjectYml,
@@ -25,6 +25,11 @@ import {
   renderLicense,
   renderSecurityMd,
   renderContributingMd,
+  renderCodeOfConduct,
+  citationVersionDrift,
+  jsonldVersionDrift,
+  dependabotEcosystems,
+  renderDependabotYml,
   mergeGenerated,
   repositoryUrl,
   deriveQuickstartCommands,
@@ -36,35 +41,42 @@ function mutation(path, before, after) {
   return { path, before, after, created: before === null };
 }
 
-/** Rewrites a `key:` block (inline or list form) inside YAML text, preserving comments. */
+/** Rewrites a `key:` block (inline or list form) inside YAML text, preserving comments and EOL style. */
 function replaceYamlList(text, key, values) {
+  const eol = dominantEol(String(text));
   const lines = String(text).split('\n');
   const keyRe = new RegExp(`^(\\s*)${key}\\s*:(.*)$`);
-  const index = lines.findIndex((line) => keyRe.test(line));
+  const index = lines.findIndex((line) => keyRe.test(line.replace(/\r$/, '')));
   if (index === -1) return { text, changed: false };
-  const indent = lines[index].match(keyRe)[1];
-  const inline = lines[index].match(keyRe)[2].trim();
+  const match = lines[index].replace(/\r$/, '').match(keyRe);
+  const indent = match[1];
+  const inline = match[2].trim();
   if (inline.startsWith('#')) {
     // key with only a comment on the same line: keep the comment, add the list below
-    const comment = inline;
-    const rendered = values.map((value) => `${indent}  - ${JSON.stringify(value)}`).join('\n');
-    lines.splice(index, 1, `${indent}${key}: ${comment}`, rendered);
+    const rendered = values.map((value) => `${indent}  - ${JSON.stringify(value)}`).join(eol);
+    lines.splice(index, 1, `${indent}${key}: ${inline}${eol}${rendered}`);
     return { text: lines.join('\n'), changed: true };
+  }
+  let comment = '';
+  if (/^[[{]/.test(inline)) {
+    const close = Math.max(inline.lastIndexOf(']'), inline.lastIndexOf('}'));
+    const tail = inline.slice(close + 1).trim();
+    if (tail.startsWith('#')) comment = ` ${tail}`;
   }
   let end = index + 1;
   while (end < lines.length) {
-    const line = lines[end];
-    if (line.trim() === '') {
+    const probe = lines[end].replace(/\r$/, '');
+    if (probe.trim() === '') {
       end += 1;
       continue;
     }
-    const lineIndent = line.length - line.trimStart().length;
-    if (lineIndent <= indent.length || !line.trim().startsWith('-')) break;
+    const lineIndent = probe.length - probe.trimStart().length;
+    if (lineIndent <= indent.length || !probe.trim().startsWith('-')) break;
     end += 1;
   }
   const rendered = values.length === 0
-    ? `${indent}${key}: []`
-    : `${indent}${key}:\n${values.map((value) => `${indent}  - ${JSON.stringify(value)}`).join('\n')}`;
+    ? `${indent}${key}: []${comment}`
+    : `${indent}${key}:${comment}${eol}${values.map((value) => `${indent}  - ${JSON.stringify(value)}`).join(eol)}`;
   lines.splice(index, end - index, rendered);
   return { text: lines.join('\n'), changed: true };
 }
@@ -83,8 +95,16 @@ function readPackageJson(ctx) {
   return { path, text, json, parseError: false };
 }
 
-function serializeJson(value) {
-  return `${JSON.stringify(value, null, 2)}\n`;
+function serializeJson(value, originalText) {
+  const indentMatch = /^(\s+)"/.exec(String(originalText || ''));
+  const indent = indentMatch ? indentMatch[1] : '  ';
+  const eol = /\r\n/.test(String(originalText || '')) ? '\r\n' : '\n';
+  return `${JSON.stringify(value, null, indent).replace(/\n/g, eol)}${eol}`;
+}
+
+// files-array entries are resolved from the publishable package directory, matching what npm pack includes
+function packageDirFor(ctx) {
+  return ctx.publishable && ctx.publishable.path ? dirname(ctx.publishable.path) : ctx.cwd;
 }
 
 function readmeBase(ctx) {
@@ -122,9 +142,22 @@ function h2Sections(text) {
   return sections;
 }
 
+const EXAMPLE_SECTION_KEYS = ['examples', 'usage', 'example', 'quickstart', 'getting started'];
+
+const EXAMPLE_STUB_MARKER = '### Example (replace with a real one)';
+
+function escapeRegExp(text) {
+  return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// raw-text guard: a fence-desynced parseMarkdown never sees appended headings and re-appends them every pass
+function rawHasHeading(text, heading) {
+  return new RegExp(`^#{1,6}[ \\t]+${escapeRegExp(heading)}[ \\t]*$`, 'im').test(String(text));
+}
+
 /** Returns the body of the section that should hold examples. */
 function exampleSectionBody(doc) {
-  const key = ['examples', 'usage', 'example', 'quickstart', 'getting started'].find((candidate) => doc.sections.has(candidate));
+  const key = EXAMPLE_SECTION_KEYS.find((candidate) => doc.sections.has(candidate));
   return key ? doc.sections.get(key).body : '';
 }
 
@@ -153,7 +186,8 @@ export const PATCHES = [
       const before = readTextIfExists(path);
       const topics = (ctx.config.keywords && ctx.config.keywords.github_topics) || [];
       const normalized = uniq(topics.map(slugifyTopic).filter(Boolean));
-      const { text } = replaceYamlList(before, 'github_topics', normalized);
+      const { text, changed } = replaceYamlList(before, 'github_topics', normalized);
+      if (!changed) return [];
       return [mutation(path, before, text)];
     },
   },
@@ -207,15 +241,16 @@ export const PATCHES = [
     description: 'Appends stubs for Who is it for / Use cases / Why choose this when absent.',
     risk: 'safe',
     applies(ctx) {
-      const doc = parseMarkdown(readmeBase(ctx).before);
-      return REQUIRED_README_SECTIONS.some((section) => !doc.sections.has(section.key));
+      const { before } = readmeBase(ctx);
+      const doc = parseMarkdown(before);
+      return REQUIRED_README_SECTIONS.some((section) => !doc.sections.has(section.key) && !rawHasHeading(before, section.heading));
     },
     mutations(ctx) {
       const { path, before } = readmeBase(ctx);
       const doc = parseMarkdown(before);
       const additions = [];
       for (const section of REQUIRED_README_SECTIONS) {
-        if (doc.sections.has(section.key)) continue;
+        if (doc.sections.has(section.key) || rawHasHeading(before, section.heading)) continue;
         if (section.key === 'who is it for') {
           additions.push(`## ${section.heading}`, '', (ctx.config.audiences || []).map((a) => `- ${a}`).join('\n') || '<!-- TODO: who is this for? -->', '');
         }
@@ -241,8 +276,10 @@ export const PATCHES = [
     applies(ctx) {
       const path = join(ctx.cwd, 'README.md');
       if (!exists(path)) return false;
-      const doc = parseMarkdown(readTextIfExists(path));
+      const text = readTextIfExists(path);
+      const doc = parseMarkdown(text);
       if (doc.sections.has('quickstart') || doc.sections.has('getting started')) return false;
+      if (rawHasHeading(text, 'Quickstart') || rawHasHeading(text, 'Getting started')) return false;
       const quickstart = ctx.config.quickstart || {};
       return Boolean(quickstart.install && quickstart.run);
     },
@@ -251,6 +288,7 @@ export const PATCHES = [
       const before = readTextIfExists(path);
       const doc = parseMarkdown(before);
       if (doc.sections.has('quickstart') || doc.sections.has('getting started')) return [];
+      if (rawHasHeading(before, 'Quickstart') || rawHasHeading(before, 'Getting started')) return [];
       const eol = dominantEol(before);
       const lines = before.split(/\r?\n/);
       const quickstart = ctx.config.quickstart || {};
@@ -266,7 +304,8 @@ export const PATCHES = [
         '',
       ].filter((line, index, arr) => !(line === '' && arr[index - 1] === ''));
       let insertAt = lines.findIndex((line) => /^#{1,2}\s/.test(line));
-      if (insertAt === -1) insertAt = 0;
+      // a first heading deep in the file would leave the stub below the 60-line fold the check measures
+      if (insertAt === -1 || insertAt > 55) insertAt = 0;
       else insertAt += 1;
       lines.splice(insertAt, 0, ...block);
       return [mutation(path, before, lines.join(eol))];
@@ -349,7 +388,7 @@ export const PATCHES = [
       if (!json.repository && repository) json.repository = repository;
       if (!json.homepage && ctx.config.links.homepage) json.homepage = ctx.config.links.homepage;
       if (!json.bugs && ctx.config.links.issues) json.bugs = { url: ctx.config.links.issues };
-      return [mutation(pkg.path, pkg.text, serializeJson(json))];
+      return [mutation(pkg.path, pkg.text, serializeJson(json, pkg.text))];
     },
   },
 
@@ -370,7 +409,7 @@ export const PATCHES = [
       const json = { ...pkg.json };
       const existing = Array.isArray(json.keywords) ? json.keywords : [];
       json.keywords = uniq([...existing, ...((ctx.config.keywords && ctx.config.keywords.npm_keywords) || [])]);
-      return [mutation(pkg.path, pkg.text, serializeJson(json))];
+      return [mutation(pkg.path, pkg.text, serializeJson(json, pkg.text))];
     },
   },
 
@@ -383,19 +422,19 @@ export const PATCHES = [
       const pkg = readPackageJson(ctx);
       if (!pkg || pkg.parseError) return false;
       if (!Array.isArray(pkg.json.files)) return false;
-      const wanted = ['llms.txt', 'llms-full.txt', 'AGENTS.md'].filter((name) => exists(join(ctx.cwd, name)));
+      const wanted = ['llms.txt', 'llms-full.txt', 'AGENTS.md'].filter((name) => exists(join(packageDirFor(ctx), name)));
       return wanted.some((name) => !pkg.json.files.includes(name));
     },
     mutations(ctx) {
       const pkg = readPackageJson(ctx);
       const json = { ...pkg.json };
-      const wanted = ['llms.txt', 'llms-full.txt', 'AGENTS.md'].filter((name) => exists(join(ctx.cwd, name)));
+      const wanted = ['llms.txt', 'llms-full.txt', 'AGENTS.md'].filter((name) => exists(join(packageDirFor(ctx), name)));
       const files = Array.isArray(json.files) ? [...json.files] : [];
       for (const name of wanted) {
         if (!files.includes(name)) files.push(name);
       }
       json.files = files;
-      return [mutation(pkg.path, pkg.text, serializeJson(json))];
+      return [mutation(pkg.path, pkg.text, serializeJson(json, pkg.text))];
     },
   },
 
@@ -413,7 +452,7 @@ export const PATCHES = [
       const pkg = readPackageJson(ctx);
       const json = { ...pkg.json };
       json.engines = { ...(json.engines || {}), node: json.engines && json.engines.node ? json.engines.node : '>=18' };
-      return [mutation(pkg.path, pkg.text, serializeJson(json))];
+      return [mutation(pkg.path, pkg.text, serializeJson(json, pkg.text))];
     },
   },
 
@@ -423,8 +462,9 @@ export const PATCHES = [
     description: 'Adds an MIT LICENSE so the project can legally be reused and recommended.',
     risk: 'safe',
     applies(ctx) {
-      const names = ['LICENSE', 'LICENSE.md', 'LICENSE.txt', 'COPYING'];
-      return !names.some((name) => exists(join(ctx.cwd, name)));
+      const names = ['LICENSE', 'LICENSE.md', 'LICENSE.txt'];
+      const dirs = [ctx.cwd, join(ctx.cwd, '.github'), join(ctx.cwd, 'docs')];
+      return !(exists(join(ctx.cwd, 'COPYING')) || dirs.some((dir) => names.some((name) => exists(join(dir, name)))));
     },
     mutations(ctx) {
       const path = join(ctx.cwd, 'LICENSE');
@@ -439,7 +479,8 @@ export const PATCHES = [
     description: 'Adds a security policy with a private reporting channel.',
     risk: 'safe',
     applies(ctx) {
-      return !exists(join(ctx.cwd, 'SECURITY.md')) && !exists(join(ctx.cwd, '.github', 'SECURITY.md'));
+      const dirs = [ctx.cwd, join(ctx.cwd, '.github'), join(ctx.cwd, 'docs')];
+      return !dirs.some((dir) => exists(join(dir, 'SECURITY.md')));
     },
     mutations(ctx) {
       const path = join(ctx.cwd, 'SECURITY.md');
@@ -453,11 +494,27 @@ export const PATCHES = [
     description: 'Adds contribution guidelines covering setup, tests and the PR process.',
     risk: 'safe',
     applies(ctx) {
-      return !exists(join(ctx.cwd, 'CONTRIBUTING.md')) && !exists(join(ctx.cwd, '.github', 'CONTRIBUTING.md'));
+      const dirs = [ctx.cwd, join(ctx.cwd, '.github'), join(ctx.cwd, 'docs')];
+      return !dirs.some((dir) => exists(join(dir, 'CONTRIBUTING.md')));
     },
     mutations(ctx) {
       const path = join(ctx.cwd, 'CONTRIBUTING.md');
       return [mutation(path, null, renderContributingMd(ctx.config.project && ctx.config.project.name))];
+    },
+  },
+
+  {
+    id: 'coc.stub',
+    title: 'Create CODE_OF_CONDUCT.md',
+    description: 'Adds the Contributor Covenant 2.1 so GitHub counts a code of conduct toward the community profile.',
+    risk: 'safe',
+    applies(ctx) {
+      const dirs = [ctx.cwd, join(ctx.cwd, '.github'), join(ctx.cwd, 'docs')];
+      return !dirs.some((dir) => exists(join(dir, 'CODE_OF_CONDUCT.md')));
+    },
+    mutations(ctx) {
+      const path = join(ctx.cwd, 'CODE_OF_CONDUCT.md');
+      return [mutation(path, null, renderCodeOfConduct())];
     },
   },
 
@@ -468,6 +525,7 @@ export const PATCHES = [
     risk: 'safe',
     applies(ctx) {
       if (!deriveQuickstartCommands(ctx.config, ctx.pkg).run) return false;
+      if (readmeBase(ctx).before.includes(EXAMPLE_STUB_MARKER)) return false;
       const doc = parseMarkdown(readmeBase(ctx).before);
       const body = exampleSectionBody(doc);
       const blocks = (body.match(/^(?:```|~~~)/gm) || []).length / 2;
@@ -477,14 +535,15 @@ export const PATCHES = [
       const { path, before } = readmeBase(ctx);
       const run = deriveQuickstartCommands(ctx.config, ctx.pkg).run;
       if (!run) return [];
+      if (before.includes(EXAMPLE_STUB_MARKER)) return [];
       const doc = parseMarkdown(before);
-      const sectionKey = ['examples', 'usage', 'example'].find((key) => doc.sections.has(key));
+      const sectionKey = EXAMPLE_SECTION_KEYS.find((key) => doc.sections.has(key));
       if (sectionKey) {
         const blocks = (doc.sections.get(sectionKey).body.match(/^(?:```|~~~)/gm) || []).length / 2;
         if (blocks >= 1) return [];
       }
       const eol = dominantEol(before);
-      const stubLines = ['', '### Example (replace with a real one)', '', '```bash', run, '```', ''];
+      const stubLines = ['', EXAMPLE_STUB_MARKER, '', '```bash', run, '```', ''];
       let after;
       if (sectionKey) {
         // insert the stub right after the section heading
@@ -502,17 +561,22 @@ export const PATCHES = [
 
   {
     id: 'citation.stub',
-    title: 'Create CITATION.cff',
-    description: 'Adds a citation file so the project can be cited from the GitHub "Cite this repository" button.',
+    title: 'Create or version-sync CITATION.cff',
+    description: 'Adds a citation file so the project can be cited from the GitHub "Cite this repository" button, and keeps its version key in sync with package.json without touching any other field.',
     risk: 'safe',
     applies(ctx) {
       const relevant = ['library', 'research', 'dataset', 'tool', 'app'].includes(String((ctx.config.project.category || '')).toLowerCase());
-      return relevant && !exists(join(ctx.cwd, 'CITATION.cff'));
+      if (!relevant) return false;
+      if (!exists(join(ctx.cwd, 'CITATION.cff'))) return true;
+      return citationVersionDrift(ctx.cwd, ctx.config, ctx.pkg) !== null;
     },
     mutations(ctx) {
       const path = join(ctx.cwd, 'CITATION.cff');
       const before = exists(path) ? readTextIfExists(path) : null;
-      return [mutation(path, before, renderCitationCff(ctx.config, ctx.pkg))];
+      if (before === null) return [mutation(path, null, renderCitationCff(ctx.config, ctx.pkg, ctx.cwd))];
+      const drift = citationVersionDrift(ctx.cwd, ctx.config, ctx.pkg);
+      if (!drift) return [];
+      return [mutation(path, before, drift.refreshed)];
     },
   },
 
@@ -579,18 +643,36 @@ export const PATCHES = [
   },
 
   {
-    id: 'jsonld.snippet',
-    title: 'Emit a JSON-LD snippet for the site/docs',
-    description: 'Writes docs/jsonld.jsonld with SoftwareSourceCode schema derived from the config.',
+    id: 'dependabot.stub',
+    title: 'Create .github/dependabot.yml',
+    description: 'Weekly dependency and GitHub Action updates for every package ecosystem detected in the repository.',
     risk: 'safe',
     applies(ctx) {
-      const hasSite = Boolean(ctx.config.links.homepage || ctx.config.links.docs || ctx.config.artifacts.has_docs_site);
-      return hasSite && !exists(join(ctx.cwd, 'docs', 'jsonld.jsonld'));
+      if (exists(join(ctx.cwd, '.github', 'dependabot.yml'))) return false;
+      return dependabotEcosystems(ctx.cwd, ctx.pkg).length > 0;
+    },
+    mutations(ctx) {
+      const path = join(ctx.cwd, '.github', 'dependabot.yml');
+      return [mutation(path, null, renderDependabotYml(dependabotEcosystems(ctx.cwd, ctx.pkg)))];
+    },
+  },
+
+  {
+    id: 'jsonld.snippet',
+    title: 'Emit or version-sync a JSON-LD snippet for the site/docs',
+    description: 'Writes docs/jsonld.jsonld with SoftwareSourceCode schema derived from the config, and keeps an existing softwareVersion key in sync with package.json.',
+    risk: 'safe',
+    applies(ctx) {
+      if (exists(join(ctx.cwd, 'docs', 'jsonld.jsonld'))) return jsonldVersionDrift(ctx.cwd, ctx.pkg) !== null;
+      return Boolean(ctx.config.links.homepage || ctx.config.links.docs || ctx.config.artifacts.has_docs_site);
     },
     mutations(ctx) {
       const path = join(ctx.cwd, 'docs', 'jsonld.jsonld');
       const before = exists(path) ? readTextIfExists(path) : null;
-      return [mutation(path, before, renderJsonLd(ctx.config, ctx.pkg, ctx.cwd))];
+      if (before === null) return [mutation(path, null, renderJsonLd(ctx.config, ctx.pkg, ctx.cwd))];
+      const drift = jsonldVersionDrift(ctx.cwd, ctx.pkg);
+      if (!drift) return [];
+      return [mutation(path, before, serializeJson({ ...drift.data, softwareVersion: drift.expected }, before))];
     },
   },
 ];
