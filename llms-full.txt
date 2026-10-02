@@ -21,7 +21,7 @@ RDK scores how discoverable your repository is, fixes the parts that can be fixe
 automatically, and keeps it from regressing in CI. It is the tool you point at a
 repo that is *good but invisible*.
 
-The audit runs **41 checks in under 300 ms offline** on this repository
+The audit runs **44 checks in under 300 ms offline** on this repository
 (measured with `rdk audit --format json`, `duration_ms` field) and carries **0
 runtime dependencies**, so `npx` stays fast and the supply chain stays small.
 
@@ -91,7 +91,7 @@ offline; `--online` adds link checks and live GitHub metadata.
 
 ```bash
 $ npx repo-aeo audit            # measured on fixtures/demo-repo, offline
-score: 51/100 (grade F) · checks: 18/41 passed · findings: 10 error, 13 warn, 8 info (17 autofixable) · mode: offline (use --online for link + GitHub checks)
+score: 52/100 (grade F) · checks: 20/43 passed · findings: 10 error, 13 warn, 10 info (19 autofixable) · mode: offline (use --online for link + GitHub checks)
 ```
 
 ### 2. Fix what is safe to fix
@@ -129,7 +129,7 @@ bot branch and opens a PR for review.
 ```bash
 $ npx repo-aeo-mcp score
 Discoverability score: 100/100 (grade A)
-checks passed: 41/41 - errors 0 - warnings 0 - autofixable 0
+checks passed: 44/44 - errors 0 - warnings 0 - autofixable 0
 trend: no history yet
 ```
 

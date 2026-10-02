@@ -54,6 +54,29 @@ test('skills/repo-discoverability references/scoring.md axis weights match AXIS_
   assert.deepEqual(drift, [], `references/scoring.md axis weights drifted from src/audit/score.js:\n${drift.join('\n')}`);
 });
 
+test('README.md axis weights and check count match the code', () => {
+  const text = readFileSync(join(ROOT, 'README.md'), 'utf8');
+  const seen = new Map();
+  for (const [, label, weight] of text.matchAll(/^\|\s*([^|]+?)\s*\|\s*(\d+)\s*\|\s*[^|]+\|/gm)) {
+    const key = LABEL_TO_KEY[label];
+    if (key) seen.set(key, Number(weight));
+  }
+  const drift = axisDrift(seen, 'README.md');
+  assert.deepEqual(drift, [], `README.md axis table drifted from src/audit/score.js:\n${drift.join('\n')}`);
+
+  const claim = /runs \*\*(\d+) checks/.exec(text);
+  assert.ok(claim, 'README.md must state the check count as "runs **N checks ...**"');
+  assert.equal(Number(claim[1]), REGISTRY.length, `README.md claims ${claim[1]} checks, the registry has ${REGISTRY.length}`);
+});
+
+test('index.d.ts declares every export of src/index.js', async () => {
+  const dts = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'index.d.ts'), 'utf8');
+  const declared = new Set([...dts.matchAll(/export declare (?:function|const) (\w+)/g)].map((match) => match[1]));
+  const module = await import('../src/index.js');
+  const missing = Object.keys(module).filter((name) => !declared.has(name));
+  assert.deepEqual(missing, [], `index.d.ts is missing declarations for: ${missing.join(', ')}`);
+});
+
 test('checks-catalog.md per-check weights match the audit registry', () => {
   const text = readFileSync(join(ROOT, 'skills', 'repo-discoverability', 'references', 'checks-catalog.md'), 'utf8');
   const rows = [...text.matchAll(/^\|\s*`([a-z0-9_.]+)`\s*\|\s*(\d+)\s*\|/gm)];

@@ -49,6 +49,7 @@ exists, docs only when a homepage/docs site is configured).
 | `npm.version_stability` | 5 | ≥ 1.0.0 for the npms.io completeness bonus |
 | `npm.test_script` | 6 | a `test` script |
 | `npm.dependency_ranges` | 5 | no `*`/`latest`/git ranges |
+| `npm.config_sync` | 6 | package.json fields match `.discoverability/project.yml` |
 
 ## Docs readiness (weight 12, only when a site/homepage exists)
 
@@ -68,9 +69,12 @@ exists, docs only when a homepage/docs site is configured).
 | `hygiene.license` | 15 | LICENSE file |
 | `hygiene.security_policy` | 12 | SECURITY.md |
 | `hygiene.contributing` | 10 | CONTRIBUTING.md |
+| `hygiene.code_of_conduct` | 4 | CODE_OF_CONDUCT.md |
+| `hygiene.dependabot` | 4 | `.github/dependabot.yml` with weekly updates |
 | `hygiene.secrets_heuristic` | 12 | rotate + purge anything found |
 | `hygiene.gitignore` | 6 | ignore build output and deps |
 | `hygiene.codeowners` | 5 | .github/CODEOWNERS |
 | `hygiene.citation` | 6 | CITATION.cff |
 | `hygiene.issue_templates` | 5 | issue/PR templates |
 | `hygiene.gitattributes` | 4 | line-ending normalisation |
+| `hygiene.dependabot` | 4 | dependabot.yml present |
