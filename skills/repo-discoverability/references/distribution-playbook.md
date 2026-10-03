@@ -54,9 +54,28 @@ survive a maintainer who has never heard of the project.
 
 ## Mechanics: one local repo, many targets
 
-One local repository holds every target as a remote; git keeps unrelated
-histories side by side, and shallow fetches keep it small. One fork per
-target is created over the API when the PR is submitted, never cloned.
+The kit automates the whole loop:
+
+```bash
+npx repo-aeo submit --search                                  # list candidates (gh)
+npx repo-aeo submit --targets owner/list --category "Tools" \
+  --position alphabetical                                     # preview: entry, branch, PR
+# then, after human review of the preview:
+npx repo-aeo submit --apply --ack <ACK> --reason "why" \
+  --plan-digest <DIGEST> --targets owner/list --category "Tools" --position alphabetical
+```
+
+`submit` forks each target just-in-time, inserts the entry into the named
+section (end or alphabetical), pushes a `rdk/<list>/add-<project>` branch to
+the fork, opens the PR and records it in `.discoverability/submissions.json`.
+A target that already has a recorded submission is skipped automatically.
+
+For targets the command cannot handle (a data file instead of README, a
+different entry format), fall back to the manual loop below — it is also what
+`submit` does per target. One local repository can hold every target as a
+remote; git keeps unrelated histories side by side, and shallow fetches keep
+it small. One fork per target is created over the API when the PR is
+submitted, never cloned.
 
 ```bash
 # once per target: register the upstream (fetch-only)
@@ -78,7 +97,8 @@ never collides with itself.
 
 ## When gh is not installed
 
-Everything still works, the automation just becomes manual:
+`rdk submit` previews offline but needs gh for `--search` and for opening
+PRs; the manual fallback works without it:
 
 - **Fork**: the target's web "Fork" button, or
   `POST /repos/{owner}/{repo}/forks` with a token.

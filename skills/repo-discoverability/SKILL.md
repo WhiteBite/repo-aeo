@@ -97,12 +97,14 @@ If the score dropped, revert the patch and re-plan.
 ### Phase 5 — DISTRIBUTE (get listed)
 
 ```bash
-npx repo-aeo-mcp submissions --live   # campaign state + live PR statuses
+npx repo-aeo submit --search                                # candidate lists via gh
+npx repo-aeo submit --targets owner/list --category "Tools"  # preview the PR plan
+npx repo-aeo-mcp submissions --live                          # campaign state + live PR statuses
 ```
 
 Find the curated lists where the project's audience already lives, propose
-the entry, and keep the ledger in `.discoverability/submissions.json`. Read
-`references/distribution-playbook.md` before the first submission: it has the
+the entry, and keep the ledger in `.discoverability/submissions.json`.
+Read `references/distribution-playbook.md` before the first submission: it has the
 per-list conventions that decide whether a PR survives review, the fork
 mechanics (create just-in-time, delete after merge) and the safety rails —
 no submission without an approved target list.
