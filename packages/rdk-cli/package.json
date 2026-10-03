@@ -1,6 +1,6 @@
 {
   "name": "repo-aeo",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "Make any repository, npm package and docs site findable and recommendable to humans, AI agents and search engines.",
   "type": "module",
   "license": "MIT",
