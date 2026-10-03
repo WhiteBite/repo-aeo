@@ -53,62 +53,18 @@ jobs:
   audit:
     name: Discoverability audit
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Setup Node
-        uses: actions/setup-node@v7
+      # The cli override keeps the PR gated by its own code, not by the published engine.
+      - name: Discoverability audit
+        uses: WhiteBite/rdk-discoverability@v1
         with:
-          node-version: '22'
-
-      # Same in-repo CLI as the guard and autofix jobs: the PR is gated by its own code.
-      - name: Run discoverability audit (PR comment)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node action/run-audit.mjs node packages/rdk-cli/bin/rdk.js audit --format github-comment --online --out rdk-comment.md
-
-      - name: Run discoverability audit (min-score gate)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node action/run-audit.mjs node packages/rdk-cli/bin/rdk.js audit --format json --online --out rdk-report.json --min-score "${{ github.event.inputs.min_score || vars.RDK_MIN_SCORE || 0 }}"
-
-      - name: Publish PR comment
-        if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v9
-        with:
-          script: |
-            const fs = require('fs');
-            const marker = '<!-- rdk-discoverability-audit -->';
-            const path = 'rdk-comment.md';
-            if (!fs.existsSync(path)) {
-              core.warning('rdk-comment.md was not produced by the audit step');
-              return;
-            }
-            let body = fs.readFileSync(path, 'utf8');
-            if (!body.includes(marker)) body = `${marker}\n${body}`;
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              per_page: 100,
-            });
-            const existing = comments.find((comment) => comment.body && comment.body.includes(marker));
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body,
-              });
-            }
+          cli: node packages/rdk-cli/bin/rdk.js
+          min_score: ${{ github.event.inputs.min_score || vars.RDK_MIN_SCORE || 0 }}
 
       - name: Upload the JSON report
         if: always()
