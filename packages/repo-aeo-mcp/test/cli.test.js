@@ -21,11 +21,11 @@ test('help prints the usage and exits 0', async () => {
   assert.match(output, /--ack/);
 });
 
-test('tools lists exactly the eight MCP tool names', async () => {
+test('tools lists exactly the nine MCP tool names', async () => {
   const { code, output } = await run(['tools']);
   assert.equal(code, 0);
   const names = output.trim().split('\n');
-  assert.equal(names.length, 8);
+  assert.equal(names.length, 9);
   assert.ok(names.includes('github_sync_metadata'));
   assert.ok(names.every((name) => /^[a-z]+(_[a-z]+){2,}$/.test(name)));
 });
@@ -110,7 +110,7 @@ test('serve --read-only hides the write tool from tools/list', async () => {
     .filter((line) => line.trim() !== '')
     .map((line) => JSON.parse(line));
   const names = messages[0].result.tools.map((tool) => tool.name);
-  assert.equal(names.length, 7);
+  assert.equal(names.length, 8);
   assert.ok(!names.includes('github_sync_metadata'));
 });
 

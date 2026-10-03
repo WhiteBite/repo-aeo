@@ -83,7 +83,7 @@ test('ping and tools/list answer the standard shapes', async () => {
   assert.deepEqual(ping.result, {});
 
   const list = await handleMessage({ jsonrpc: '2.0', id: 'l', method: 'tools/list' });
-  assert.equal(list.result.tools.length, 8);
+  assert.equal(list.result.tools.length, 9);
   for (const tool of list.result.tools) {
     assert.equal(typeof tool.name, 'string');
     assert.equal(tool.inputSchema.type, 'object');
@@ -147,7 +147,7 @@ test('read-only mode hides the write tool from tools/list and refuses calls to i
 
   const list = await handleMessage({ jsonrpc: '2.0', id: 'ro-list', method: 'tools/list' }, context);
   const names = list.result.tools.map((tool) => tool.name);
-  assert.equal(names.length, 7, 'the write tool must be omitted from tools/list');
+  assert.equal(names.length, 8, 'the write tool must be omitted from tools/list');
   assert.ok(!names.includes('github_sync_metadata'));
 
   const call = await handleMessage(

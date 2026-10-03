@@ -28,7 +28,7 @@ MCP tools). These checks are advisory: they are not part of the numeric score.
   single vulnerable transitive dependency is a serious risk.
 - Read-only by default. Any write tool requires an explicit acknowledgement
   string plus a reason, and both are logged.
-- Keep the tool count small in v1 (≤ 8) — discoverability beats coverage.
+- Keep the tool count small (single digits) — discoverability beats coverage.
 - Register the server in public MCP directories once it is stable.
 
 ## Dogfooding: this repository against the checklist
@@ -39,12 +39,12 @@ applied to it directly:
 | Requirement | How `repo-aeo-mcp` meets it |
 | --- | --- |
 | kebab-case name containing `mcp` | package and bin are both `repo-aeo-mcp` |
-| `[service]_[action]_[object]`, snake_case | 8 tools, e.g. `github_audit_visibility_signals` |
+| `[service]_[action]_[object]`, snake_case | 9 tools, e.g. `github_audit_visibility_signals` |
 | 1–2 sentence descriptions, params in the schema | descriptions state the outcome; `limit`, `severity`, `cwd`, `apply` live in `inputSchema` |
 | Dockerfile | `packages/repo-aeo-mcp/Dockerfile` (`node:22-alpine`, stdio only) |
 | No dependencies | zero runtime dependencies; the engine is a workspace link to `repo-aeo` |
-| Read-only by default, write needs ack + reason | 7 tools annotated `readOnlyHint: true`; `github_sync_metadata` requires the configured acknowledgement string (default `I_ACK_RDK_GITHUB_WRITE`, overridable via `safety.ack`) plus a reason, binds the write to an approved plan digest (or an accepted elicitation confirmation) and previews before it writes |
-| ≤ 8 tools in v1 | exactly 8 |
+| Read-only by default, write needs ack + reason | 8 tools annotated `readOnlyHint: true`; `github_sync_metadata` requires the configured acknowledgement string (default `I_ACK_RDK_GITHUB_WRITE`, overridable via `safety.ack`) plus a reason, binds the write to an approved plan digest (or an accepted elicitation confirmation) and previews before it writes |
+| small tool count | exactly 9 |
 
 An agent auditing this repository should read the same table as evidence, not as
 a claim: `node packages/repo-aeo-mcp/bin/repo-aeo-mcp.js tools` lists the names

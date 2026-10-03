@@ -29,8 +29,8 @@ function bareRepo() {
   return box;
 }
 
-test('the tool registry exposes 8 read-mostly tools with stable names', () => {
-  assert.equal(TOOLS.length, 8, `expected 8 tools, got ${TOOLS.length}`);
+test('the tool registry exposes 9 read-mostly tools with stable names', () => {
+  assert.equal(TOOLS.length, 9, `expected 9 tools, got ${TOOLS.length}`);
   for (const tool of TOOLS) {
     assert.match(tool.name, /^[a-z]+(_[a-z]+){2,}$/, `tool name ${tool.name} must be snake_case service_action_object`);
     assert.ok(tool.name.split('_').length >= 3, `${tool.name} must have at least three segments`);
@@ -51,6 +51,7 @@ test('the tool registry exposes 8 read-mostly tools with stable names', () => {
     'repo_get_discoverability_score',
     'repo_list_findings',
     'competitor_scan_list_articles',
+    'distribution_check_submissions',
     'github_sync_metadata',
   ]);
   // Exactly one tool may write, and it must be annotated as such.
@@ -293,6 +294,61 @@ test('competitor_scan_list_articles requires a search endpoint', async () => {
     assert.match(payload.error, /RDK_SEARCH_ENDPOINT/);
   } finally {
     if (previous !== undefined) process.env.RDK_SEARCH_ENDPOINT = previous;
+  }
+});
+
+test('distribution_check_submissions reads the ledger offline and degrades without gh', async () => {
+  const box = sandbox();
+  try {
+    const empty = await callTool('distribution_check_submissions', { cwd: box.dir });
+    assert.equal(empty.ok, true, 'a missing ledger is an empty campaign, not an error');
+    assert.equal(empty.total, 0);
+    assert.deepEqual(empty.submissions, []);
+
+    mkdirSync(join(box.dir, '.discoverability'), { recursive: true });
+    writeFileSync(
+      join(box.dir, '.discoverability', 'submissions.json'),
+      JSON.stringify([
+        {
+          target: 'kirodotdev-labs/awesome-kiro',
+          pr_url: 'https://github.com/example/nonexistent-repo/pull/1',
+          branch: 'rdk/awesome-kiro/add-myproject',
+          fork: 'WhiteBite/awesome-kiro',
+          submitted_at: '2026-10-03T09:00:00Z',
+          status: 'open',
+        },
+        {
+          target: 'hashgraph-online/awesome-codex-plugins',
+          pr_url: 'https://github.com/example/nonexistent-repo/pull/2',
+          branch: 'rdk/awesome-codex-plugins/add-myproject',
+          fork: 'WhiteBite/awesome-codex-plugins',
+          submitted_at: '2026-09-30T09:00:00Z',
+          status: 'merged',
+        },
+        { target: 'some/curated-list', status: 'prepared' },
+      ]),
+    );
+
+    const payload = await callTool('distribution_check_submissions', { cwd: box.dir });
+    assert.equal(payload.ok, true);
+    assert.equal(payload.total, 3);
+    assert.equal(payload.summary.open, 1);
+    assert.equal(payload.summary.merged, 1);
+    assert.equal(payload.summary.prepared, 1);
+    assert.deepEqual(payload.cleanup_forks, ['WhiteBite/awesome-codex-plugins']);
+    assert.equal(payload.submissions[0].live_status, null, 'no live probing unless requested');
+
+    // gh availability varies across run environments; both paths must leave live_status null
+    const livePayload = await callTool('distribution_check_submissions', { cwd: box.dir, live: true });
+    assert.equal(livePayload.ok, true);
+    assert.equal(livePayload.submissions[0].live_status, null);
+
+    writeFileSync(join(box.dir, '.discoverability', 'submissions.json'), '{ not json');
+    const corrupt = await callTool('distribution_check_submissions', { cwd: box.dir });
+    assert.equal(corrupt.ok, false, 'committed campaign state is never silently rotated away');
+    assert.match(corrupt.error, /parse/);
+  } finally {
+    box.cleanup();
   }
 });
 

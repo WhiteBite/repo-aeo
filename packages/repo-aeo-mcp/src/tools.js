@@ -8,6 +8,8 @@
  */
 import { promisify } from 'node:util';
 import { execFile } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   audit,
   loadConfig,
@@ -531,6 +533,101 @@ export const TOOLS = [
         articles: results.slice(0, limit).map((item) => ({ title: item.title || null, url: item.url || null, snippet: item.snippet || null })),
         note: 'presence in high-ranking list articles is a proxy for chat-assistant recommendations, not a guarantee',
       };
+    },
+  },
+
+  {
+    name: 'distribution_check_submissions',
+    title: 'Distribution campaign status',
+    description:
+      'List the curated-list and registry submissions recorded in .discoverability/submissions.json with per-entry PR state, a summary and fork-cleanup hints. live: true probes the current PR state of each entry via the gh CLI; without gh the recorded state is reported unchanged.',
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        cwd: { type: 'string', description: 'Repository directory holding .discoverability/submissions.json.' },
+        live: { type: 'boolean', default: false, description: 'Probe the live PR state of each submission via gh (default false: report the recorded state).' },
+      },
+      additionalProperties: false,
+    },
+    async run(args, context = {}) {
+      const cwd = resolveCwd(args, context);
+      const path = join(cwd, '.discoverability', 'submissions.json');
+      if (!existsSync(path)) {
+        return {
+          ok: true,
+          cwd,
+          live: args.live === true,
+          total: 0,
+          submissions: [],
+          summary: {},
+          cleanup_forks: [],
+          hint: 'no submissions logged yet - append entries to .discoverability/submissions.json as the distribution playbook describes',
+        };
+      }
+      let entries;
+      try {
+        entries = JSON.parse(readFileSync(path, 'utf8'));
+      } catch (error) {
+        return { ok: false, cwd, error: `could not parse .discoverability/submissions.json: ${error.message}`, fix: 'the file is committed campaign state - fix it by hand or restore it from git' };
+      }
+      if (!Array.isArray(entries)) {
+        return { ok: false, cwd, error: '.discoverability/submissions.json must hold a JSON array of submissions', fix: 'see the schema in references/distribution-playbook.md' };
+      }
+
+      const live = args.live === true;
+      let ghAvailable = null;
+      const liveStateOf = async (entry) => {
+        if (!live || typeof entry.pr_url !== 'string' || entry.pr_url === '' || ghAvailable === false) return null;
+        const result = await gh(['pr', 'view', entry.pr_url, '--json', 'state'], cwd);
+        if (!result.ok) {
+          if (result.code === 'ENOENT') ghAvailable = false;
+          return null;
+        }
+        try {
+          const state = JSON.parse(result.stdout).state;
+          return typeof state === 'string' ? state.toLowerCase() : null;
+        } catch {
+          return null;
+        }
+      };
+
+      const rows = [];
+      for (const entry of entries) {
+        const source = entry && typeof entry === 'object' ? entry : {};
+        const liveState = await liveStateOf(source);
+        const status = liveState
+          || (typeof source.status === 'string' && source.status !== '' ? source.status : source.pr_url ? 'unknown' : 'prepared');
+        rows.push({
+          target: typeof source.target === 'string' ? source.target : null,
+          pr_url: typeof source.pr_url === 'string' ? source.pr_url : null,
+          branch: typeof source.branch === 'string' ? source.branch : null,
+          fork: typeof source.fork === 'string' ? source.fork : null,
+          submitted_at: typeof source.submitted_at === 'string' ? source.submitted_at : null,
+          status,
+          live_status: liveState,
+        });
+      }
+
+      const summary = {};
+      for (const row of rows) summary[row.status] = (summary[row.status] || 0) + 1;
+      const cleanupForks = [...new Set(rows.filter((row) => (row.status === 'merged' || row.status === 'closed') && row.fork).map((row) => row.fork))];
+      const payload = {
+        ok: true,
+        cwd,
+        live,
+        total: rows.length,
+        submissions: rows,
+        summary,
+        cleanup_forks: cleanupForks,
+      };
+      if (ghAvailable === false) {
+        payload.note = 'the gh CLI is not installed - reporting recorded statuses only; install gh to probe live PR states with live: true';
+      }
+      if (cleanupForks.length > 0) {
+        payload.hint = 'forks of merged/closed submissions can be deleted (gh repo delete <fork> --yes; scope: gh auth refresh -h github.com -s delete_repo)';
+      }
+      return payload;
     },
   },
 
