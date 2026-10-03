@@ -52,6 +52,40 @@ from `links.repository`, the description line from the project `description`
 (ends with a period, objective — not the tagline). Test: the line must
 survive a maintainer who has never heard of the project.
 
+### Write a strong entry
+
+Curated lists reject marketing language on sight — their whole value is
+objective curation ("Do not use marketing language. 'AI visibility
+monitoring for ChatGPT and Perplexity' is an entry; 'the leading AI
+visibility platform' is not." — elmohq's contributing guide; awesome-go and
+sindresorhus/awesome say the same). A superlative ("one of the best") gets
+the PR closed unread. It also fails our own audit, which flags unsourced
+claims.
+
+The entry is a doorway, not a billboard: the reader clicks through and
+decides on the repository itself. The line's job is to describe precisely
+and to carry one verifiable fact the section's neighbours do not have —
+a number, a constraint, a capability. Adjectives are not verifiable.
+
+| Entry | Verdict | Why |
+| --- | --- | --- |
+| `- [X](url) - One of the best discoverability tools.` | rejected | unverifiable superlative, marketing tone |
+| `- [X](url) - Tool for repo discoverability.` | forgettable | says nothing a hundred other entries don't |
+| `- [X](url) - Zero-dependency CLI that audits and fixes repo discoverability: 44 checks offline, llms.txt and AGENTS.md generation, CI gate.` | strong | function + checkable facts + traits the neighbours lack |
+
+A battle-tested example (accepted by the elmohq AEO list):
+
+```markdown
+- [repo-aeo](https://github.com/WhiteBite/repo-aeo) - **Open source.** Make any
+  repository, npm package and docs site findable and recommendable to humans,
+  AI agents and search engines.
+```
+
+Craft order: start from `project.yml`'s one-liner, then scan the target
+section's neighbours, then sharpen the line until it answers "why this one"
+with a fact instead of an adjective. Local list conventions (marker prefixes
+like `**Open source.**`, dash style, sort order) always win over this guide.
+
 ## Mechanics: one local repo, many targets
 
 The kit automates the whole loop:
