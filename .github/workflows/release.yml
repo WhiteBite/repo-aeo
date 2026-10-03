@@ -1,14 +1,10 @@
 name: release
 
-# Publishes the two packages to npm, in dependency order:
-#   repo-aeo  (the engine, zero dependencies)
-#   repo-aeo-mcp       (depends on the published rdk-cli)
-#
-# Deliberately manual: `workflow_dispatch` only, protected by the `npm`
-# environment so a human has to approve every publish. Nothing here runs on a
-# tag or on a push, because publishing is never implicit in this project.
+# Tag push = release: verify, OIDC-publish, GitHub release with tarballs.
 
 on:
+  push:
+    tags: ['v*']
   workflow_dispatch:
     inputs:
       dry_run:
@@ -47,7 +43,7 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Test suite
-        if: ${{ inputs.run_tests }}
+        if: ${{ github.event_name == 'push' || inputs.run_tests }}
         run: npm test
 
       - name: Discoverability audit (offline, read-only)
@@ -64,9 +60,12 @@ jobs:
   publish:
     name: Publish to npm
     needs: verify
-    # The `npm` environment holds the approval rule; auth is OIDC trusted publishing, no long-lived token.
+    # OIDC trusted publishing is bound to this environment; no long-lived secrets.
     environment: npm
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -158,10 +157,31 @@ jobs:
             npm publish --access public
           fi
 
+      - name: Pack the published tarballs
+        run: |
+          npm pack --workspace packages/rdk-cli --pack-destination .
+          npm pack --workspace packages/repo-aeo-mcp --pack-destination .
+
+      - name: Create the GitHub release with the tarballs
+        if: github.event_name == 'push'
+        run: |
+          tag="$GITHUB_REF_NAME"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "release for $tag already exists; skipping"
+            exit 0
+          fi
+          if git tag -l --format='%(contents)' "$tag" | grep -q .; then
+            gh release create "$tag" --verify-tag --notes-from-tag repo-aeo-*.tgz repo-aeo-mcp-*.tgz
+          else
+            gh release create "$tag" --verify-tag --generate-notes repo-aeo-*.tgz repo-aeo-mcp-*.tgz
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       - name: Summary
         run: |
           {
-            echo "### npm publish (${{ inputs.dry_run == true && 'dry run' || 'live' }})";
+            echo "### npm publish (${{ github.event_name == 'workflow_dispatch' && (inputs.dry_run == true && 'dry run' || 'live') || 'tag release' }})";
             echo "";
             echo "| Package | Version |";
             echo "| --- | --- |";
