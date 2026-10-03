@@ -8,6 +8,6 @@
   "license": "https://opensource.org/licenses/MIT",
   "keywords": "cli, discoverability, repo-audit, github-topics, llms-txt, agents-md, npm-metadata, geo, aeo, developer-tools",
   "url": "https://github.com/WhiteBite/repo-aeo#readme",
-  "softwareVersion": "0.3.7",
+  "softwareVersion": "1.0.0",
   "codeRepository": "https://github.com/WhiteBite/repo-aeo"
 }

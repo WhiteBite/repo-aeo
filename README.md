@@ -66,6 +66,7 @@ npx repo-aeo audit         # score 0-100 + findings (json | markdown | github-co
 npx repo-aeo fix           # preview safe autofixes; --apply to write them
 npx repo-aeo npm-surface   # package.json publish surface + npm pack --dry-run
 npx repo-aeo github-sync   # push description/homepage/topics (needs --apply --ack --reason --plan-digest)
+npx repo-aeo submit        # propose the project to curated lists (needs --apply --ack --reason --plan-digest)
 npx repo-aeo skill install # link the agent skill into OpenCode/Claude/Codex skill dirs
 
 npx repo-aeo-mcp serve # the same engine as an MCP server: 9 read-mostly tools
@@ -107,8 +108,8 @@ $ npx repo-aeo npm-surface --pack
 - uses: actions/checkout@v4
 - uses: actions/setup-node@v4
   with: { node-version: '22' }
-- run: npx --yes repo-aeo@^0.3.0 audit --format github-comment --online
-- run: npx --yes repo-aeo@^0.3.0 audit --format json --online --min-score "${{ github.event.inputs.min_score || vars.RDK_MIN_SCORE || 0 }}"
+- run: npx --yes repo-aeo@^1.0.0 audit --format github-comment --online
+- run: npx --yes repo-aeo@^1.0.0 audit --format json --online --min-score "${{ github.event.inputs.min_score || vars.RDK_MIN_SCORE || 0 }}"
 ```
 
 The CLI itself never force-pushes; the workflow's opt-in autofix job (gated by
