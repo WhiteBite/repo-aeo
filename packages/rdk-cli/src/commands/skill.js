@@ -3,9 +3,12 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadRegistry, harness as harnessRow } from '../../vendor/harness-kit/src/index.mjs';
 import { linkDir, linkState, unlinkDir } from '../../vendor/harness-kit/src/symlink.mjs';
 
 export const SKILL_NAME = 'repo-discoverability';
+
+const SKILL_HARNESSES = ['opencode', 'claude', 'codex'];
 
 /** The skill ships inside the tarball (prepack copy) and in the repo checkout (dev). */
 export function skillSourceDir() {
@@ -16,18 +19,16 @@ export function skillSourceDir() {
 
 export function skillTargets({ cwd = process.cwd(), project = false, targets = null } = {}) {
   if (Array.isArray(targets)) return targets;
-  const home = homedir();
+  const registry = loadRegistry();
+  const rows = SKILL_HARNESSES.map((id) => [id, harnessRow(registry, id).skills ?? {}]);
   if (project) {
-    return [
-      { harness: 'opencode-project', dir: join(cwd, '.opencode', 'skills') },
-      { harness: 'claude-project', dir: join(cwd, '.claude', 'skills') },
-    ];
+    return rows.flatMap(([id, skills]) =>
+      (skills.project ?? []).map((dir) => ({ harness: `${id}-project`, dir: join(cwd, dir) })),
+    );
   }
-  return [
-    { harness: 'opencode', dir: join(home, '.config', 'opencode', 'skills') },
-    { harness: 'claude', dir: join(home, '.claude', 'skills') },
-    { harness: 'codex', dir: join(home, '.codex', 'skills') },
-  ];
+  return rows.flatMap(([id, skills]) =>
+    (skills.global ?? []).map((dir) => ({ harness: id, dir: join(homedir(), dir) })),
+  );
 }
 
 function act(action, targets, source) {

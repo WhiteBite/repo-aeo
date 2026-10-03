@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { skillCommand, skillSourceDir, SKILL_NAME } from '../src/commands/skill.js';
+import { skillCommand, skillSourceDir, skillTargets, SKILL_NAME } from '../src/commands/skill.js';
 
 function twoTargets() {
   const a = mkdtempSync(join(tmpdir(), 'rdk-skill-a-'));
@@ -72,4 +72,17 @@ test('skill status reports absent targets without creating anything', () => {
   } finally {
     box.cleanup();
   }
+});
+
+test('skillTargets defaults keep the registry-derived dirs, labels and order', () => {
+  const home = homedir();
+  assert.deepEqual(skillTargets({ cwd: join(tmpdir(), 'w') }), [
+    { harness: 'opencode', dir: join(home, '.config', 'opencode', 'skills') },
+    { harness: 'claude', dir: join(home, '.claude', 'skills') },
+    { harness: 'codex', dir: join(home, '.codex', 'skills') },
+  ]);
+  assert.deepEqual(skillTargets({ cwd: join(tmpdir(), 'w'), project: true }), [
+    { harness: 'opencode-project', dir: join(tmpdir(), 'w', '.opencode', 'skills') },
+    { harness: 'claude-project', dir: join(tmpdir(), 'w', '.claude', 'skills') },
+  ]);
 });
