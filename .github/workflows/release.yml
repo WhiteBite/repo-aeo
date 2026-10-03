@@ -171,9 +171,9 @@ jobs:
             exit 0
           fi
           if git tag -l --format='%(contents)' "$tag" | grep -q .; then
-            gh release create "$tag" --verify-tag --notes-from-tag repo-aeo-*.tgz repo-aeo-mcp-*.tgz
+            gh release create "$tag" --verify-tag --notes-from-tag repo-aeo-[0-9]*.tgz repo-aeo-mcp-[0-9]*.tgz
           else
-            gh release create "$tag" --verify-tag --generate-notes repo-aeo-*.tgz repo-aeo-mcp-*.tgz
+            gh release create "$tag" --verify-tag --generate-notes repo-aeo-[0-9]*.tgz repo-aeo-mcp-[0-9]*.tgz
           fi
         env:
           GH_TOKEN: ${{ github.token }}
