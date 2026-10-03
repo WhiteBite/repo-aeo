@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { makeRepo, removeRepo } from './helpers.js';
 import { parseArgs } from '../src/cli.js';
 import { DEFAULT_ACK, githubSyncCommand } from '../src/commands/githubSync.js';
+import { submitCommand } from '../src/commands/submit.js';
 import { loadConfig } from '../src/config.js';
 import { listFiles } from '../src/util/fs.js';
 
@@ -248,6 +249,52 @@ const BEHAVIOUR = {
       assert.equal(result.status, 1);
       assert.match(result.stdout, /--plan-digest is required/);
     });
+  },
+
+  '--targets': async () => {
+    assert.equal(parseArgs(['submit', '--targets', 'a/b,c/d']).flags.targets, 'a/b,c/d');
+    await withRepo({ 'package.json': JSON.stringify(PKG) }, async (dir) => {
+      const result = rdk(['submit', '--category', 'Tools'], dir);
+      assert.equal(result.status, 1, result.stdout + result.stderr);
+      assert.match(result.stdout, /No targets/i);
+    });
+  },
+
+  '--category': async () => {
+    await withRepo({ 'package.json': JSON.stringify(PKG) }, async (dir) => {
+      const result = rdk(['submit', '--targets', 'owner/list'], dir);
+      assert.equal(result.status, 1, result.stdout + result.stderr);
+      assert.match(result.stdout, /category is required/i);
+    });
+  },
+
+  '--entry': async () => {
+    await withRepo({ 'package.json': JSON.stringify(PKG) }, async (dir) => {
+      const result = rdk(['submit', '--targets', 'owner/list', '--category', 'Tools', '--repo', 'owner/demo', '--entry', '- [Demo](https://github.com/owner/demo) — Custom entry.'], dir);
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      assert.match(result.stdout, /- \[Demo\]\(https:\/\/github\.com\/owner\/demo\) — Custom entry\./);
+      assert.match(result.stdout, /Plan digest: [0-9a-f]{64}/);
+    });
+  },
+
+  '--position': async () => {
+    await withRepo({ 'package.json': JSON.stringify(PKG) }, async (dir) => {
+      const result = rdk(['submit', '--targets', 'owner/list', '--category', 'Tools', '--repo', 'owner/demo', '--position', 'alphabetical'], dir);
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      assert.match(result.stdout, /\(alphabetical\)/);
+    });
+  },
+
+  '--search': async () => {
+    assert.equal(parseArgs(['submit', '--search']).flags.search, true);
+    const result = await submitCommand({
+      cwd: process.cwd(),
+      options: { search: true },
+      config: loadConfig(process.cwd()).config,
+      ghRunner: () => ({ ok: false, stdout: '', stderr: 'stubbed failure', code: 1 }),
+    });
+    assert.equal(result.exitCode, 1);
+    assert.match(result.error, /gh/);
   },
 
   '--project': async () => {

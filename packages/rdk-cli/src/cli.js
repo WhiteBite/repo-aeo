@@ -3,6 +3,7 @@ import { auditCommand } from './commands/audit.js';
 import { initCommand } from './commands/init.js';
 import { fixCommand } from './commands/fix.js';
 import { githubSyncCommand } from './commands/githubSync.js';
+import { submitCommand } from './commands/submit.js';
 import { npmSurfaceCommand } from './commands/npmSurface.js';
 import { skillCommand } from './commands/skill.js';
 import { loadConfig } from './config.js';
@@ -18,6 +19,7 @@ Usage:
   rdk fix                  Show (or apply) safe autofixes
   rdk npm-surface          Audit the publishable package.json surface
   rdk github-sync          Push description/homepage/topics to GitHub (needs --apply --ack)
+  rdk submit               Propose the project to curated lists (needs --apply --ack)
   rdk skill <install|uninstall|status>  Link the agent skill into harness skill dirs (--project: repo-local)
 
 Common flags:
@@ -29,6 +31,11 @@ Common flags:
   --only <ids>                                   comma-separated patch ids for fix/init
   --skip <ids>                                   comma-separated patch ids to skip
   --repo <owner/name>                            target repository for github-sync
+  --targets <owner/name,...>                     curated lists for submit
+  --category <heading>                           exact section heading in the target list (submit)
+  --entry <markdown line>                        override the generated list entry (submit)
+  --position <end|alphabetical>                  entry placement inside the section (submit)
+  --search                                       propose candidate curated lists via gh (submit)
   --ack <string>                                 explicit acknowledgement for writes
   --reason <text>                                auditable reason for writes
   --plan-digest <hex>                            plan digest from the github-sync preview; the write is refused if the plan changed
@@ -42,9 +49,10 @@ Common flags:
   -v, --version                                  print the CLI version
 
 Safety model:
-  Audit is read-only and offline by default. fix, init and github-sync preview
-  by default; any write requires an explicit flag: \`rdk fix --apply\`,
-  \`rdk init --apply\`, \`rdk github-sync --apply --ack <ACK> --reason "..."\`.
+  Audit is read-only and offline by default. fix, init, github-sync and submit
+  preview by default; any write requires an explicit flag: \`rdk fix --apply\`,
+  \`rdk init --apply\`, \`rdk github-sync --apply --ack <ACK> --reason "..."\`,
+  \`rdk submit --apply --ack <ACK> --reason "..." --plan-digest <DIGEST>\`.
   Publishing, tagging and force-pushing are never performed by rdk.
 `;
 
@@ -75,7 +83,8 @@ export function parseArgs(argv) {
         continue;
       }
       const next = args[i + 1];
-      if (next !== undefined && !next.startsWith('-')) {
+      // "- [x]" и одиночный "-" — это значения (markdown-entry, минус), а не флаги
+      if (next !== undefined && (!next.startsWith('-') || next === '-' || /^-\s/.test(next))) {
         flags[key] = next;
         i += 1;
       } else {
@@ -95,6 +104,7 @@ const POSITIONAL_LIMITS = {
   fix: 1,
   'npm-surface': 1,
   'github-sync': 1,
+  submit: 1,
   skill: 2,
 };
 
@@ -177,6 +187,12 @@ export async function main(argv = process.argv.slice(2), io = {}) {
       case 'github-sync': {
         const loaded = loadConfig(cwd);
         const result = await githubSyncCommand({ cwd, options: { ...flags, plan_digest: flags.planDigest }, config: loaded.config });
+        if (!flags.quiet) log(result.output);
+        return result.exitCode;
+      }
+      case 'submit': {
+        const loaded = loadConfig(cwd);
+        const result = await submitCommand({ cwd, options: { ...flags, plan_digest: flags.planDigest }, config: loaded.config });
         if (!flags.quiet) log(result.output);
         return result.exitCode;
       }
