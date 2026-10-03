@@ -4,7 +4,7 @@ Continuous discoverability monitoring as an [MCP](https://modelcontextprotocol.i
 
 The CLI (`repo-aeo`) audits a repository once, on demand. This server keeps the same engine available to an AI agent or a monitoring job, adds a **trend history** so regressions are visible, and wraps everything in the tool format agents already know.
 
-- 8 tools, zero runtime dependencies, Node.js >= 18
+- 9 tools, zero runtime dependencies, Node.js >= 18
 - Read-only by default: the single write tool previews first and requires an acknowledgement
 - Same 0-100 score as the CLI, recorded locally per run so you can see `71 -> 84` over time
 
@@ -50,6 +50,7 @@ docker run -i -v "$PWD:/repo" -w /repo repo-aeo-mcp serve
 | `llms_txt_check_freshness` | Whether `llms.txt` is older than its sources, and by how much. |
 | `site_check_llms_txt` | Whether a docs site actually serves `/llms.txt`, with size and first heading. |
 | `competitor_scan_list_articles` | Who is mentioned in "top N tools" listicles for your keywords (needs `RDK_SEARCH_ENDPOINT`). |
+| `distribution_check_submissions` | Which curated lists the project is submitted to, per-entry PR state and fork-cleanup hints. |
 | `github_sync_metadata` | Writes description/homepage/topics from `.discoverability/project.yml` to GitHub. **The only write tool.** |
 
 ### Safety model
@@ -74,6 +75,9 @@ The server reads the repository it is pointed at; nothing else is required.
 | `RDK_SEARCH_ENDPOINT` | unset | JSON search API accepting `?q=` and returning `{ results: [{ title, url, snippet }] }`. Enables `competitor_scan_list_articles`. |
 
 History lives in `.discoverability/cache/metrics.json` and is git-ignored.
+The distribution ledger lives in `.discoverability/submissions.json` and is
+meant to be committed; `submissions --live` probes PR states through `gh`
+and falls back to the recorded state when `gh` is not installed.
 
 ## Command line
 
@@ -87,6 +91,7 @@ repo-aeo-mcp npm-score typescript
 repo-aeo-mcp github owner/name
 repo-aeo-mcp freshness
 repo-aeo-mcp site https://example.com
+repo-aeo-mcp submissions [--live]
 repo-aeo-mcp history
 repo-aeo-mcp tools
 ```

@@ -54,9 +54,9 @@ force-push в свою датированную бот-ветку `rdk/autofix-<
 | Слой | Что это | Где |
 | --- | --- | --- |
 | **Repo Kit** | `.discoverability/project.yml` как единственный источник правды, плюс шаблоны и генераторы | `.discoverability/`, `packages/rdk-cli/src/generate/` |
-| **Skillpack** | Инструкции для агентов с прогрессивным раскрытием: аудит → план → патч → проверка | `skills/repo-discoverability/` |
+| **Skillpack** | Инструкции для агентов с прогрессивным раскрытием: аудит → план → патч → проверка → распространение | `skills/repo-discoverability/` |
 | **Automation** | GitHub Action на `pull_request`, `workflow_dispatch` и еженедельный cron | `.github/workflows/rdk-audit.yml`, `action/action.yml` |
-| **Monitoring** | MCP-сервер с 8 преимущественно read-only инструментами, историей тренда и живыми пробами GitHub / сайта / npms | `packages/repo-aeo-mcp/` |
+| **Monitoring** | MCP-сервер с 9 преимущественно read-only инструментами, историей тренда и живыми пробами GitHub / сайта / npms | `packages/repo-aeo-mcp/` |
 
 ## Команды
 
@@ -68,7 +68,7 @@ npx repo-aeo npm-surface   # package.json publish surface + npm pack --dry-run
 npx repo-aeo github-sync   # push description/homepage/topics (needs --apply --ack --reason --plan-digest)
 npx repo-aeo skill install # link the agent skill into OpenCode/Claude/Codex skill dirs
 
-npx repo-aeo-mcp serve # the same engine as an MCP server: 8 read-mostly tools
+npx repo-aeo-mcp serve # the same engine as an MCP server: 9 read-mostly tools
 claude mcp add rdk -- npx repo-aeo-mcp serve
 docker run -i repo-aeo-mcp serve
 ```
@@ -132,7 +132,8 @@ trend: no history yet
 ```text
 skills/repo-discoverability/SKILL.md → description triggers on
 "make repo discoverable", "add topics", "improve README for users and agents",
-"prepare npm metadata", "generate AGENTS.md", "optimize for AI search"
+"prepare npm metadata", "generate AGENTS.md", "optimize for AI search",
+"run a distribution campaign", "submit to awesome lists"
 ```
 
 ## Сценарии использования
@@ -142,6 +143,7 @@ skills/repo-discoverability/SKILL.md → description triggers on
 - Подготовить метаданные `package.json`, exports и содержимое тарболла перед релизом на npm.
 - Заполнить описание, homepage и 8–20 topics GitHub из одного конфиг-файла.
 - Не дать discoverability деградировать с помощью еженедельного аудита GitHub Action.
+- Запустить кампанию по распространению: подготовить записи для релевантных curated-списков, отправить ревьюибельные PR и вести их учёт в `.discoverability/submissions.json`.
 - Следить за оценкой, npm search score и сигналами GitHub из MCP-клиента или cron-задачи.
 
 ## Discoverability Score
@@ -290,7 +292,7 @@ IDE-упаковка — следующая
 | Путь | Назначение |
 | --- | --- |
 | `packages/rdk-cli/` | пакет `repo-aeo` (без зависимостей) |
-| `packages/repo-aeo-mcp/` | MCP-сервер `repo-aeo-mcp` (8 инструментов, stdio, Dockerfile) |
+| `packages/repo-aeo-mcp/` | MCP-сервер `repo-aeo-mcp` (9 инструментов, stdio, Dockerfile) |
 | `skills/repo-discoverability/` | SKILL.md + references + скрипты для кодинг-агентов |
 | `action/`, `.github/workflows/` | GitHub Action и переиспользуемый composite action |
 | `fixtures/demo-repo/` | демо-репозиторий до/после |

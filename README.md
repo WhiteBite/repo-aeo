@@ -54,9 +54,9 @@ Three layers, because a one-off script is not enough:
 | Layer | What it is | Where |
 | --- | --- | --- |
 | **Repo Kit** | `.discoverability/project.yml` as the single source of truth, plus templates and generators | `.discoverability/`, `packages/rdk-cli/src/generate/` |
-| **Skillpack** | Agent instructions with progressive disclosure: audit → plan → patch → verify | `skills/repo-discoverability/` |
+| **Skillpack** | Agent instructions with progressive disclosure: audit → plan → patch → verify → distribute | `skills/repo-discoverability/` |
 | **Automation** | GitHub Action on `pull_request`, `workflow_dispatch` and weekly cron | `.github/workflows/rdk-audit.yml`, `action/action.yml` |
-| **Monitoring** | MCP server with 8 read-mostly tools, trend history and live GitHub / site / npms probes | `packages/repo-aeo-mcp/` |
+| **Monitoring** | MCP server with 9 read-mostly tools, trend history and live GitHub / site / npms probes | `packages/repo-aeo-mcp/` |
 
 ## Commands
 
@@ -68,7 +68,7 @@ npx repo-aeo npm-surface   # package.json publish surface + npm pack --dry-run
 npx repo-aeo github-sync   # push description/homepage/topics (needs --apply --ack --reason --plan-digest)
 npx repo-aeo skill install # link the agent skill into OpenCode/Claude/Codex skill dirs
 
-npx repo-aeo-mcp serve # the same engine as an MCP server: 8 read-mostly tools
+npx repo-aeo-mcp serve # the same engine as an MCP server: 9 read-mostly tools
 claude mcp add rdk -- npx repo-aeo-mcp serve
 docker run -i repo-aeo-mcp serve
 ```
@@ -132,7 +132,8 @@ The first run records the score; every subsequent run prints the delta instead
 ```text
 skills/repo-discoverability/SKILL.md → description triggers on
 "make repo discoverable", "add topics", "improve README for users and agents",
-"prepare npm metadata", "generate AGENTS.md", "optimize for AI search"
+"prepare npm metadata", "generate AGENTS.md", "optimize for AI search",
+"run a distribution campaign", "submit to awesome lists"
 ```
 
 ## Use cases
@@ -142,6 +143,7 @@ skills/repo-discoverability/SKILL.md → description triggers on
 - Prepare `package.json` metadata, exports and tarball contents before an npm release.
 - Fill GitHub description, homepage and 8–20 topics from one config file.
 - Keep discoverability from regressing with a weekly GitHub Action audit.
+- Run a distribution campaign: prepare entries for the relevant curated lists, submit reviewable PRs, track them in `.discoverability/submissions.json`.
 - Watch score, npm search score and GitHub signals from an MCP client or a cron job.
 
 ## Discoverability Score
@@ -290,7 +292,7 @@ server. IDE packaging is next
 | Path | Purpose |
 | --- | --- |
 | `packages/rdk-cli/` | the `repo-aeo` package (zero dependencies) |
-| `packages/repo-aeo-mcp/` | the `repo-aeo-mcp` MCP server (8 tools, stdio, Dockerfile) |
+| `packages/repo-aeo-mcp/` | the `repo-aeo-mcp` MCP server (9 tools, stdio, Dockerfile) |
 | `skills/repo-discoverability/` | SKILL.md + references + scripts for coding agents |
 | `action/`, `.github/workflows/` | GitHub Action and reusable composite action |
 | `fixtures/demo-repo/` | before/after demo repository |

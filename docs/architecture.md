@@ -25,7 +25,7 @@ Three layers, because no single artifact makes discoverability "just happen".
                           ┌────────────────────────┐
                           │ (4) MCP server         │
                           │ packages/repo-aeo-mcp  │
-                          │ 8 tools, stdio, Docker │
+                          │ 9 tools, stdio, Docker │
                           └────────────────────────┘
 ```
 
@@ -43,7 +43,8 @@ Three layers, because no single artifact makes discoverability "just happen".
 `skills/repo-discoverability/SKILL.md` follows the Agent Skills format: YAML
 frontmatter with a trigger-rich `name`/`description`, because OpenCode and
 similar runtimes load only those two fields before deciding to use the skill.
-The body is the four-phase workflow (AUDIT → PLAN → PATCH → VERIFY) and the
+The body is the five-phase workflow (AUDIT → PLAN → PATCH → VERIFY →
+DISTRIBUTE) and the
 heavy lifting is delegated to `scripts/` and to the CLI, so agent context is
 spent on decisions, not on re-implemented checks.
 
@@ -77,8 +78,8 @@ jobs over MCP stdio. It adds two things the CLI cannot do:
 - **Live integrations** — `gh` for GitHub visibility signals, HTTP for
   `/llms.txt` checks, npms.io for the published score.
 
-Design constraints: zero runtime dependencies, 8 tools maximum, names in
-`[service]_[action]_[object]`, every tool annotated with MCP hints, and exactly
+Design constraints: zero runtime dependencies, a single-digit tool count,
+names in `[service]_[action]_[object]`, every tool annotated with MCP hints, and exactly
 one write tool (`github_sync_metadata`) which reuses the CLI's guarded
 implementation, requires an ack string plus a reason, and **previews by
 default** (`apply: true` is opt-in, mirroring `rdk fix`). See
