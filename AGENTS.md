@@ -40,7 +40,7 @@ every change.
 | `packages/repo-aeo-mcp/src/history.js` | metric history in `.discoverability/cache/metrics.json` (trends) |
 | `packages/repo-aeo-mcp/src/server.js` | dependency-free MCP stdio JSON-RPC 2.0 transport |
 | `skills/repo-discoverability/` | the agent skill (SKILL.md + references) |
-| `action/`, `.github/workflows/rdk-audit.yml` | GitHub Action and composite action |
+| `.github/workflows/` | CI: the PR discoverability audit (dogfoods the marketplace action) and the tag-driven release |
 | `fixtures/demo-repo/` | the before/after demo repo used by tests and REPORT.md |
 | `.discoverability/project.yml` | source of truth for this repository's metadata |
 

@@ -51,21 +51,25 @@ spent on decisions, not on re-implemented checks.
 ## (3) Automation
 
 `.github/workflows/rdk-audit.yml` runs on `pull_request`, `workflow_dispatch`
-and a weekly cron:
+and a weekly cron. It dogfoods the marketplace action
+[`WhiteBite/rdk-discoverability`](https://github.com/WhiteBite/rdk-discoverability)
+with a `cli` override pointing at the in-repo engine, so every PR is gated by
+its own code, not by the published package:
 
 1. `actions/checkout`
-2. `actions/setup-node@v4` (Node 22)
-3. `npx repo-aeo audit --format github-comment --online`
-4. post/update a PR comment carrying the marker
-   `<!-- rdk-discoverability-audit -->` (so repeated runs edit one comment)
+2. `uses: WhiteBite/rdk-discoverability@v1` — runs the audit, posts/updates a
+   PR comment carrying the marker `<!-- rdk-discoverability-audit -->` (so
+   repeated runs edit one comment), and gates the run on `min_score`
+
+The marketplace wrapper is a separate repository (a root `action.yml` is
+required for the Actions listing); it pulls the engine from npm by default
+and its `sync-engine` workflow retags it automatically on every engine
+release.
 
 Autofix is a separate job chain: the `guard` job only reports `enabled=true`
 when `.discoverability/project.yml` sets `safety.allow_autofix: true` **and**
 there is at least one autofixable finding. The `autofix` job then creates
 `rdk/autofix-<date>`, runs `rdk fix --apply`, commits and opens a pull request.
-
-`action/action.yml` is a reusable composite action with the same steps for
-repositories that prefer a single `uses:` line.
 
 ## (4) MCP server
 

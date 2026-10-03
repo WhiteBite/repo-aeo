@@ -70,7 +70,7 @@ RDK превращает это в тестируемое свойство: ау
 | --- | --- | --- |
 | **Repo Kit** | `.discoverability/project.yml` как единственный источник правды, плюс шаблоны и генераторы | `.discoverability/`, `packages/rdk-cli/src/generate/` |
 | **Skillpack** | Инструкции для агентов с прогрессивным раскрытием: аудит → план → патч → проверка → распространение | `skills/repo-discoverability/` |
-| **Automation** | GitHub Action на `pull_request`, `workflow_dispatch` и еженедельный cron | `.github/workflows/rdk-audit.yml`, `action/action.yml` |
+| **Automation** | [GitHub Action](https://github.com/WhiteBite/rdk-discoverability) на `pull_request`, `workflow_dispatch` и еженедельный cron; собственный CI репозитория догфудит его | `.github/workflows/rdk-audit.yml` |
 | **Monitoring** | MCP-сервер с 9 преимущественно read-only инструментами, историей тренда и живыми пробами GitHub / сайта / npms | `packages/repo-aeo-mcp/` |
 
 ## Команды
@@ -202,7 +202,7 @@ skills/repo-discoverability/SKILL.md → description triggers on
 
 | Инструмент | Единица анализа | Оценки | Генерирует | Валидирует | Пишет в GitHub | Агентский интерфейс | CI |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| **RDK (этот репо)** | git working tree | рубрика 0-100, 6 осей | llms.txt, llms-full.txt, AGENTS.md, JSON-LD, CITATION.cff, шаблоны | свежесть, структура, пробы ссылок (`--online`) | guarded sync (ack + reason + preview) | MCP-сервер + агентский скилл | composite Action |
+| **RDK (этот репо)** | git working tree | рубрика 0-100, 6 осей | llms.txt, llms-full.txt, AGENTS.md, JSON-LD, CITATION.cff, шаблоны | свежесть, структура, пробы ссылок (`--online`) | guarded sync (ack + reason + preview) | MCP-сервер + агентский скилл | marketplace Action |
 | [repo-health-radar](https://github.com/xxrraa/repo-health-radar) | git working tree | 0-100 + буквенная оценка, 6 осей для человеческого мейнтейнера | - | 35 проверок (доки, CI, готовность к релизу, активность) | - | - | composite Action |
 | [GitHub community profile](https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/about-community-profiles-for-public-repositories) | репо, hosted checklist | чеклист | - | наличие + поддерживаемое расположение trust-файлов | - | - | встроено в github.com |
 | [standard-readme](https://github.com/RichardLitt/standard-readme) + [remark preset](https://github.com/RichardLitt/standard-readme-preset) | README.md | pass/fail lint | только скаффолд | спецификация секций для человеческих читателей | - | - | remark CLI |
@@ -284,7 +284,7 @@ discoverability, а не трафик краулеров.
 
 - Единственный инструмент из перечисленных, чья единица анализа — working tree:
   всё чинится до первого деплоя или публикации. Ближайший близнец,
-  repo-health-radar, делит форму (zero-dep CLI, composite action, min-score гейт),
+  repo-health-radar, делит форму (zero-dep CLI, marketplace-экшен, min-score гейт),
   но грейдит оси человеческого мейнтейнера и не возит ни autofix, ни MCP-сервер,
   ни агентские артефакты.
 - README primitives скорятся под потребление агентами (детектируемость команды
@@ -310,7 +310,7 @@ IDE-упаковка — следующая
 | `packages/rdk-cli/` | пакет `repo-aeo` (без зависимостей) |
 | `packages/repo-aeo-mcp/` | MCP-сервер `repo-aeo-mcp` (9 инструментов, stdio, Dockerfile) |
 | `skills/repo-discoverability/` | SKILL.md + references + скрипты для кодинг-агентов |
-| `action/`, `.github/workflows/` | GitHub Action и переиспользуемый composite action |
+| `.github/workflows/` | CI: аудит discoverability на PR (догфудит marketplace-экшен) и tag-driven релиз |
 | `fixtures/demo-repo/` | демо-репозиторий до/после |
 | `docs/` | архитектура, конфигурация, скоринг, MCP-план, ссылки |
 | `REPORT.md` | реальный вывод аудита и образец PR-комментария |

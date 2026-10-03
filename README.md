@@ -70,7 +70,7 @@ Three layers, because a one-off script is not enough:
 | --- | --- | --- |
 | **Repo Kit** | `.discoverability/project.yml` as the single source of truth, plus templates and generators | `.discoverability/`, `packages/rdk-cli/src/generate/` |
 | **Skillpack** | Agent instructions with progressive disclosure: audit → plan → patch → verify → distribute | `skills/repo-discoverability/` |
-| **Automation** | GitHub Action on `pull_request`, `workflow_dispatch` and weekly cron | `.github/workflows/rdk-audit.yml`, `action/action.yml` |
+| **Automation** | [GitHub Action](https://github.com/WhiteBite/rdk-discoverability) on `pull_request`, `workflow_dispatch` and weekly cron, dogfooded by this repo's own CI | `.github/workflows/rdk-audit.yml` |
 | **Monitoring** | MCP server with 9 read-mostly tools, trend history and live GitHub / site / npms probes | `packages/repo-aeo-mcp/` |
 
 ## Commands
@@ -201,7 +201,7 @@ repairs the repository itself, before anything is served or published.
 
 | Tool | Unit of analysis | Scores | Generates | Validates | Writes to GitHub | Agent interface | CI |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| **RDK (this repo)** | git working tree | 0-100 rubric, 6 axes | llms.txt, llms-full.txt, AGENTS.md, JSON-LD, CITATION.cff, templates | freshness, structure, link probes (`--online`) | guarded sync (ack + reason + preview) | MCP server + agent skill | composite Action |
+| **RDK (this repo)** | git working tree | 0-100 rubric, 6 axes | llms.txt, llms-full.txt, AGENTS.md, JSON-LD, CITATION.cff, templates | freshness, structure, link probes (`--online`) | guarded sync (ack + reason + preview) | MCP server + agent skill | marketplace Action |
 | [repo-health-radar](https://github.com/xxrraa/repo-health-radar) | git working tree | 0-100 + letter grade, 6 human-maintainer axes | - | 35 checks (docs, CI, release readiness, activity) | - | - | composite Action |
 | [GitHub community profile](https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/about-community-profiles-for-public-repositories) | repo, hosted checklist | checklist | - | presence + supported location of trust files | - | - | built into github.com |
 | [standard-readme](https://github.com/RichardLitt/standard-readme) + [remark preset](https://github.com/RichardLitt/standard-readme-preset) | README.md | pass/fail lint | scaffold only | section spec for human readers | - | - | remark CLI |
@@ -284,7 +284,7 @@ discoverability audits above, not crawler traffic.
 
 - The only tool above whose unit of analysis is the working tree: everything
   is fixable before the first deploy or publish. The nearest twin,
-  repo-health-radar, shares the shape (zero-dep CLI, composite action,
+  repo-health-radar, shares the shape (zero-dep CLI, marketplace action,
   min-score gate) but grades human-maintainer axes and ships no autofixes,
   MCP server or agent artifacts.
 - README primitives are scored for agent consumption (install-command
@@ -310,7 +310,7 @@ server. IDE packaging is next
 | `packages/rdk-cli/` | the `repo-aeo` package (zero dependencies) |
 | `packages/repo-aeo-mcp/` | the `repo-aeo-mcp` MCP server (9 tools, stdio, Dockerfile) |
 | `skills/repo-discoverability/` | SKILL.md + references + scripts for coding agents |
-| `action/`, `.github/workflows/` | GitHub Action and reusable composite action |
+| `.github/workflows/` | CI: the PR discoverability audit (dogfoods the marketplace action) and the tag-driven release |
 | `fixtures/demo-repo/` | before/after demo repository |
 | `docs/` | architecture, configuration, scoring, MCP plan, links |
 | `REPORT.md` | real audit output and PR comment sample |
