@@ -1,5 +1,7 @@
 # repo-aeo — Repo Discoverability Kit (RDK)
 
+**English** | [Русский](README.ru.md)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Node >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
 
