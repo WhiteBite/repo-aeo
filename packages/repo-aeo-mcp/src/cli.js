@@ -18,6 +18,7 @@ Usage:
   repo-aeo-mcp github-sync [--apply]          preview/write repo metadata (needs --ack --reason)
   repo-aeo-mcp freshness                      llms.txt drift check
   repo-aeo-mcp site [url]                     /llms.txt check on a domain
+  repo-aeo-mcp submissions [--live]           curated-list submission ledger + PR states
   repo-aeo-mcp history [metric]               stored metric history
   repo-aeo-mcp tools                          list MCP tool names
 
@@ -74,6 +75,8 @@ function parseFlags(argv) {
       }
     } else if (arg === '--apply') {
       flags.apply = true;
+    } else if (arg === '--live') {
+      flags.live = true;
     } else if (arg === '--read-only') {
       flags.readOnly = true;
     } else if (arg === '-h' || arg === '--help') {
@@ -260,6 +263,27 @@ export async function main(argv = process.argv.slice(2), io = {}) {
             value.ok
               ? `${value.url}: present (HTTP ${value.status}, ${value.bytes} bytes, first heading "${value.first_heading}")`
               : `${value.url || 'site'}: not reachable - ${value.error || `HTTP ${value.status}`}`,
+        });
+        return 0;
+      }
+
+      case 'submissions': {
+        const payload = await call('distribution_check_submissions', { live: flags.live === true });
+        print(payload, {
+          json: flags.json,
+          write,
+          render: (value) =>
+            value.ok
+              ? [
+                  value.total === 0
+                    ? 'no submissions recorded yet'
+                    : `${value.total} submission(s): ${Object.entries(value.summary).map(([status, count]) => `${count} ${status}`).join(', ')}`,
+                  ...value.submissions.map((entry) =>
+                    `  - ${entry.target}: ${entry.status}${entry.live_status ? ` (live ${entry.live_status})` : ''}${entry.pr_url ? ` ${entry.pr_url}` : ''}`),
+                  ...(value.cleanup_forks.length ? [`forks ready to delete: ${value.cleanup_forks.join(', ')}`] : []),
+                  ...(value.note ? [value.note] : []),
+                ].join('\n')
+              : `submissions unavailable: ${value.error}`,
         });
         return 0;
       }

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PassThrough } from 'node:stream';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { main } from '../src/cli.js';
@@ -64,6 +64,31 @@ test('github-sync gets past the guard with an acknowledgement', async () => {
     assert.match(output, /--apply/);
   } else {
     assert.match(output, /github-sync refused: \S/, 'the refusal must quote a reason');
+  }
+});
+
+test('submissions reports the ledger offline and flags forks ready for cleanup', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'repo-aeo-mcp-submissions-'));
+  try {
+    const empty = await run(['submissions', '--cwd', dir]);
+    assert.equal(empty.code, 0);
+    assert.match(empty.output, /no submissions recorded yet/);
+
+    mkdirSync(join(dir, '.discoverability'), { recursive: true });
+    writeFileSync(
+      join(dir, '.discoverability', 'submissions.json'),
+      JSON.stringify([
+        { target: 'a/b', pr_url: 'https://github.com/a/b/pull/1', fork: 'u/b', status: 'open' },
+        { target: 'c/d', fork: 'u/d', status: 'merged' },
+      ]),
+    );
+    const filled = await run(['submissions', '--cwd', dir]);
+    assert.equal(filled.code, 0);
+    assert.match(filled.output, /2 submission\(s\): 1 open, 1 merged/);
+    assert.match(filled.output, /- a\/b: open .*pull\/1/);
+    assert.match(filled.output, /forks ready to delete: u\/d/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 
