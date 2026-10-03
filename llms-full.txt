@@ -51,6 +51,23 @@ reviewable diff — it never publishes, tags or force-pushes. The one exception
 lives in CI: the opt-in autofix job force-pushes its own dated
 `rdk/autofix-<date>` bot branch and opens a reviewable PR.
 
+## Ways to use it
+
+You fork nothing and install nothing permanently. Pick the surface that
+matches how you work — each pulls the engine on demand:
+
+| You want | You write | What lands in your repo |
+| --- | --- | --- |
+| A CI gate on every pull request | `uses: WhiteBite/rdk-discoverability@v1` in a workflow | `.github/workflows/rdk.yml` (~6 lines) |
+| A one-off audit from the terminal | `npx repo-aeo audit` | nothing, until you run `rdk init` |
+| A monitoring tool for your AI agent | `claude mcp add rdk -- npx repo-aeo-mcp serve` | nothing (client-side config) |
+| The agent skill in OpenCode/Claude/Codex | `npx repo-aeo skill install` | nothing (a symlink) |
+
+Commit to it and exactly two files ever appear in your repository: the
+workflow above and `.discoverability/project.yml`, the generated source of
+truth for your metadata. The two RDK repositories (engine and the action
+wrapper) stay ours — they are the factory, not a dependency you carry.
+
 ## The problem
 
 You shipped a good package, but nobody finds it: npm search buries it,
@@ -130,13 +147,15 @@ $ npx repo-aeo npm-surface --pack
 ### 4. Keep it from regressing in CI
 
 ```yaml
-# .github/workflows/rdk-audit.yml (already in this repo)
+# .github/workflows/rdk.yml — in YOUR repository
 - uses: actions/checkout@v4
-- uses: actions/setup-node@v4
-  with: { node-version: '22' }
-- run: npx --yes repo-aeo@^1.0.0 audit --format github-comment --online
-- run: npx --yes repo-aeo@^1.0.0 audit --format json --online --min-score "${{ github.event.inputs.min_score || vars.RDK_MIN_SCORE || 0 }}"
+- uses: WhiteBite/rdk-discoverability@v1
+  with:
+    min_score: ${{ vars.RDK_MIN_SCORE || 0 }}
 ```
+
+GitHub downloads the action, the action pulls the engine from npm — nothing
+to install or fork. This is the same action this repository's own CI runs.
 
 The CLI itself never force-pushes; the workflow's opt-in autofix job (gated by
 `safety.allow_autofix`) force-pushes only its own dated `rdk/autofix-<date>`

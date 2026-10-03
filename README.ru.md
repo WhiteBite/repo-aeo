@@ -40,6 +40,23 @@ npm test
 force-push. Единственное исключение живёт в CI: опциональный autofix-job делает
 force-push в свою датированную бот-ветку `rdk/autofix-<date>` и открывает PR на ревью.
 
+## Способы использования
+
+Ничего не форкается и не устанавливается насовсем. Выберите поверхность под
+свой сценарий — каждая тянет движок по требованию:
+
+| Задача | Команда | Что появится в вашем репо |
+| --- | --- | --- |
+| CI-гейт на каждый pull request | `uses: WhiteBite/rdk-discoverability@v1` в воркфлоу | `.github/workflows/rdk.yml` (~6 строк) |
+| Разовый аудит из терминала | `npx repo-aeo audit` | ничего, пока не запустите `rdk init` |
+| Мониторинг для AI-агента | `claude mcp add rdk -- npx repo-aeo-mcp serve` | ничего (конфиг клиента) |
+| Скилл в OpenCode/Claude/Codex | `npx repo-aeo skill install` | ничего (симлинк) |
+
+Решите остаться — в репозитории появятся ровно два файла: воркфлоу выше и
+`.discoverability/project.yml` — сгенерированный источник правды для ваших
+метаданных. Два репозитория RDK (движок и обёртка экшена) остаются нашими:
+это фабрика, а не зависимость, которую вы таскаете с собой.
+
 ## Проблема
 
 Вы выпустили хороший пакет, но его никто не находит: поиск npm хоронит
@@ -119,13 +136,16 @@ $ npx repo-aeo npm-surface --pack
 ### 4. Не дать деградировать в CI
 
 ```yaml
-# .github/workflows/rdk-audit.yml (already in this repo)
+# .github/workflows/rdk.yml — в ВАШЕМ репозитории
 - uses: actions/checkout@v4
-- uses: actions/setup-node@v4
-  with: { node-version: '22' }
-- run: npx --yes repo-aeo@^1.0.0 audit --format github-comment --online
-- run: npx --yes repo-aeo@^1.0.0 audit --format json --online --min-score "${{ github.event.inputs.min_score || vars.RDK_MIN_SCORE || 0 }}"
+- uses: WhiteBite/rdk-discoverability@v1
+  with:
+    min_score: ${{ vars.RDK_MIN_SCORE || 0 }}
 ```
+
+GitHub сам скачивает экшен, экшен сам тянет движок из npm — ничего
+устанавливать и форкать не нужно. Это тот же экшен, который гоняет CI
+самого repo-aeo.
 
 Сам CLI никогда не делает force-push; опциональный autofix-job воркфлоу (под гейтом
 `safety.allow_autofix`) force-pushит только свою датированную бот-ветку
