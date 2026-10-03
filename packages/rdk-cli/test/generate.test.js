@@ -10,6 +10,7 @@ import {
   mergeGenerated,
   renderCodeowners,
   renderCitationCff,
+  citationRepositoryRefresh,
   renderProjectYml,
   renderReadme,
   renderAgentsMd,
@@ -30,7 +31,7 @@ const FULL_CONFIG = {
   keywords: { github_topics: ['cli', 'developer-tools'], npm_keywords: ['cli'] },
   links: { homepage: 'https://example.com', docs: null, demo: null, issues: 'https://github.com/o/r/issues' },
   quickstart: { prerequisites: ['Node.js >= 18'], install: 'npm i round-trip', run: 'npm start', test: 'npm test' },
-  artifacts: { has_npm_package: true, has_docs_site: false },
+  artifacts: { has_npm_package: true, has_docs_site: false, npm_published: false },
   differentiators: ['because'],
   safety: { allow_autofix: false, require_ack_for_publish: true, ack: null },
 };
@@ -289,6 +290,15 @@ test('citation stub takes the version from package.json', () => {
   }
 });
 
+test('citationRepositoryRefresh fills only a present-but-empty repository-code', () => {
+  assert.equal(citationRepositoryRefresh('cff-version: 1.2.0\nrepository-code: ""\n', 'https://github.com/o/r'), 'cff-version: 1.2.0\nrepository-code: "https://github.com/o/r"\n');
+  assert.equal(citationRepositoryRefresh('repository-code:\n', 'https://github.com/o/r'), 'repository-code: "https://github.com/o/r"\n');
+  assert.equal(citationRepositoryRefresh('repository-code: ""\r\n', 'https://github.com/o/r'), 'repository-code: "https://github.com/o/r"\r\n');
+  assert.equal(citationRepositoryRefresh('repository-code: "https://keep.example"\n', 'https://github.com/o/r'), null);
+  assert.equal(citationRepositoryRefresh('repository-code: ""\n', null), null);
+  assert.equal(citationRepositoryRefresh('type: software\n', 'https://github.com/o/r'), null);
+});
+
 test('generated project.yml points at the tool documentation, not at the audited repo', () => {
   const yml = renderProjectYml({ project: { name: 'docs-link', one_liner: 'Check the docs link' } });
   const docsLine = yml.split('\n').find((line) => line.startsWith('# Docs:'));
@@ -325,10 +335,17 @@ test('renderJsonLd emits author and sameAs from config and package facts', () =>
     project: { name: 'jsonld-demo', one_liner: 'Demo', copyright_holder: 'Ada Lovelace' },
     links: { issues: 'https://github.com/o/r/issues' },
     keywords: { npm_keywords: ['demo'] },
+    artifacts: { npm_published: true },
   };
   const json = JSON.parse(renderJsonLd(config, { name: 'jsonld-demo', version: '1.0.0' }));
   assert.equal(json.author, 'Ada Lovelace');
   assert.deepEqual(json.sameAs, ['https://github.com/o/r', 'https://www.npmjs.com/package/jsonld-demo']);
+});
+
+test('renderJsonLd omits the npm sameAs until artifacts.npm_published is set', () => {
+  const config = { project: { name: 'unpub' }, links: { issues: 'https://github.com/o/unpub/issues' } };
+  const json = JSON.parse(renderJsonLd(config, { name: 'unpub', version: '1.0.0' }));
+  assert.deepEqual(json.sameAs, ['https://github.com/o/unpub']);
 });
 
 test('renderJsonLd falls back to the repository owner and skips npm for private packages', () => {

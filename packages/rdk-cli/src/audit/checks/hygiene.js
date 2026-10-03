@@ -5,7 +5,7 @@
  */
 import { check, finding, skip } from './_shared.js';
 import { exists, readTextIfExists } from '../../util/fs.js';
-import { citationVersionDrift, dependabotEcosystems } from '../../generate/index.js';
+import { citationVersionDrift, citationRepositoryDrift, dependabotEcosystems } from '../../generate/index.js';
 import { join } from 'node:path';
 import { recentCommits } from '../../util/git.js';
 
@@ -196,6 +196,10 @@ export const hygieneChecks = [
       const drift = citationVersionDrift(ctx.cwd, ctx.config, ctx.pkg);
       if (drift) {
         return finding({ id: this.id, axis: this.axis, severity: 'warn', title: `CITATION.cff version is stale: ${drift.current}, package is ${drift.expected}`, why: 'A citation pinned to an old version misleads readers and citation indexes about which release the metadata describes.', fix: 'Run `rdk fix` to refresh the version key from package.json; every other field is left untouched.', effort: 'S' });
+      }
+      const repositoryDrift = citationRepositoryDrift(ctx.cwd, ctx.config, ctx.pkg);
+      if (repositoryDrift) {
+        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'CITATION.cff repository-code is empty while a repository URL is derivable', why: 'repository-code connects the citation back to the source repository; an empty value leaves readers and citation indexes with metadata and no code behind it.', fix: 'Run `rdk fix` to fill repository-code from package.json or the git remote; every other field is left untouched.', effort: 'S' });
       }
       return null;
     },

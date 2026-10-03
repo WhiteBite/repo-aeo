@@ -265,6 +265,36 @@ test('citation.stub leaves a CITATION.cff without a version key alone', () => {
   }
 });
 
+test('citation.stub fills an empty repository-code once a URL is derivable', () => {
+  const dir = makeRepo({
+    'package.json': JSON.stringify({ name: 'heal', version: '1.0.0', repository: 'https://github.com/jane/heal' }),
+    'CITATION.cff': 'cff-version: 1.2.0\nversion: "0.9.0"\nrepository-code: ""\n',
+  });
+  try {
+    const planned = planPatches(contextFor(dir), { only: ['citation.stub'] });
+    assert.equal(planned.length, 1);
+    applyPatches(planned);
+    const after = readFileSync(join(dir, 'CITATION.cff'), 'utf8');
+    assert.match(after, /^version: "1\.0\.0"$/m);
+    assert.match(after, /^repository-code: "https:\/\/github\.com\/jane\/heal"$/m);
+    assert.deepEqual(planPatches(contextFor(dir), { only: ['citation.stub'] }), []);
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('citation.stub leaves a filled repository-code alone', () => {
+  const dir = makeRepo({
+    'package.json': JSON.stringify({ name: 'keep', version: '1.0.0', repository: 'https://github.com/jane/keep' }),
+    'CITATION.cff': 'cff-version: 1.2.0\nversion: "1.0.0"\nrepository-code: "https://custom.example/source"\n',
+  });
+  try {
+    assert.deepEqual(planPatches(contextFor(dir), { only: ['citation.stub'] }), []);
+  } finally {
+    removeRepo(dir);
+  }
+});
+
 test('jsonld.snippet refreshes a stale softwareVersion and preserves everything else', () => {
   const snippet = {
     '@context': 'https://schema.org',
@@ -315,6 +345,23 @@ test('audit reports a stale CITATION.cff version as autofixable', async () => {
     assert.match(stale.title, /stale/i);
     assert.equal(stale.autoFixable, true);
     assert.equal(stale.patchId, 'citation.stub');
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('audit reports an empty CITATION.cff repository-code as autofixable', async () => {
+  const dir = makeRepo({
+    'package.json': JSON.stringify({ name: 'audr', version: '1.0.0', repository: 'https://github.com/jane/audr' }),
+    'CITATION.cff': 'cff-version: 1.2.0\nversion: "1.0.0"\nrepository-code: ""\n',
+  });
+  try {
+    const report = await audit(dir, { online: false });
+    const row = report.findings.find((f) => f.id === 'hygiene.citation');
+    assert.ok(row, 'expected a hygiene.citation finding for the empty repository-code');
+    assert.match(row.title, /repository-code/i);
+    assert.equal(row.autoFixable, true);
+    assert.equal(row.patchId, 'citation.stub');
   } finally {
     removeRepo(dir);
   }

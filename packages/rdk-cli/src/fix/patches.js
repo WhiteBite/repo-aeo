@@ -27,6 +27,8 @@ import {
   renderContributingMd,
   renderCodeOfConduct,
   citationVersionDrift,
+  citationRepositoryDrift,
+  citationRepositoryRefresh,
   jsonldVersionDrift,
   dependabotEcosystems,
   renderDependabotYml,
@@ -561,22 +563,27 @@ export const PATCHES = [
 
   {
     id: 'citation.stub',
-    title: 'Create or version-sync CITATION.cff',
-    description: 'Adds a citation file so the project can be cited from the GitHub "Cite this repository" button, and keeps its version key in sync with package.json without touching any other field.',
+    title: 'Create or sync CITATION.cff',
+    description: 'Adds a citation file so the project can be cited from the GitHub "Cite this repository" button; on an existing file it refreshes the version key and fills an empty repository-code, touching no other field.',
     risk: 'safe',
     applies(ctx) {
       const relevant = ['library', 'research', 'dataset', 'tool', 'app'].includes(String((ctx.config.project.category || '')).toLowerCase());
       if (!relevant) return false;
       if (!exists(join(ctx.cwd, 'CITATION.cff'))) return true;
-      return citationVersionDrift(ctx.cwd, ctx.config, ctx.pkg) !== null;
+      return citationVersionDrift(ctx.cwd, ctx.config, ctx.pkg) !== null
+        || citationRepositoryDrift(ctx.cwd, ctx.config, ctx.pkg) !== null;
     },
     mutations(ctx) {
       const path = join(ctx.cwd, 'CITATION.cff');
       const before = exists(path) ? readTextIfExists(path) : null;
       if (before === null) return [mutation(path, null, renderCitationCff(ctx.config, ctx.pkg, ctx.cwd))];
-      const drift = citationVersionDrift(ctx.cwd, ctx.config, ctx.pkg);
-      if (!drift) return [];
-      return [mutation(path, before, drift.refreshed)];
+      let text = before;
+      const versionDrift = citationVersionDrift(ctx.cwd, ctx.config, ctx.pkg);
+      if (versionDrift) text = versionDrift.refreshed;
+      const repositoryRefreshed = citationRepositoryRefresh(text, repositoryUrl(ctx.config, ctx.pkg));
+      if (repositoryRefreshed !== null) text = repositoryRefreshed;
+      if (text === before) return [];
+      return [mutation(path, before, text)];
     },
   },
 

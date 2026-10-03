@@ -40,6 +40,7 @@ export const DEFAULT_CONFIG = {
   artifacts: {
     has_npm_package: false,
     has_docs_site: false,
+    npm_published: false,
   },
   differentiators: [],
   safety: {
@@ -247,6 +248,7 @@ export function buildSeedConfig(cwd = process.cwd()) {
     artifacts: {
       has_npm_package: Boolean(pkg && pkg.name),
       has_docs_site: Boolean(config.artifacts.has_docs_site),
+      npm_published: Boolean(config.artifacts.npm_published),
     },
   };
 }

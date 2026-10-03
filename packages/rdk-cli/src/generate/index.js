@@ -228,6 +228,7 @@ ${yamlBlock('prerequisites', quickstart.prerequisites, '  ')}
 artifacts:
   has_npm_package: ${artifacts.has_npm_package ? 'true' : 'false'}
   has_docs_site: ${artifacts.has_docs_site ? 'true' : 'false'}
+  npm_published: ${artifacts.npm_published ? 'true' : 'false'}   # flip to true once the package actually lands on the npm registry
 
 ${yamlBlock('differentiators', config.differentiators)}   # "why this repo, not the alternatives"
 
@@ -502,6 +503,7 @@ function citationAuthor(config, pkg, cwd) {
 }
 
 const CITATION_VERSION_RE = /^version:[ \t]*("(?:[^"\\]|\\.)*"|'[^']*'|[^\s#]+)/m;
+const CITATION_REPOSITORY_RE = /^repository-code:[ \t]*("(?:[^"\\]|\\.)*"|'[^']*'|[^\s#]*)/m;
 
 function unquoteYamlScalar(raw) {
   const value = String(raw).trim();
@@ -527,6 +529,27 @@ export function citationVersionDrift(cwd, config, pkg) {
   const expected = expectedVersion(config, pkg);
   if (current === expected) return null;
   return { path, current, expected, refreshed: text.replace(CITATION_VERSION_RE, `version: ${JSON.stringify(expected)}`) };
+}
+
+/** Fills a present-but-empty repository-code scalar; an absent or filled key is never touched and no derivable URL means nothing to fill. */
+export function citationRepositoryRefresh(text, url) {
+  if (!url) return null;
+  const value = String(text);
+  const match = CITATION_REPOSITORY_RE.exec(value);
+  if (match === null) return null;
+  if (unquoteYamlScalar(match[1]).trim() !== '') return null;
+  return value.replace(CITATION_REPOSITORY_RE, `repository-code: ${JSON.stringify(url)}`);
+}
+
+/** Disk-backed repository-code drift: feeds the citation patch applicability and the hygiene audit. */
+export function citationRepositoryDrift(cwd, config, pkg) {
+  const path = join(cwd, 'CITATION.cff');
+  const text = readTextIfExists(path);
+  if (text === null) return null;
+  const expected = repositoryUrl(config, pkg);
+  const refreshed = citationRepositoryRefresh(text, expected);
+  if (refreshed === null) return null;
+  return { path, current: '', expected, refreshed };
 }
 
 /**
@@ -679,7 +702,9 @@ export function renderJsonLd(config, pkg, cwd) {
   const sameAs = [];
   const identityUrl = repoUrl || (config.links && config.links.homepage);
   if (identityUrl) sameAs.push(identityUrl);
-  if (pkg && pkg.name && !pkg.private) sameAs.push(`https://www.npmjs.com/package/${pkg.name}`);
+  // npm sameAs claims a registry page exists: only the config's npm_published flag can honestly source that
+  const npmPublished = Boolean(config.artifacts && config.artifacts.npm_published);
+  if (npmPublished && pkg && pkg.name && !pkg.private) sameAs.push(`https://www.npmjs.com/package/${pkg.name}`);
   if (sameAs.length > 0) data.sameAs = sameAs;
   return `${JSON.stringify(data, null, 2)}\n`;
 }
