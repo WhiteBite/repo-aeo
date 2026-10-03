@@ -32,7 +32,7 @@
     "test": "node ../../scripts/run-tests.mjs test"
   },
   "dependencies": {
-    "repo-aeo": "^0.3.6"
+    "repo-aeo": "^1.0.0"
   },
   "keywords": [
     "mcp",
