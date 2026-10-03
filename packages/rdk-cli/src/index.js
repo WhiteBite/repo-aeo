@@ -7,6 +7,7 @@ export { renderGithubComment, COMMENT_MARKER } from './report/githubComment.js';
 export { AXIS_WEIGHTS, AXIS_LABELS, computeScore, grade } from './audit/score.js';
 export { parse as parseYaml } from './yaml.js';
 export { githubSyncCommand, DEFAULT_ACK, resolveRepo, effectiveAck, planDigest } from './commands/githubSync.js';
+export { submitCommand, insertEntryIntoReadme, buildEntry, readSubmissions, submissionsPath } from './commands/submit.js';
 export { auditCommand } from './commands/audit.js';
 export { fixCommand } from './commands/fix.js';
 export { initCommand } from './commands/init.js';

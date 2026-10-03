@@ -223,6 +223,44 @@ export declare function githubSyncCommand(args: {
   ghRunner?: (args: string[], options: { cwd: string }) => Promise<{ ok: boolean; stdout?: string; stderr?: string }>;
 }): Promise<GithubSyncResult>;
 
+export interface Submission {
+  target: string;
+  pr_url?: string;
+  branch?: string;
+  fork?: string;
+  submitted_at?: string;
+  status?: string;
+}
+
+export interface SubmitResult {
+  ok: boolean;
+  output: string;
+  error?: string | null;
+  code?: string | null;
+  exitCode?: number;
+  applied: Submission[];
+  plan?: unknown[];
+  plan_digest?: string | null;
+}
+
+export declare function submissionsPath(cwd?: string): string;
+/** Reads the campaign ledger; null means present but unparsable. */
+export declare function readSubmissions(cwd?: string): Submission[] | null;
+export declare function buildEntry(args: { name: string; url: string; oneLiner?: string | null; entry?: string }): string;
+export declare function insertEntryIntoReadme(
+  readme: string,
+  category: string,
+  entry: string,
+  position?: 'end' | 'alphabetical',
+): { ok: boolean; readme?: string; error?: string };
+export declare function submitCommand(args: {
+  cwd: string;
+  options: Record<string, unknown>;
+  config: RdkConfig;
+  ghRunner?: (args: string[]) => { ok: boolean; stdout?: string; stderr?: string };
+  gitRunner?: (args: string[], options?: { timeout?: number }) => { ok: boolean; stdout?: string; stderr?: string };
+}): Promise<SubmitResult>;
+
 export interface CommandResult {
   ok: boolean;
   output: string;
