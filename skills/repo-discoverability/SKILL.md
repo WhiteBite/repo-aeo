@@ -6,7 +6,9 @@ description: >-
   discoverable", "add GitHub topics", "improve README for users and agents",
   "prepare npm metadata", "generate AGENTS.md", "why is my package not
   recommended", "optimize for AI search", "GEO/AEO for my repo", "add llms.txt",
-  "audit repo discoverability", or before publishing/releasing a package.
+  "audit repo discoverability", "run a distribution campaign", "submit to
+  awesome lists", "get my package listed", or before publishing/releasing a
+  package.
   Only activate on an explicit user request; do not use for routine code edits,
   commits or PRs. Produces an audit, a plan and small verified patches; never
   publishes, tags or force-pushes without an explicit ACK.
@@ -30,8 +32,11 @@ report is derived from files in the repository, never invented.
 4. **Verify** every change: tests, `npm pack --dry-run`, link checks.
 5. Heavy logic lives in `scripts/` (code does not burn context; only its output
    does). Prefer running the CLI over re-implementing checks inline.
+6. **Outbound submissions** (PRs to curated lists, registries) go out only
+   after the human approves the target list, the exact entry and the fork
+   plan. Record every submission in `.discoverability/submissions.json`.
 
-## The four phases
+## The five phases
 
 ### Phase 1 — AUDIT (collect facts)
 
@@ -89,6 +94,19 @@ node packages/rdk-cli/bin/rdk.js audit --format json  # score must not regress
 
 If the score dropped, revert the patch and re-plan.
 
+### Phase 5 — DISTRIBUTE (get listed)
+
+```bash
+npx repo-aeo-mcp submissions --live   # campaign state + live PR statuses
+```
+
+Find the curated lists where the project's audience already lives, propose
+the entry, and keep the ledger in `.discoverability/submissions.json`. Read
+`references/distribution-playbook.md` before the first submission: it has the
+per-list conventions that decide whether a PR survives review, the fork
+mechanics (create just-in-time, delete after merge) and the safety rails —
+no submission without an approved target list.
+
 ## What "good" looks like (checklist)
 
 - **README**: install/run in the first 60 lines, 2–5 short examples, sections
@@ -120,4 +138,5 @@ If the score dropped, revert the patch and re-plan.
 - `references/scoring.md` — read when you need to explain or predict how the 0–100 score moves.
 - `references/mcp-manifest.md` — read if the project ships an MCP server.
 - `references/geo-playbook.md` — read before writing positioning or discovery copy; it explains why these moves work.
+- `references/distribution-playbook.md` — read before proposing the project to any curated list; it explains entry conventions, fork mechanics and submission tracking.
 - `scripts/audit.sh` — run if Node is not on PATH; a thin wrapper around the CLI.
