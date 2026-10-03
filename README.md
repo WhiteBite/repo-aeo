@@ -40,6 +40,21 @@ reviewable diff — it never publishes, tags or force-pushes. The one exception
 lives in CI: the opt-in autofix job force-pushes its own dated
 `rdk/autofix-<date>` bot branch and opens a reviewable PR.
 
+## The problem
+
+You shipped a good package, but nobody finds it: npm search buries it,
+AI assistants recommend the incumbents, and the README explains the
+philosophy for 90 lines before the first runnable example.
+
+Fixing that once is the easy half. The hard half is keeping it fixed: six
+months later a contributor's PR "tidies up" the README with a banner and a
+table of contents, the quickstart sinks below line 60, the tests stay green
+— and the package quietly disappears from search results and AI answers
+again. Nobody notices, because nothing in CI watches discoverability.
+
+RDK makes it a tested property: audit locally, gate in CI on every pull
+request.
+
 ## Who is it for
 
 - Maintainers publishing an npm package for the first time.
