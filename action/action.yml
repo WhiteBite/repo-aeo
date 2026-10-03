@@ -63,3 +63,7 @@ runs:
           } else {
             await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
           }
+
+branding:
+  icon: 'search'
+  color: 'blue'
