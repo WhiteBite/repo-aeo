@@ -64,6 +64,7 @@ quickstart:
 artifacts:
   has_npm_package: true
   has_docs_site: false
+  npm_published: true
 
 differentiators:
   - "One config file (.discoverability/project.yml) drives README, AGENTS.md, llms.txt, npm metadata and GitHub topics"

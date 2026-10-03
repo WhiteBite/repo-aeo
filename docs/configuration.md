@@ -64,6 +64,7 @@ the audit flags them.
 | --- | --- |
 | `has_npm_package` | enables the npm axis (also implied by the presence of `package.json`) |
 | `has_docs_site` | enables the docs axis (also implied by `links.homepage`/`links.docs`) |
+| `npm_published` | gates the npm registry `sameAs` in the generated JSON-LD; set to `true` only after the package actually lands on the registry |
 
 When `has_docs_site: false` while `links.homepage` or `links.docs` is set,
 `rdk` emits the `config.docs_site_overridden` warning: the links imply a docs
