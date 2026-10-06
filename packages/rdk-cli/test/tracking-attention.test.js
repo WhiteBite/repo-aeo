@@ -168,7 +168,7 @@ test('commandFor emits the guarded update command for action_required', () => {
   };
   assert.equal(
     commandFor(item, CTX),
-    'rdk submit --channel awesome-list --targets owner/list --apply --ack <ACK> --reason "address review" --plan-digest <DIGEST>',
+    'rdk submit --channel awesome-list --targets owner/list --category "<CATEGORY>" --apply --ack <ACK> --reason "address review" --plan-digest <DIGEST>',
   );
 });
 

@@ -132,8 +132,8 @@ gh pr create -R kirodotdev-labs/awesome-kiro \
   --title "Add myproject" --body-file pr-body.md
 ```
 
-Branch names are namespaced by target (`rdk/<list>/<topic>`) so a campaign
-never collides with itself.
+Branch names are namespaced by target (`rdk/<listRepo>/add-<slug>`) so a
+campaign never collides with itself.
 
 ## Registry APIs (http-json)
 
@@ -230,7 +230,7 @@ at submit time and rewritten only by `rdk track --sync` under the guard.
 probe snapshots: safe to lose, never the source of truth.
 
 ```bash
-npx repo-aeo track                    # read-only dashboard, no writes
+npx repo-aeo track                    # read-only dashboard, no committed writes (may write the gitignored snapshot cache)
 npx repo-aeo track --json             # canonical JSON only
 ```
 
@@ -238,8 +238,10 @@ Each rendered item carries an attention state —
 `action_required|awaiting_review|approved|stale|none|listed|terminal` — plus a
 `needed` list (`address_review`, `fix_checks`, `rebase`, ...) and, when
 something is due, the exact guarded `command` to run next. Work the queue: on
-`action_required` address the review via the emitted command; merged items
-read `listed`, closed ones `terminal`.
+`action_required` run `rdk track --sync` first (a changes-requested PR moves
+to `needs_changes`, which is non-blocking), then run the emitted command with
+`--category` filled from the exact list heading; merged items read `listed`,
+closed ones `terminal`.
 
 PRs opened by hand or by an earlier run that never landed in the ledger are
 adopted by branch convention (`rdk/<listRepo>/add-<slug>`):

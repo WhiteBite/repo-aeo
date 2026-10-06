@@ -10,6 +10,7 @@ import { appendRecords } from '../ledger.js';
 const SEARCH_FIELDS = 'url,repository,number,title,state,isDraft';
 const LIST_FIELDS = 'url,number,title,state,isDraft,headRefName';
 const STATUS_BY_STATE = { OPEN: 'open', MERGED: 'listed', CLOSED: 'closed' };
+const ADOPT_BRANCH = /^rdk\/[^/]+\/add-.+$/;
 
 function ghItems(gh, args, cwd) {
   let result;
@@ -33,15 +34,18 @@ function prEntry(item, target) {
   return entry;
 }
 
-/** Cross-repo search plus one pr list per target, merged and deduped by url. */
+/** Cross-repo search plus one pr list per target and per search-discovered repo, merged and deduped by url. */
 export function discoverOwnedPrs({ gh, cwd, targets = [] }) {
   const byUrl = new Map();
+  const discovered = [];
   for (const item of ghItems(gh, ['search', 'prs', '--author', '@me', '--state', 'all', '--json', SEARCH_FIELDS], cwd)) {
     const target = item && item.repository && typeof item.repository.nameWithOwner === 'string' ? item.repository.nameWithOwner : null;
     if (!item || typeof item.url !== 'string' || item.url === '' || target === null) continue;
     byUrl.set(item.url, prEntry(item, target));
+    if (!discovered.includes(target)) discovered.push(target);
   }
-  for (const target of Array.isArray(targets) ? targets : []) {
+  const wanted = [...(Array.isArray(targets) ? targets : []), ...discovered].filter((target, idx, all) => all.indexOf(target) === idx);
+  for (const target of wanted) {
     for (const item of ghItems(gh, ['pr', 'list', '-R', target, '--author', '@me', '--state', 'all', '--json', LIST_FIELDS], cwd)) {
       if (!item || typeof item.url !== 'string' || item.url === '') continue;
       const existing = byUrl.get(item.url);
@@ -59,7 +63,7 @@ export function discoverOwnedPrs({ gh, cwd, targets = [] }) {
 export function matchAdoptable(prs) {
   const rows = [];
   for (const pr of Array.isArray(prs) ? prs : []) {
-    if (!pr || typeof pr.headRefName !== 'string' || !pr.headRefName.startsWith('rdk/')) continue;
+    if (!pr || typeof pr.headRefName !== 'string' || !ADOPT_BRANCH.test(pr.headRefName)) continue;
     rows.push({ url: pr.url, target: pr.target, branch: pr.headRefName, number: pr.number, state: pr.state });
   }
   return rows;

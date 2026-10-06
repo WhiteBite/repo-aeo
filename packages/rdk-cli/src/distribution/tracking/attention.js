@@ -87,7 +87,7 @@ export function neededFor(attention, hydrated) {
 export function commandFor(item, ctx) {
   const row = item || {};
   if (row.attention === 'action_required') {
-    return `rdk submit --channel ${row.channel} --targets ${row.target} --apply --ack <ACK> --reason "address review" --plan-digest <DIGEST>`;
+    return `rdk submit --channel ${row.channel} --targets ${row.target} --category "<CATEGORY>" --apply --ack <ACK> --reason "address review" --plan-digest <DIGEST>`;
   }
   if (row.attention === 'approved') return `gh pr merge ${row.pr_url} --squash`;
   if (row.attention === 'listed' && row.fork) return `gh repo delete ${row.fork} --yes`;

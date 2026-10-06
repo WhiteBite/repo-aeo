@@ -141,15 +141,18 @@ default channel is `awesome-list`. Mechanisms differ in what RDK may do:
 
 Every executed or prepared submission lands in
 `.discoverability/submissions.json` with `channel`, `mechanism`, `artifact`,
-`dedupe_key`, `target` and a status (`prepared|submitted|listed`, terminal
-negatives `rejected|closed|unlisted|failed`).
+`dedupe_key`, `target` and a status
+(`prepared|submitted|open|needs_changes|listed`, terminal negatives
+`rejected|closed|unlisted|failed`).
 
 After submitting, close the loop with `rdk track`: it projects the ledger
 through live probes into one status list where each item carries an attention
 state (`action_required|awaiting_review|approved|stale|none|listed|terminal`)
 and, when something is due, the exact guarded command to run next. On
-`action_required` address the review via that emitted `command`; once the PR
-merges or closes, `rdk track --sync` (under the same guard chain) rewrites the
+`action_required` run `rdk track --sync` first (a changes-requested PR moves
+to `needs_changes`, which is non-blocking), then run the emitted `command`
+with `--category` filled from the exact list heading; once the PR merges or
+closes, `rdk track --sync` (under the same guard chain) rewrites the
 recorded status so the ledger reflects it. PRs opened by hand outside the
 ledger come in with `rdk track --adopt`. Read
 `references/distribution-playbook.md` before the first submission and for the

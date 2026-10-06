@@ -101,7 +101,7 @@ test('buildDistributionStatus marks an open changes-requested row action_require
     assert.equal(item.why, `needs: ${item.needed.join(', ')}`);
     assert.equal(
       item.command,
-      'rdk submit --channel awesome-list --targets owner/list --apply --ack <ACK> --reason "address review" --plan-digest <DIGEST>',
+      'rdk submit --channel awesome-list --targets owner/list --category "<CATEGORY>" --apply --ack <ACK> --reason "address review" --plan-digest <DIGEST>',
     );
     assert.equal(status.summary.by_attention.action_required, 1);
     assert.equal(status.summary.by_state.open, 1);

@@ -13,12 +13,13 @@ in `distribution-playbook.md`.
 | `npm-registry` | `cli-publish` | `npm-tarball` | project has a publishable npm package | human-gated (RDK prepares the checklist, never publishes) | `npm-registry:<package>` | npm credentials (held by the human/CI) |
 
 Statuses in `.discoverability/submissions.json` move `prepared -> submitted
--> listed`; `rejected|closed|unlisted|failed` are terminal negatives that
+-> open -> listed`, with `needs_changes` marking a maintainer
+changes-request; `rejected|closed|unlisted|failed` are terminal negatives that
 allow one retry. `rdk channels` prints applicability, recorded status and the
 next action per channel; `rdk submit --channel <id>` defaults to
 `awesome-list`. The descriptor's `probe` field selects the live hydrator: only
 `gh-pr` has one (`gh pr view`), so rows on other probe kinds keep their
-recorded state until `rdk track --sync` or a human updates them.
+recorded state until a human or `rdk submit` updates them.
 
 ## Which mechanism, why
 

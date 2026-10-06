@@ -30,6 +30,19 @@ test('matchAdoptable keeps only rdk/ head branches and derives target and listRe
   assert.equal(rows[0].branch.split('/')[1], rows[0].target.split('/')[1]);
 });
 
+test('matchAdoptable rejects the CI autofix branch and keeps the add convention', () => {
+  const prs = [
+    { url: 'https://github.com/foo/bar/pull/1', target: 'foo/bar', number: 1, state: 'OPEN', headRefName: 'rdk/autofix-2026-01-01' },
+    { url: 'https://github.com/foo/bar/pull/2', target: 'foo/bar', number: 2, state: 'OPEN', headRefName: 'rdk/list/add-demo' },
+  ];
+
+  const rows = matchAdoptable(prs);
+
+  assert.deepEqual(rows, [
+    { url: 'https://github.com/foo/bar/pull/2', target: 'foo/bar', branch: 'rdk/list/add-demo', number: 2, state: 'OPEN' },
+  ]);
+});
+
 test('adoptRows appends missing rows with adopted:true and skips existing pr_url/dedupe_key', () => {
   const ledger = [
     { channel: 'awesome-list', target: 'foo/bar', pr_url: 'https://github.com/foo/bar/pull/7', status: 'open', dedupe_key: 'awesome-list:foo/bar' },
@@ -80,6 +93,11 @@ test('discoverOwnedPrs calls the cross-repo search then per-target pr list and m
         { url: 'https://github.com/foo/bar/pull/7', number: 7, title: 'Add mine', state: 'OPEN', isDraft: false, headRefName: 'rdk/bar/add-mine' },
       ]));
     }
+    if (args[3] === 'baz/qux') {
+      return ok(JSON.stringify([
+        { url: 'https://github.com/baz/qux/pull/9', number: 9, title: 'Add mine', state: 'MERGED', isDraft: false, headRefName: 'rdk/qux/add-mine' },
+      ]));
+    }
     return ok(JSON.stringify([
       { url: 'https://github.com/other/repo/pull/2', number: 2, title: 'Add mine', state: 'CLOSED', isDraft: true, headRefName: 'feature-x' },
     ]));
@@ -88,15 +106,42 @@ test('discoverOwnedPrs calls the cross-repo search then per-target pr list and m
 
   const prs = discoverOwnedPrs({ gh, cwd, targets: ['foo/bar', 'other/repo'] });
 
-  assert.equal(calls.length, 3);
+  assert.equal(calls.length, 4);
   assert.deepEqual(calls[0].args, SEARCH_ARGS);
   assert.deepEqual(calls[1].args, listArgs('foo/bar'));
   assert.deepEqual(calls[2].args, listArgs('other/repo'));
-  assert.deepEqual(calls.map((call) => call.opts), [{ cwd }, { cwd }, { cwd }]);
+  assert.deepEqual(calls[3].args, listArgs('baz/qux'));
+  assert.deepEqual(calls.map((call) => call.opts), [{ cwd }, { cwd }, { cwd }, { cwd }]);
   assert.deepEqual(prs, [
     { url: 'https://github.com/foo/bar/pull/7', target: 'foo/bar', number: 7, state: 'OPEN', isDraft: false, headRefName: 'rdk/bar/add-mine' },
-    { url: 'https://github.com/baz/qux/pull/9', target: 'baz/qux', number: 9, state: 'MERGED', isDraft: false },
+    { url: 'https://github.com/baz/qux/pull/9', target: 'baz/qux', number: 9, state: 'MERGED', isDraft: false, headRefName: 'rdk/qux/add-mine' },
     { url: 'https://github.com/other/repo/pull/2', target: 'other/repo', number: 2, state: 'CLOSED', isDraft: true, headRefName: 'feature-x' },
+  ]);
+});
+
+test('discoverOwnedPrs lists search-discovered repos so a PR to a new target keeps headRefName', () => {
+  const calls = [];
+  const gh = (args) => {
+    calls.push(args);
+    if (args[0] === 'search') {
+      return ok(JSON.stringify([
+        { url: 'https://github.com/new/list/pull/5', repository: { nameWithOwner: 'new/list' }, number: 5, title: 'Add mine', state: 'OPEN', isDraft: false },
+      ]));
+    }
+    return ok(JSON.stringify([
+      { url: 'https://github.com/new/list/pull/5', number: 5, title: 'Add mine', state: 'OPEN', isDraft: false, headRefName: 'rdk/list/add-mine' },
+    ]));
+  };
+
+  const prs = discoverOwnedPrs({ gh, cwd: '/nowhere', targets: [] });
+  const rows = matchAdoptable(prs);
+
+  assert.deepEqual(calls, [SEARCH_ARGS, listArgs('new/list')]);
+  assert.deepEqual(prs, [
+    { url: 'https://github.com/new/list/pull/5', target: 'new/list', number: 5, state: 'OPEN', isDraft: false, headRefName: 'rdk/list/add-mine' },
+  ]);
+  assert.deepEqual(rows, [
+    { url: 'https://github.com/new/list/pull/5', target: 'new/list', branch: 'rdk/list/add-mine', number: 5, state: 'OPEN' },
   ]);
 });
 
