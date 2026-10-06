@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { assertWriteGuards, DEFAULT_ACK, planDigest } from '../src/distribution/guard.js';
 import { CHANNELS, CHANNEL_DESCRIPTOR_FIELDS, channelById, applicableChannels } from '../src/distribution/channels.js';
-import { appendRecords, isBlocking, projectStatus, readLedger } from '../src/distribution/ledger.js';
+import { appendRecords, applySync, isBlocking, projectStatus, readLedger, syncTransition, writeLedger } from '../src/distribution/ledger.js';
 import { artifactInventory, recommend } from '../src/distribution/recommend.js';
 import { describe as describeGitPr, plan as planGitPr, probe as probeGitPr } from '../src/distribution/mechanisms/gitPr.js';
 import { loadConfig } from '../src/config.js';
@@ -278,4 +278,79 @@ test('gitPr describe and probe expose the mechanism contract', () => {
   assert.deepEqual(probeGitPr({ pr_url: 'https://github.com/owner/list/pull/42' }), { kind: 'gh-pr', ref: 'https://github.com/owner/list/pull/42' });
   assert.deepEqual(probeGitPr({}), { kind: 'gh-pr', ref: null });
   assert.deepEqual(probeGitPr(null), { kind: 'gh-pr', ref: null });
+});
+
+test('writeLedger rewrites atomically and leaves an unparsable ledger untouched', () => {
+  const dir = makeRepo({});
+  try {
+    const rows = [{ dedupe_key: 'k1', status: 'submitted' }];
+    const written = writeLedger(dir, rows);
+    assert.deepEqual(written, rows);
+    assert.deepEqual(readLedger(dir), rows);
+    assert.equal(readFileSync(join(dir, '.discoverability', 'submissions.json'), 'utf8'), `${JSON.stringify(rows, null, 2)}\n`);
+
+    const rewritten = writeLedger(dir, [{ dedupe_key: 'k1', status: 'listed' }]);
+    assert.deepEqual(rewritten, [{ dedupe_key: 'k1', status: 'listed' }]);
+    assert.deepEqual(readLedger(dir), rewritten);
+
+    const before = readFileSync(join(dir, '.discoverability', 'submissions.json'), 'utf8');
+    writeFileSync(join(dir, '.discoverability', 'submissions.json'), '{ not json');
+    assert.equal(writeLedger(dir, [{ dedupe_key: 'k2' }]), null);
+    assert.equal(readFileSync(join(dir, '.discoverability', 'submissions.json'), 'utf8'), '{ not json');
+    assert.equal(readLedger(dir), null);
+
+    const leftovers = readdirSync(join(dir, '.discoverability')).filter((name) => name !== 'submissions.json');
+    assert.deepEqual(leftovers, []);
+    assert.ok(before.length > 0);
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('syncTransition maps merged/closed/changes-requested to listed/closed/needs_changes', () => {
+  assert.equal(syncTransition({ merged: true }), 'listed');
+  assert.equal(syncTransition({ state: 'CLOSED' }), 'closed');
+  assert.equal(syncTransition({ review_decision: 'CHANGES_REQUESTED' }), 'needs_changes');
+  assert.equal(syncTransition({ reviews: [{ authorAssociation: 'MEMBER', state: 'CHANGES_REQUESTED' }] }), 'needs_changes');
+  assert.equal(syncTransition({ reviews: [{ authorAssociation: 'CONTRIBUTOR', state: 'CHANGES_REQUESTED' }] }), null);
+  assert.equal(syncTransition({ state: 'OPEN' }), null);
+  assert.equal(syncTransition({}), null);
+});
+
+test('applySync is idempotent and marks synced_at only on changed rows', () => {
+  const at = '2026-10-06T00:00:00.000Z';
+  const rows = [
+    { dedupe_key: 'k1', pr_url: 'https://github.com/o/l/pull/1', status: 'submitted' },
+    { dedupe_key: 'k2', pr_url: 'https://github.com/o/l/pull/2', status: 'submitted' },
+    { dedupe_key: 'k3', pr_url: 'https://github.com/o/l/pull/3', status: 'open' },
+  ];
+  const hydratedByKey = {
+    k1: { merged: true },
+    k2: { state: 'CLOSED', close_reason: 'NOT_PLANNING' },
+    k3: { state: 'OPEN' },
+  };
+
+  const first = applySync(rows, hydratedByKey, { at });
+  assert.deepEqual(first.changes, [
+    { key: 'k1', from: 'submitted', to: 'listed' },
+    { key: 'k2', from: 'submitted', to: 'closed' },
+  ]);
+  assert.deepEqual(first.rows[0], { dedupe_key: 'k1', pr_url: 'https://github.com/o/l/pull/1', status: 'listed', synced_at: at });
+  assert.deepEqual(first.rows[1], { dedupe_key: 'k2', pr_url: 'https://github.com/o/l/pull/2', status: 'closed', synced_at: at, close_reason: 'NOT_PLANNING' });
+  assert.deepEqual(first.rows[2], rows[2]);
+
+  const second = applySync(first.rows, hydratedByKey, { at });
+  assert.deepEqual(second.changes, []);
+  assert.deepEqual(second.rows, first.rows);
+
+  const keyedByPrUrl = applySync([{ pr_url: 'https://github.com/o/l/pull/9', status: 'open' }], { 'https://github.com/o/l/pull/9': { merged: true } }, { at });
+  assert.deepEqual(keyedByPrUrl.changes, [{ key: 'https://github.com/o/l/pull/9', from: 'open', to: 'listed' }]);
+
+  const noHydration = applySync(rows, {}, { at });
+  assert.deepEqual(noHydration.changes, []);
+  assert.deepEqual(noHydration.rows, rows);
+});
+
+test('isBlocking frees needs_changes as a terminal negative', () => {
+  assert.equal(isBlocking({ status: 'needs_changes' }), false);
 });

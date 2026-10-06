@@ -4,8 +4,9 @@
  * prepared -> submitted -> listed, with terminal negatives
  * rejected|closed|unlisted|failed that allow one retry.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { isMaintainer } from './tracking/attention.js';
 
 const BLOCKING_STATUSES = new Set(['prepared', 'submitted', 'open', 'merged', 'listed']);
 
@@ -35,6 +36,44 @@ export function appendRecords(cwd, rows) {
   const merged = [...existing, ...rows];
   writeFileSync(path, `${JSON.stringify(merged, null, 2)}\n`);
   return merged;
+}
+
+/** Rewrites the whole ledger atomically; null means the existing ledger is unparsable and was left untouched. */
+export function writeLedger(cwd, rows) {
+  if (readLedger(cwd) === null) return null;
+  const path = submissionsPath(cwd);
+  mkdirSync(dirname(path), { recursive: true });
+  const tmp = `${path}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify(rows, null, 2)}\n`);
+  renameSync(tmp, path);
+  return rows;
+}
+
+/** Maps a hydrated PR onto a ledger status transition; null means no transition. */
+export function syncTransition(hydrated) {
+  if (hydrated.merged) return 'listed';
+  if (hydrated.state === 'CLOSED') return 'closed';
+  if (hydrated.review_decision === 'CHANGES_REQUESTED') return 'needs_changes';
+  const reviews = Array.isArray(hydrated.reviews) ? hydrated.reviews : [];
+  if (reviews.some((review) => review && isMaintainer(review.authorAssociation) && review.state === 'CHANGES_REQUESTED')) return 'needs_changes';
+  return null;
+}
+
+/** Applies hydrated PR states to ledger rows; pure, returns the new rows and the list of changes. */
+export function applySync(rows, hydratedByKey, { at }) {
+  const changes = [];
+  const nextRows = rows.map((row) => {
+    const key = row.dedupe_key || row.pr_url;
+    const hydrated = hydratedByKey[key];
+    if (!hydrated) return row;
+    const next = syncTransition(hydrated);
+    if (next === null || next === row.status) return row;
+    changes.push({ key, from: row.status, to: next });
+    const updated = { ...row, status: next, synced_at: at };
+    if (hydrated.close_reason !== undefined) updated.close_reason = hydrated.close_reason;
+    return updated;
+  });
+  return { rows: nextRows, changes };
 }
 
 /** True while a submission is in flight or already landed; terminal negatives allow one retry. */

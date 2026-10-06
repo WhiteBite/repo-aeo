@@ -75,6 +75,19 @@ export function insertEntryIntoReadme(readme, category, entry, position = 'end')
   return { ok: true, readme: lines.join('\n') };
 }
 
+/** Removes the README line that links to the given URL. Pure, so it is unit-testable offline. */
+export function removeEntryByUrl(readme, url) {
+  const text = String(readme);
+  const lines = text.split(/\r?\n/);
+  const idx = lines.findIndex((line) => line.includes(`](${url})`));
+  if (idx === -1) return { ok: true, readme: text };
+  lines.splice(idx, 1);
+  const before = lines[idx - 1];
+  const after = lines[idx];
+  if (before !== undefined && after !== undefined && before.trim() === '' && after.trim() === '') lines.splice(idx, 1);
+  return { ok: true, readme: lines.join('\n') };
+}
+
 /** Builds the per-target plan items; pure, and the direct input of the plan digest. */
 export function plan({ targets, category, position, entry, name, url }) {
   return targets.map((target) => {
@@ -85,6 +98,74 @@ export function plan({ targets, category, position, entry, name, url }) {
 
 function prBody(item) {
   return `Adds ${item.project} to "${item.category}".\n\n${item.entry}\n\nRepository: ${item.url}\n`;
+}
+
+function openPrUrl({ item, owner, gh }) {
+  const listed = gh(['pr', 'list', '-R', item.target, '--head', `${owner}:${item.branch}`, '--state', 'open', '--json', 'url']);
+  if (!listed.ok) return null;
+  try {
+    const parsed = JSON.parse(listed.stdout);
+    if (!Array.isArray(parsed)) return null;
+    const hit = parsed.find((pr) => pr && typeof pr.url === 'string' && pr.url !== '');
+    return hit ? hit.url : null;
+  } catch {
+    return null;
+  }
+}
+
+function updateExistingPr({ item, git, lines, fail, fork, prUrl }) {
+  const work = mkdtempSync(join(tmpdir(), 'rdk-submit-'));
+  try {
+    const clone = git(['clone', '--depth=1', `https://github.com/${item.target}.git`, work], { timeout: 120000 });
+    if (!clone.ok) {
+      lines.push(`❌ clone failed: ${clone.stderr.trim().slice(0, 200)}`);
+      return fail(`failed to clone ${item.target}: ${clone.stderr.trim().slice(0, 200)}`);
+    }
+    const steps = [
+      ['fetch', `https://github.com/${fork}.git`, item.branch],
+      ['checkout', item.branch],
+    ];
+    for (const stepArgs of steps) {
+      const step = git(['-C', work, ...stepArgs]);
+      if (!step.ok) {
+        lines.push(`❌ git ${stepArgs[0]} failed: ${step.stderr.trim().slice(0, 200)}`);
+        return fail(`${item.target}: git ${stepArgs[0]} failed: ${step.stderr.trim().slice(0, 200)}`);
+      }
+    }
+    const readmePath = join(work, 'README.md');
+    if (!existsSync(readmePath)) {
+      lines.push('❌ README.md not found at the repository root.');
+      return fail(`${item.target}: README.md not found at the repository root`);
+    }
+    const readme = readFileSync(readmePath, 'utf8');
+    const withoutOld = removeEntryByUrl(readme, item.url);
+    const insert = insertEntryIntoReadme(withoutOld.readme, item.category, item.entry, item.position);
+    if (!insert.ok) {
+      lines.push(`❌ ${insert.error}`);
+      return fail(`${item.target}: ${insert.error}`);
+    }
+    writeFileSync(readmePath, insert.readme);
+    const pushSteps = [
+      ['add', 'README.md'],
+      ['commit', '-m', item.title],
+      ['push', `https://github.com/${fork}.git`, item.branch],
+    ];
+    for (const stepArgs of pushSteps) {
+      const step = git(['-C', work, ...stepArgs]);
+      if (!step.ok) {
+        lines.push(`❌ git ${stepArgs[0]} failed: ${step.stderr.trim().slice(0, 200)}`);
+        return fail(`${item.target}: git ${stepArgs[0]} failed: ${step.stderr.trim().slice(0, 200)}`);
+      }
+    }
+    lines.push(`✅ updated ${prUrl}`);
+    return {
+      ok: true,
+      lines,
+      record: { target: item.target, pr_url: prUrl, branch: item.branch, fork, submitted_at: new Date().toISOString(), status: 'open', updated: true },
+    };
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
 }
 
 /**
@@ -102,6 +183,8 @@ export function execute({ item, owner, gh, git }) {
     lines.push(`❌ fork failed: ${forked.stderr.trim().slice(0, 200)}`);
     return fail(`failed to fork ${item.target}: ${forked.stderr.trim().slice(0, 200)}`);
   }
+  const existing = openPrUrl({ item, owner, gh });
+  if (existing !== null) return updateExistingPr({ item, git, lines, fail, fork, prUrl: existing });
   const work = mkdtempSync(join(tmpdir(), 'rdk-submit-'));
   try {
     const clone = git(['clone', '--depth=1', `https://github.com/${item.target}.git`, work], { timeout: 120000 });
