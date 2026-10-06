@@ -92,6 +92,38 @@ test('submissions reports the ledger offline and flags forks ready for cleanup',
   }
 });
 
+test('submissions --recommend appends the channel recommendations', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'repo-aeo-mcp-submissions-rec-'));
+  try {
+    mkdirSync(join(dir, '.discoverability'), { recursive: true });
+    writeFileSync(
+      join(dir, '.discoverability', 'submissions.json'),
+      JSON.stringify([
+        {
+          channel: 'awesome-list',
+          mechanism: 'git-pr',
+          artifact: 'readme-row',
+          dedupe_key: 'a/b:u/x',
+          target: 'a/b',
+          pr_url: 'https://github.com/a/b/pull/1',
+          fork: 'u/b',
+          status: 'open',
+        },
+      ]),
+    );
+    const plain = await run(['submissions', '--cwd', dir]);
+    assert.equal(plain.code, 0);
+    assert.doesNotMatch(plain.output, /channels:/);
+
+    const recommended = await run(['submissions', '--cwd', dir, '--recommend']);
+    assert.equal(recommended.code, 0);
+    assert.match(recommended.output, /channels:/);
+    assert.match(recommended.output, /- awesome-list: /);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('score records history, so its own trend line is not always empty', async () => {
   // Regression: the CLI used to call audit() directly and never recorded the
   // metric, which made `trend` a permanent "no history yet" and made the CLI

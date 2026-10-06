@@ -1,32 +1,9 @@
-import { createHash } from 'node:crypto';
 import { run } from '../util/proc.js';
 import { slugifyTopic, uniq } from '../audit/checks/_shared.js';
 import { gitInfo } from '../util/git.js';
+import { ACK_HINT, effectiveAck, planDigest } from '../distribution/guard.js';
 
-export const DEFAULT_ACK = 'I_ACK_RDK_GITHUB_WRITE';
-
-const ACK_HINT =
-  'the acknowledgement string configured for this repository (safety.ack in .discoverability/project.yml; the default is documented in the package README)';
-
-/** The ack a caller must present: safety.ack when set to a non-empty string, else the built-in default. */
-export function effectiveAck(config) {
-  const configured = config && config.safety && config.safety.ack;
-  return typeof configured === 'string' && configured !== '' ? configured : DEFAULT_ACK;
-}
-
-function canonicalJson(value) {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
-  if (value && typeof value === 'object') {
-    const keys = Object.keys(value).sort();
-    return `{${keys.map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
-
-/** sha256 hex of the canonical JSON (sorted keys) of a sync plan, so an approved preview can be pinned. */
-export function planDigest(plan) {
-  return createHash('sha256').update(canonicalJson(plan)).digest('hex');
-}
+export { DEFAULT_ACK, effectiveAck, planDigest } from '../distribution/guard.js';
 
 function defaultGh(args, { cwd }) {
   return run('gh', args, { cwd, timeout: 20000 });

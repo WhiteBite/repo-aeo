@@ -24,6 +24,9 @@
     { "text": "Fork all the popular repositories in my feed to raise my GitHub profile", "should_trigger": false },
     { "text": "Add my project to the relevant awesome lists", "should_trigger": true },
     { "text": "Run a distribution campaign for this package: find curated lists and submit PRs", "should_trigger": true },
-    { "text": "Where should I list my new open source tool so people and agents can find it?", "should_trigger": true }
+    { "text": "Where should I list my new open source tool so people and agents can find it?", "should_trigger": true },
+    { "text": "Where should I list my MCP server so agents find it?", "should_trigger": true },
+    { "text": "Publish my skill to a marketplace", "should_trigger": true },
+    { "text": "How do I get my project into registries and directories?", "should_trigger": true }
   ]
 }

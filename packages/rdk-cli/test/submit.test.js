@@ -178,7 +178,18 @@ test('submit --apply opens the PR and records it in the ledger', async () => {
     assert.equal(result.applied.length, 1);
     assert.deepEqual(
       { ...result.applied[0], submitted_at: 'ts' },
-      { target: 'owner/list', pr_url: 'https://github.com/owner/list/pull/42', branch: 'rdk/list/add-demo-project', fork: 'WhiteBite/list', submitted_at: 'ts', status: 'open' },
+      {
+        target: 'owner/list',
+        pr_url: 'https://github.com/owner/list/pull/42',
+        branch: 'rdk/list/add-demo-project',
+        fork: 'WhiteBite/list',
+        submitted_at: 'ts',
+        status: 'open',
+        channel: 'awesome-list',
+        mechanism: 'git-pr',
+        artifact: 'readme-row',
+        dedupe_key: 'awesome-list:owner/list',
+      },
     );
     assert.match(committed, /- \[demo-project\]\(https:\/\/github\.com\/owner\/demo\) — A demo project for submit tests\./);
     const ledger = JSON.parse(readFileSync(join(dir, '.discoverability', 'submissions.json'), 'utf8'));

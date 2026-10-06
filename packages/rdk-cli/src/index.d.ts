@@ -230,6 +230,10 @@ export interface Submission {
   fork?: string;
   submitted_at?: string;
   status?: string;
+  channel?: string;
+  mechanism?: string;
+  artifact?: string;
+  dedupe_key?: string;
 }
 
 export interface SubmitResult {
@@ -257,9 +261,217 @@ export declare function submitCommand(args: {
   cwd: string;
   options: Record<string, unknown>;
   config: RdkConfig;
+  /** The full loadConfig() result; loaded.publishable.pkg feeds the http-json and cli-publish plans, falling back to loaded.pkg. */
+  loaded?: ReturnType<typeof loadConfig> | null;
   ghRunner?: (args: string[]) => { ok: boolean; stdout?: string; stderr?: string };
   gitRunner?: (args: string[], options?: { timeout?: number }) => { ok: boolean; stdout?: string; stderr?: string };
+  fetchImpl?: (url: string, init?: Record<string, unknown>) => Promise<{ ok: boolean; status?: number; text?: () => Promise<string> }>;
 }): Promise<SubmitResult>;
+
+export interface GuardResult {
+  ok: boolean;
+  code?: 'ack_mismatch' | 'reason_required' | 'plan_digest_required' | 'plan_digest_mismatch';
+  error?: string;
+}
+
+/**
+ * Enforces the write-guard chain in order: ack -> reason (>= 5 chars) ->
+ * plan_digest present -> digest match. Guards apply only when
+ * options.apply is set; the digest match runs only when a plan is passed.
+ */
+export declare function assertWriteGuards(args: {
+  options: Record<string, unknown>;
+  config: RdkConfig;
+  plan?: unknown[];
+}): GuardResult;
+
+export interface ChannelDescriptor {
+  id: string;
+  mechanism: string;
+  artifact: string;
+  accepts: string[];
+  summary: string;
+  /** Named predicate evaluated against the artifact inventory by applicableChannels. */
+  when: string;
+  automatable: boolean;
+  probe: string;
+  endpoint?: string;
+  method?: string;
+  auth?: { env: string };
+  dedupe?: { url: string };
+  formUrl?: string;
+  fields?: string[];
+  checkUrl?: string;
+}
+
+export declare const CHANNELS: ChannelDescriptor[];
+export declare const CHANNEL_DESCRIPTOR_FIELDS: readonly string[];
+export declare function channelById(id: string): ChannelDescriptor | null;
+export declare function applicableChannels(inventory: ArtifactInventory): ChannelDescriptor[];
+
+export declare function readLedger(cwd?: string): Submission[] | null;
+/** Appends rows and returns the written ledger; null means the existing ledger is unparsable and was left untouched. */
+export declare function appendRecords(cwd: string, rows: Submission[]): Submission[] | null;
+/** True while a submission is in flight or already landed; terminal negatives allow one retry. */
+export declare function isBlocking(record: Submission): boolean;
+/**
+ * Projects a record's status through a live probe result. probeResult carries
+ * the PR state ('open' | 'merged' | 'closed'); null keeps the recorded status.
+ */
+export declare function projectStatus(record: Submission, probeResult: { state: string } | null): string | null;
+
+export interface ArtifactInventory {
+  has_npm_package: boolean;
+  has_docs_site: boolean;
+  npm_published: boolean;
+  has_mcp_server: boolean;
+  has_action: boolean;
+  has_skill: boolean;
+  git_host: string | null;
+  git_owner: string | null;
+  git_repo: string | null;
+}
+
+export declare function artifactInventory(loaded: ReturnType<typeof loadConfig>): ArtifactInventory;
+
+export interface ChannelRecommendation extends ChannelDescriptor {
+  applicable: boolean;
+  status: string;
+  next_action: string;
+}
+
+export declare function recommend(cwd: string, loaded: ReturnType<typeof loadConfig>): {
+  inventory: ArtifactInventory;
+  channels: ChannelRecommendation[];
+};
+
+export declare function describeGitPr(): { id: string; summary: string };
+export declare function planGitPr(ctx: {
+  targets: string[];
+  category: string;
+  position: string;
+  entry: string;
+  name: string;
+  url: string;
+}): Array<{
+  target: string;
+  category: string;
+  position: string;
+  entry: string;
+  title: string;
+  branch: string;
+  project: string;
+  url: string;
+}>;
+export declare function executeGitPr(ctx: {
+  item: { target: string; category: string; position: string; entry: string; title: string; branch: string; project: string; url: string };
+  owner: string;
+  gh: (args: string[]) => { ok: boolean; stdout?: string; stderr?: string };
+  git: (args: string[], options?: { timeout?: number }) => { ok: boolean; stdout?: string; stderr?: string };
+}): {
+  ok: boolean;
+  error?: string;
+  lines: string[];
+  record?: Submission;
+};
+/** How to probe a record's live state: the PR URL through the gh CLI. */
+export declare function probeGitPr(record: Submission): { kind: string; ref: string | null };
+
+export declare function describeHttpJson(): { id: string; summary: string };
+export declare function planHttpJson(ctx: {
+  targets: string[];
+  channel: ChannelDescriptor | null;
+  payload: unknown;
+}): Array<{ target: string; endpoint: string | null; method: string; payload: unknown }>;
+export declare function executeHttpJson(ctx: {
+  item: { target: string; endpoint: string | null; method: string; payload: unknown };
+  channel: ChannelDescriptor | null;
+  fetchImpl?: (url: string, init: unknown) => Promise<Response>;
+  env?: Record<string, string>;
+}): Promise<{
+  ok: boolean;
+  error?: string;
+  lines: string[];
+  record?: Submission;
+  checklist?: { steps: string[] };
+}>;
+/** How to probe a record's live state: the listing URL returned at submit time. */
+export declare function probeHttpJson(record: Submission): { kind: string; ref: string | null };
+
+export declare function describeWebForm(): { id: string; summary: string };
+/** Maps the channel's form fields onto project values; unknown fields map to ''. */
+export declare function buildPayload(ctx: {
+  config: RdkConfig;
+  url: string | null;
+  channel: ChannelDescriptor | null;
+}): Record<string, string>;
+export declare function planWebForm(ctx: {
+  channels: ChannelDescriptor[];
+  config: RdkConfig;
+  url: string | null;
+}): Array<{ target: string | null; formUrl: string | null; payload: Record<string, string>; url: string | null }>;
+export declare function executeWebForm(ctx: {
+  item: { target: string | null; formUrl: string | null; payload: Record<string, string>; url: string | null };
+  channel: ChannelDescriptor | null;
+  cwd?: string;
+  config: RdkConfig;
+}): {
+  ok: boolean;
+  error?: string;
+  lines: string[];
+  record?: Submission;
+  checklist?: { steps: string[]; target: string | null };
+};
+/** A web-form submission has no programmatic probe. */
+export declare function probeWebForm(record: Submission): { kind: string; ref: null };
+
+export declare function describePassive(): { id: string; summary: string };
+export declare function planPassive(ctx: { channel?: ChannelDescriptor | null }): Array<{
+  channel: string;
+  precondition: string;
+  requirement: string;
+}>;
+export declare function executePassive(ctx: {
+  item?: { requirement?: string };
+  channel?: ChannelDescriptor | null;
+}): { ok: boolean; lines: string[]; checklist: { steps: string[] } };
+/** How to probe a record's live state: the project URL to look for on the channel's index page. */
+export declare function probePassive(record: Submission): { kind: string; ref: string | null };
+/** Verifies presence after the fact by fetching the channel's checkUrl; resolves to 'unlisted' on any failure. */
+export declare function verify(ctx: {
+  record?: Submission | null;
+  channel?: ChannelDescriptor | null;
+  fetchImpl?: (url: string) => Promise<Response>;
+}): Promise<{ status: 'listed' | 'unlisted' }>;
+
+export declare const POLICY: { mode: 'listings-only'; runs_publish_commands: false };
+export declare function describeCliPublish(): { id: string; summary: string };
+export declare function planCliPublish(ctx: {
+  channel?: ChannelDescriptor | null;
+  config?: RdkConfig | null;
+  pkg?: Record<string, unknown> | null;
+}): Array<{ channel: string; package: string; version: string; artifact: string; registry_url: string }>;
+export declare function buildChecklist(ctx: {
+  channel?: ChannelDescriptor | null;
+  config?: RdkConfig | null;
+  pkg?: Record<string, unknown> | null;
+}): { steps: string[] };
+export declare function executeCliPublish(ctx: {
+  item: { channel: string; package: string; version: string; artifact: string; registry_url: string };
+  channel?: ChannelDescriptor | null;
+  cwd?: string;
+  config?: RdkConfig | null;
+}): { ok: boolean; lines: string[]; record: Submission; checklist: { steps: string[] } };
+/** How to probe a record's live state: the registry URL for the published package. */
+export declare function probeCliPublish(record: Submission): { kind: string; ref: string | null };
+
+export declare function renderServerJson(config: RdkConfig, pkg: Record<string, unknown> | null): Record<string, unknown>;
+/** The value the published package must carry as mcpName. */
+export declare function mcpOwnershipMarker(name: string): string;
+export declare function renderClaudeMarketplace(config: RdkConfig, pkg: Record<string, unknown> | null): Record<string, unknown>;
+export declare function renderCodexMarketplace(config: RdkConfig, pkg: Record<string, unknown> | null): Record<string, unknown>;
+
+export declare function channelsCommand(args: { cwd: string; loaded: ReturnType<typeof loadConfig> }): CommandResult;
 
 export interface CommandResult {
   ok: boolean;

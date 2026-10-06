@@ -1,10 +1,16 @@
-# Distribution playbook (curated lists)
+# Distribution playbook (channels)
 
-How to get a project listed where its audience already searches: awesome
-lists, catalogs and other curated collections. Load this reference before
-proposing the project to any repository you do not own.
+How to get a project listed where its audience already searches: curated
+lists, registries, directories and auto-crawled indexes. Load this reference
+before submitting to any channel you do not own. `references/channels.md` is
+the compact matrix of every channel; this file is the procedure per mechanism.
 
-## The one platform constraint
+The boundary is the same for every mechanism: **listings-only**. RDK prepares,
+submits listings and records state; it never publishes packages, images or
+releases, never tags, never force-pushes. Web forms and publishes are
+human-gated by design.
+
+## The one platform constraint (git-pr)
 
 A pull request head must live in a fork of the target repository — GitHub
 compares only inside a fork network, so **one fork per target** is the
@@ -86,7 +92,7 @@ section's neighbours, then sharpen the line until it answers "why this one"
 with a fact instead of an adjective. Local list conventions (marker prefixes
 like `**Open source.**`, dash style, sort order) always win over this guide.
 
-## Mechanics: one local repo, many targets
+## Mechanics: one local repo, many targets (git-pr)
 
 The kit automates the whole loop:
 
@@ -129,6 +135,66 @@ gh pr create -R kirodotdev-labs/awesome-kiro \
 Branch names are namespaced by target (`rdk/<list>/<topic>`) so a campaign
 never collides with itself.
 
+## Registry APIs (http-json)
+
+Registries with a JSON listing API take a generated document instead of a
+README row. The official MCP registry channel posts a `server.json` built
+deterministically from `.discoverability/project.yml` and `package.json` to
+the registry endpoint with a bearer token from `MCP_REGISTRY_TOKEN`. When the
+channel declares a dedupe URL the mechanism checks it first, so an existing
+registration records `listed` instead of a second POST; otherwise the ledger's
+blocking status stops a re-run. The official registry channel currently
+declares no dedupe URL, so a retry after a terminal-negative row re-POSTs.
+
+Precondition: the npm package must already be published carrying the
+`mcpName` ownership marker — the registry resolves server identity through
+the package, and publishing that package is outside RDK (see cli-publish).
+Procedure:
+
+```bash
+npx repo-aeo channels                       # mcp-official-registry: applicable? status? next action?
+npx repo-aeo submit --channel mcp-official-registry            # preview the payload + digest
+npx repo-aeo submit --channel mcp-official-registry \
+  --apply --ack <ACK> --reason "why" --plan-digest <DIGEST>    # POST + record
+```
+
+The record carries the listing URL; a later live check can move the status to
+`listed`. `submissions --live` currently probes only git-pr rows, so registry
+rows keep their recorded state until updated.
+
+## Web-form channels (web-form)
+
+Directories that accept entries only through a human-operated form (e.g.
+mcp.so) have no write API, so RDK performs no network call and no write.
+`submit --channel mcp-directory-form` builds the payload from the project
+config, prints the exact field checklist (form URL plus one fill instruction
+per field), and records status `prepared`. Unknown fields come out empty for
+a human to fill.
+
+Procedure: run the preview, a human opens the form URL and submits it, then
+updates the ledger row to `submitted`. There is no programmatic probe for
+these channels — verify presence by looking at the directory page, and set
+`listed` manually. RDK never submits a web form.
+
+## Passive / crawl channels (passive)
+
+Auto-crawled indexes (e.g. skills.sh) have nothing to submit. The channel is
+earned by meeting crawlability preconditions, which `submit --channel
+skills-sh` prints as a checklist: public repository, `llms.txt` served at the
+root, GitHub topics set. Presence is verified after the fact by fetching the
+channel's index page and looking for the project URL; absent means `unlisted`
+and the retry is "meet the preconditions again", not "submit again".
+
+## Cli-publish channels (cli-publish)
+
+Registry channels whose intake is a publish command (npm) sit exactly on the
+listings-only boundary: RDK prepares, a human or CI publishes. `submit
+--channel npm-registry` returns the artifact name (`<name>-<version>.tgz`)
+and the checklist — `npm pack`, `npm publish` (scoped packages need
+`--access public`), `npm view <name>@<version>` — and records status
+`prepared`. It never runs any of those commands. After the human publishes,
+the probe reads the registry URL and moves the record to `listed`.
+
 ## When gh is not installed
 
 `rdk submit` previews offline but needs gh for `--search` and for opening
@@ -158,11 +224,18 @@ PRs; the manual fallback works without it:
 ## Track the campaign
 
 `.discoverability/submissions.json` (committed, unlike `cache/`) is the
-campaign ledger; every submission is appended before the PR is opened:
+campaign ledger; every submission is appended before the PR is opened. Rows
+carry `channel`, `mechanism`, `artifact`, `dedupe_key`, `target` and a
+status moving `prepared -> submitted -> listed`, with terminal negatives
+`rejected|closed|unlisted|failed` that allow one retry:
 
 ```json
 [
   {
+    "channel": "awesome-list",
+    "mechanism": "git-pr",
+    "artifact": "readme-row",
+    "dedupe_key": "awesome-list:kirodotdev-labs/awesome-kiro",
     "target": "kirodotdev-labs/awesome-kiro",
     "pr_url": "https://github.com/kirodotdev-labs/awesome-kiro/pull/123",
     "branch": "rdk/awesome-kiro/add-myproject",
@@ -194,6 +267,8 @@ npx repo-aeo-mcp submissions --live   # probe PR states via gh
   requirement list for the next attempt, months later, if the project
   changed enough.
 - Record every submission in `submissions.json` at submit time.
+- Listings-only, everywhere: no publish, no tag, no release, no force-push,
+  no form submission by the tool.
 
 ## What gets PRs rejected
 

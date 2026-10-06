@@ -19,6 +19,9 @@ import {
   TOOL_HOME,
   llmsFreshness,
   httpGetText,
+  channelById,
+  projectStatus,
+  recommend,
 } from 'repo-aeo';
 import { record, trend, series } from './history.js';
 
@@ -540,21 +543,23 @@ export const TOOLS = [
     name: 'distribution_check_submissions',
     title: 'Distribution campaign status',
     description:
-      'List the curated-list and registry submissions recorded in .discoverability/submissions.json with per-entry PR state, a summary and fork-cleanup hints. live: true probes the current PR state of each entry via the gh CLI; without gh the recorded state is reported unchanged.',
+      'Report the whole distribution campaign recorded in .discoverability/submissions.json across all channels (curated-list PRs, registries, directories, passive crawlers) with per-entry state, a status summary and fork-cleanup hints. live: true probes git-pr entries through the gh CLI while registry- and crawl-style entries keep their recorded state; include_recommendations: true adds which channels apply to this repository and the next action for each.',
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     inputSchema: {
       type: 'object',
       properties: {
         cwd: { type: 'string', description: 'Repository directory holding .discoverability/submissions.json.' },
-        live: { type: 'boolean', default: false, description: 'Probe the live PR state of each submission via gh (default false: report the recorded state).' },
+        live: { type: 'boolean', default: false, description: 'Probe the live state of git-pr submissions via gh (default false: report the recorded state).' },
+        include_recommendations: { type: 'boolean', default: false, description: 'Also recommend distribution channels: which apply to this repository, their campaign status and the next action (default false).' },
       },
       additionalProperties: false,
     },
     async run(args, context = {}) {
       const cwd = resolveCwd(args, context);
       const path = join(cwd, '.discoverability', 'submissions.json');
+      const includeRecommendations = args.include_recommendations === true;
       if (!existsSync(path)) {
-        return {
+        const payload = {
           ok: true,
           cwd,
           live: args.live === true,
@@ -564,6 +569,8 @@ export const TOOLS = [
           cleanup_forks: [],
           hint: 'no submissions logged yet - append entries to .discoverability/submissions.json as the distribution playbook describes',
         };
+        if (includeRecommendations) payload.recommendations = recommend(cwd, loadConfig(cwd));
+        return payload;
       }
       let entries;
       try {
@@ -577,9 +584,17 @@ export const TOOLS = [
 
       const live = args.live === true;
       let ghAvailable = null;
+      // only channels with a gh-pr probe have a PR to view; registry- and crawl-style rows keep their recorded state
+      const ghProbeUrlOf = (entry) => {
+        const channel = typeof entry.channel === 'string' && entry.channel !== '' ? channelById(entry.channel) : null;
+        if (channel && channel.probe !== 'gh-pr') return null;
+        return typeof entry.pr_url === 'string' && entry.pr_url !== '' ? entry.pr_url : null;
+      };
       const liveStateOf = async (entry) => {
-        if (!live || typeof entry.pr_url !== 'string' || entry.pr_url === '' || ghAvailable === false) return null;
-        const result = await gh(['pr', 'view', entry.pr_url, '--json', 'state'], cwd);
+        if (!live || ghAvailable === false) return null;
+        const prUrl = ghProbeUrlOf(entry);
+        if (prUrl === null) return null;
+        const result = await gh(['pr', 'view', prUrl, '--json', 'state'], cwd);
         if (!result.ok) {
           if (result.code === 'ENOENT') ghAvailable = false;
           return null;
@@ -596,9 +611,15 @@ export const TOOLS = [
       for (const entry of entries) {
         const source = entry && typeof entry === 'object' ? entry : {};
         const liveState = await liveStateOf(source);
-        const status = liveState
-          || (typeof source.status === 'string' && source.status !== '' ? source.status : source.pr_url ? 'unknown' : 'prepared');
+        const recorded = typeof source.status === 'string' && source.status !== ''
+          ? source.status
+          : source.pr_url ? 'unknown' : 'prepared';
+        const status = projectStatus({ status: recorded }, liveState === null ? null : { state: liveState });
         rows.push({
+          channel: typeof source.channel === 'string' ? source.channel : null,
+          mechanism: typeof source.mechanism === 'string' ? source.mechanism : null,
+          artifact: typeof source.artifact === 'string' ? source.artifact : null,
+          dedupe_key: typeof source.dedupe_key === 'string' ? source.dedupe_key : null,
           target: typeof source.target === 'string' ? source.target : null,
           pr_url: typeof source.pr_url === 'string' ? source.pr_url : null,
           branch: typeof source.branch === 'string' ? source.branch : null,
@@ -611,7 +632,7 @@ export const TOOLS = [
 
       const summary = {};
       for (const row of rows) summary[row.status] = (summary[row.status] || 0) + 1;
-      const cleanupForks = [...new Set(rows.filter((row) => (row.status === 'merged' || row.status === 'closed') && row.fork).map((row) => row.fork))];
+      const cleanupForks = [...new Set(rows.filter((row) => (row.status === 'merged' || row.status === 'listed' || row.status === 'closed') && row.fork).map((row) => row.fork))];
       const payload = {
         ok: true,
         cwd,
@@ -621,6 +642,7 @@ export const TOOLS = [
         summary,
         cleanup_forks: cleanupForks,
       };
+      if (includeRecommendations) payload.recommendations = recommend(cwd, loadConfig(cwd));
       if (ghAvailable === false) {
         payload.note = 'the gh CLI is not installed - reporting recorded statuses only; install gh to probe live PR states with live: true';
       }

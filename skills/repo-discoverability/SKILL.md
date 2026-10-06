@@ -7,7 +7,9 @@ description: >-
   "prepare npm metadata", "generate AGENTS.md", "why is my package not
   recommended", "optimize for AI search", "GEO/AEO for my repo", "add llms.txt",
   "audit repo discoverability", "run a distribution campaign", "submit to
-  awesome lists", "get my package listed", or before publishing/releasing a
+  awesome lists", "get my package listed", "where should I list my MCP server",
+  "register in the MCP registry", "publish my skill to a marketplace", "get my
+  project into registries and directories", or before publishing/releasing a
   package.
   Only activate on an explicit user request; do not use for routine code edits,
   commits or PRs. Produces an audit, a plan and small verified patches; never
@@ -32,9 +34,13 @@ report is derived from files in the repository, never invented.
 4. **Verify** every change: tests, `npm pack --dry-run`, link checks.
 5. Heavy logic lives in `scripts/` (code does not burn context; only its output
    does). Prefer running the CLI over re-implementing checks inline.
-6. **Outbound submissions** (PRs to curated lists, registries) go out only
-   after the human approves the target list, the exact entry and the fork
-   plan. Record every submission in `.discoverability/submissions.json`.
+6. **Listings-only.** RDK gets artifacts *listed*; it never publishes
+   packages, images or releases, and never tags or force-pushes. Web-form
+   channels and publishes are human-gated by design: RDK prepares the payload
+   or checklist, a human runs the submit or publish. Outbound writes (PRs to
+   curated lists, registry submissions) go out only after the human approves
+   the exact plan; record every submission in
+   `.discoverability/submissions.json`.
 
 ## The five phases
 
@@ -96,18 +102,40 @@ If the score dropped, revert the patch and re-plan.
 
 ### Phase 5 — DISTRIBUTE (get listed)
 
+Distribution runs on channels: curated lists, registries, directories and
+auto-crawled indexes, each with its own mechanism. Inventory first, then act
+per channel:
+
 ```bash
-npx repo-aeo submit --search                                # candidate lists via gh
-npx repo-aeo submit --targets owner/list --category "Tools"  # preview the PR plan
-npx repo-aeo-mcp submissions --live                          # campaign state + live PR statuses
+node packages/rdk-cli/bin/rdk.js channels                    # every channel: mechanism, applicability, status, next action
+node packages/rdk-cli/bin/rdk.js submit --channel <id>      # offline preview of that channel's campaign
+# after human review of the preview:
+node packages/rdk-cli/bin/rdk.js submit --channel <id> \
+  --apply --ack <ACK> --reason "<why>" --plan-digest <DIGEST>
 ```
 
-Find the curated lists where the project's audience already lives, propose
-the entry, and keep the ledger in `.discoverability/submissions.json`.
-Read `references/distribution-playbook.md` before the first submission: it has the
-per-list conventions that decide whether a PR survives review, the fork
-mechanics (create just-in-time, delete after merge) and the safety rails —
-no submission without an approved target list.
+`channels` is read-only and prints, for each channel, whether it applies to
+the artifact inventory, the recorded ledger status and the next action. The
+default channel is `awesome-list`. Mechanisms differ in what RDK may do:
+
+- `git-pr` (awesome lists): fork, insert a README row, open a PR. Automatable.
+- `http-json` (official MCP registry): POST a generated `server.json` with a
+  bearer token, deduped against an existing listing. Requires the npm package
+  already published with the `mcpName` marker.
+- `web-form` (MCP directories): RDK prepares the payload and the exact field
+  checklist, records status `prepared`, never submits. A human fills the form.
+- `passive` (skills.sh-style crawlers): nothing to submit; meet the
+  crawlability preconditions and verify presence later.
+- `cli-publish` (npm registry): RDK prepares the artifact name and the
+  `npm pack` / `npm publish` / `npm view` checklist; it never publishes.
+
+Every executed or prepared submission lands in
+`.discoverability/submissions.json` with `channel`, `mechanism`, `artifact`,
+`dedupe_key`, `target` and a status (`prepared|submitted|listed`, terminal
+negatives `rejected|closed|unlisted|failed`). Read
+`references/channels.md` for the channel matrix and
+`references/distribution-playbook.md` before the first submission: entry
+conventions, fork mechanics, per-mechanism procedure and pacing.
 
 ## What "good" looks like (checklist)
 
@@ -140,5 +168,6 @@ no submission without an approved target list.
 - `references/scoring.md` — read when you need to explain or predict how the 0–100 score moves.
 - `references/mcp-manifest.md` — read if the project ships an MCP server.
 - `references/geo-playbook.md` — read before writing positioning or discovery copy; it explains why these moves work.
-- `references/distribution-playbook.md` — read before proposing the project to any curated list; it explains entry conventions, fork mechanics and submission tracking.
+- `references/distribution-playbook.md` — read before the first submission to any channel; it explains entry conventions, fork mechanics, per-mechanism procedure and submission tracking.
+- `references/channels.md` — read when choosing channels; the compact matrix of mechanism, artifact, applicability, gating and dedupe key.
 - `scripts/audit.sh` — run if Node is not on PATH; a thin wrapper around the CLI.

@@ -18,7 +18,7 @@ Usage:
   repo-aeo-mcp github-sync [--apply]          preview/write repo metadata (needs --ack --reason)
   repo-aeo-mcp freshness                      llms.txt drift check
   repo-aeo-mcp site [url]                     /llms.txt check on a domain
-  repo-aeo-mcp submissions [--live]           curated-list submission ledger + PR states
+  repo-aeo-mcp submissions [--live] [--recommend] distribution campaign ledger + channel recommendations
   repo-aeo-mcp history [metric]               stored metric history
   repo-aeo-mcp tools                          list MCP tool names
 
@@ -77,6 +77,8 @@ function parseFlags(argv) {
       flags.apply = true;
     } else if (arg === '--live') {
       flags.live = true;
+    } else if (arg === '--recommend') {
+      flags.recommend = true;
     } else if (arg === '--read-only') {
       flags.readOnly = true;
     } else if (arg === '-h' || arg === '--help') {
@@ -268,7 +270,7 @@ export async function main(argv = process.argv.slice(2), io = {}) {
       }
 
       case 'submissions': {
-        const payload = await call('distribution_check_submissions', { live: flags.live === true });
+        const payload = await call('distribution_check_submissions', { live: flags.live === true, include_recommendations: flags.recommend === true });
         print(payload, {
           json: flags.json,
           write,
@@ -280,6 +282,9 @@ export async function main(argv = process.argv.slice(2), io = {}) {
                     : `${value.total} submission(s): ${Object.entries(value.summary).map(([status, count]) => `${count} ${status}`).join(', ')}`,
                   ...value.submissions.map((entry) =>
                     `  - ${entry.target}: ${entry.status}${entry.live_status ? ` (live ${entry.live_status})` : ''}${entry.pr_url ? ` ${entry.pr_url}` : ''}`),
+                  ...(value.recommendations
+                    ? ['channels:', ...value.recommendations.channels.map((channel) => `  - ${channel.id}: ${channel.next_action}`)]
+                    : []),
                   ...(value.cleanup_forks.length ? [`forks ready to delete: ${value.cleanup_forks.join(', ')}`] : []),
                   ...(value.note ? [value.note] : []),
                 ].join('\n')

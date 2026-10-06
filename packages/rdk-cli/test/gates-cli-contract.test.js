@@ -251,6 +251,19 @@ const BEHAVIOUR = {
     });
   },
 
+  '--channel': async () => {
+    assert.equal(parseArgs(['submit', '--channel', 'http-json']).flags.channel, 'http-json');
+    await withRepo({ 'package.json': JSON.stringify(PKG) }, async (dir) => {
+      const unknown = rdk(['submit', '--channel', 'no-such-channel'], dir);
+      assert.equal(unknown.status, 1, unknown.stdout + unknown.stderr);
+      assert.match(unknown.stdout, /unknown channel/i);
+      const preview = rdk(['submit', '--channel', 'skills-sh'], dir);
+      assert.equal(preview.status, 0, preview.stdout + preview.stderr);
+      assert.match(preview.stdout, /- \*\*skills-sh\*\*/);
+      assert.match(preview.stdout, /Plan digest: [0-9a-f]{64}/);
+    });
+  },
+
   '--targets': async () => {
     assert.equal(parseArgs(['submit', '--targets', 'a/b,c/d']).flags.targets, 'a/b,c/d');
     await withRepo({ 'package.json': JSON.stringify(PKG) }, async (dir) => {

@@ -3,126 +3,162 @@
  * like). Previews the whole campaign by default; opening pull requests needs
  * the same guard chain as github-sync: --apply --ack --reason --plan-digest.
  */
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
 import { run } from '../util/proc.js';
-import { effectiveAck, planDigest, resolveRepo } from './githubSync.js';
-import { normalizeHeading } from '../audit/checks/_shared.js';
+import { resolveRepo } from './githubSync.js';
+import { ACK_HINT, assertWriteGuards, planDigest } from '../distribution/guard.js';
+import { appendRecords, isBlocking, readLedger, submissionsPath } from '../distribution/ledger.js';
+import { applicableChannels, channelById } from '../distribution/channels.js';
+import { mechanismById } from '../distribution/mechanisms/registry.js';
+import { artifactInventory } from '../distribution/recommend.js';
+import { buildEntry, insertEntryIntoReadme } from '../distribution/mechanisms/gitPr.js';
+import { renderServerJson } from '../distribution/artifacts/serverJson.js';
 
-const ACK_HINT =
-  'the acknowledgement string configured for this repository (safety.ack in .discoverability/project.yml; the default is documented in the package README)';
+export { submissionsPath } from '../distribution/ledger.js';
+export { buildEntry, insertEntryIntoReadme } from '../distribution/mechanisms/gitPr.js';
+export const readSubmissions = readLedger;
 
 const TARGET_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 
-const BLOCKING_STATUSES = new Set(['prepared', 'open', 'merged', 'closed']);
-
-export function submissionsPath(cwd = process.cwd()) {
-  return join(cwd, '.discoverability', 'submissions.json');
-}
-
-/** Reads the campaign ledger; null means present but unparsable (committed state, never auto-repaired). */
-export function readSubmissions(cwd = process.cwd()) {
-  const path = submissionsPath(cwd);
-  if (!existsSync(path)) return [];
-  let parsed;
-  try {
-    parsed = JSON.parse(readFileSync(path, 'utf8'));
-  } catch {
-    return null;
-  }
-  return Array.isArray(parsed) ? parsed : null;
-}
-
-export function buildEntry({ name, url, oneLiner, entry }) {
-  if (entry) return String(entry);
-  const text = String(oneLiner || '').trim();
-  return `- [${name}](${url}) — ${text.endsWith('.') ? text : `${text}.`}`;
-}
-
-function slug(name) {
-  return String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'project';
-}
-
-function listItemName(line) {
-  const match = /^[-*]\s*\[([^\]]+)\]/.exec(String(line));
-  return match ? match[1].toLowerCase() : null;
-}
-
-/** Inserts one entry line into a section of a curated list's README. Pure, so it is unit-testable offline. */
-export function insertEntryIntoReadme(readme, category, entry, position = 'end') {
-  const lines = String(readme).split(/\r?\n/);
-  const wanted = normalizeHeading(category);
-  let headingIdx = -1;
-  let level = 0;
-  for (let i = 0; i < lines.length; i += 1) {
-    const match = /^(#{1,6})\s+(.+?)\s*#*$/.exec(lines[i]);
-    if (match && normalizeHeading(match[2]) === wanted) {
-      headingIdx = i;
-      level = match[1].length;
-      break;
-    }
-  }
-  if (headingIdx === -1) return { ok: false, error: `category "${category}" not found in the list README` };
-  let end = lines.length;
-  for (let i = headingIdx + 1; i < lines.length; i += 1) {
-    const match = /^(#{1,6})\s+/.exec(lines[i]);
-    if (match && match[1].length <= level) {
-      end = i;
-      break;
-    }
-  }
-  if (position === 'alphabetical') {
-    const entryName = listItemName(entry);
-    if (entryName === null) return { ok: false, error: 'an alphabetical entry must start with "- [Name]"' };
-    let insertAt = end;
-    for (let i = headingIdx + 1; i < end; i += 1) {
-      const name = listItemName(lines[i]);
-      if (name === null) continue;
-      if (name === entryName) return { ok: false, error: `an entry named "${entryName}" already exists in "${category}"` };
-      if (name > entryName) {
-        insertAt = i;
-        break;
-      }
-    }
-    lines.splice(insertAt, 0, entry);
-  } else {
-    let insertAt = end;
-    while (insertAt > headingIdx + 1 && lines[insertAt - 1].trim() === '') insertAt -= 1;
-    lines.splice(insertAt, 0, entry);
-  }
-  return { ok: true, readme: lines.join('\n') };
-}
+const GUARD_LINES = {
+  ack_mismatch: `Refusing to write: --ack must equal ${ACK_HINT}.`,
+  reason_required: 'Refusing to write: pass --reason "<why this change is correct>" so the change is auditable.',
+  plan_digest_required: 'Refusing to write: --plan-digest is required so the write binds to the approved preview.',
+  plan_digest_mismatch: 'Refusing to write: the plan changed since the approved preview (plan_digest mismatch).',
+};
 
 function parseTargets(option) {
   const raw = Array.isArray(option) ? option.map(String) : typeof option === 'string' && option !== '' ? option.split(',') : [];
   return raw.map((target) => String(target).trim()).filter(Boolean);
 }
 
-function prBody(item) {
-  return `Adds ${item.project} to "${item.category}".\n\n${item.entry}\n\nRepository: ${item.url}\n`;
+function previewValue(value) {
+  if (value === null || value === undefined) return 'null';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
 }
 
-export async function submitCommand({ cwd, options = {}, config, ghRunner, gitRunner }) {
+function planIdentity(item) {
+  return typeof item.target === 'string' && item.target !== '' ? item.target : item.channel;
+}
+
+function planFor({ cwd, options, config, loaded, channel, mechanism }) {
+  const pkg = (loaded && loaded.publishable && loaded.publishable.pkg) || (loaded && loaded.pkg) || null;
+  if (channel.mechanism === 'http-json') {
+    return mechanism.plan({ targets: options.targets ? parseTargets(options.targets) : [channel.id], channel, payload: renderServerJson(config, pkg) });
+  }
+  if (channel.mechanism === 'web-form') {
+    const repoSlug = resolveRepo(cwd, options);
+    return mechanism.plan({ channels: [channel], config, url: repoSlug ? `https://github.com/${repoSlug}` : null });
+  }
+  if (channel.mechanism === 'cli-publish') return mechanism.plan({ channel, config, pkg });
+  return mechanism.plan({ channel });
+}
+
+function executeFor({ mechanism, channel, item, cwd, config, fetchImpl }) {
+  if (channel.mechanism === 'http-json') return mechanism.execute({ item, channel, fetchImpl, env: process.env });
+  if (channel.mechanism === 'web-form' || channel.mechanism === 'cli-publish') return mechanism.execute({ item, channel, cwd, config });
+  return mechanism.execute({ item, channel });
+}
+
+async function submitViaChannel({ cwd, options, config, loaded, channel, mechanism, fetchImpl, lines, fail, refuse }) {
+  if (loaded && !applicableChannels(artifactInventory(loaded)).some((entry) => entry.id === channel.id)) {
+    lines.push(`note: ${channel.id} is not applicable to this repository (${channel.when} is false); continuing anyway`);
+  }
+  const ledger = readLedger(cwd);
+  if (ledger === null) {
+    lines.push('Could not parse .discoverability/submissions.json - fix it by hand or restore it from git.');
+    return fail('could not parse .discoverability/submissions.json - fix it by hand or restore it from git');
+  }
+  const blocked = new Map();
+  for (const record of ledger) {
+    if (!record || !isBlocking(record)) continue;
+    if (typeof record.channel === 'string' && record.channel !== '' && record.channel !== channel.id) continue;
+    for (const key of [record.target, record.dedupe_key, record.channel]) {
+      if (typeof key === 'string' && key !== '' && !blocked.has(key)) blocked.set(key, record.status);
+    }
+  }
+
+  const plan = planFor({ cwd, options, config, loaded, channel, mechanism });
+  const active = plan.filter((item) => !blocked.has(planIdentity(item)));
+  const skipped = new Set();
+  for (const item of plan) {
+    const id = planIdentity(item);
+    if (blocked.has(id) && !skipped.has(id)) {
+      skipped.add(id);
+      lines.push(`- ${id}: skipped, a ${blocked.get(id)} submission is already recorded`);
+    }
+  }
+  lines.push('');
+
+  if (active.length === 0) {
+    lines.push('Every target already has a recorded submission - nothing to do.');
+    return { ok: true, output: `${lines.join('\n')}\n`, exitCode: 0, plan: [], plan_digest: null, applied: [] };
+  }
+
+  const digest = planDigest(active);
+  const bound = assertWriteGuards({ options, config, plan: active });
+  if (!bound.ok) return refuse(bound, bound.code === 'plan_digest_mismatch' ? { plan_digest: digest } : {});
+
+  for (const item of active) {
+    lines.push(`- **${planIdentity(item)}**`);
+    for (const [key, value] of Object.entries(item)) {
+      if (key === 'target' || key === 'channel') continue;
+      lines.push(`  - ${key}: ${previewValue(value)}`);
+    }
+  }
+  lines.push('');
+
+  if (!options.apply) {
+    lines.push(`Plan digest: ${digest}`);
+    lines.push('Dry run. Re-run with `--apply --ack <ACK_STRING> --reason "<why>" --plan-digest <PLAN_DIGEST>` to run this channel.');
+    return { ok: true, output: `${lines.join('\n')}\n`, exitCode: 0, plan: active, plan_digest: digest, applied: [] };
+  }
+
+  const applied = [];
+  for (const item of active) {
+    const executed = await executeFor({ mechanism, channel, item, cwd, config, fetchImpl });
+    lines.push(...executed.lines);
+    if (!executed.ok) return fail(executed.error, { applied });
+    if (executed.record) {
+      const target = executed.record.target || planIdentity(item);
+      applied.push({
+        ...executed.record,
+        target,
+        channel: channel.id,
+        mechanism: channel.mechanism,
+        artifact: channel.artifact,
+        dedupe_key: `${channel.id}:${target}`,
+      });
+    }
+  }
+
+  if (applied.length > 0) appendRecords(cwd, applied);
+  lines.push('');
+  lines.push(`Reason logged: ${options.reason}`);
+  lines.push(`Recorded ${applied.length} submission(s) in .discoverability/submissions.json.`);
+  return { ok: true, output: `${lines.join('\n')}\n`, exitCode: 0, plan: active, plan_digest: digest, applied };
+}
+
+export async function submitCommand({ cwd, options = {}, config, loaded, ghRunner, gitRunner, fetchImpl }) {
   const gh = ghRunner || ((args, opts = {}) => run('gh', args, { cwd: (opts && opts.cwd) || cwd, timeout: (opts && opts.timeout) || 20000 }));
   const git = gitRunner || ((args, opts = {}) => run('git', args, { cwd: (opts && opts.cwd) || cwd, timeout: (opts && opts.timeout) || 60000 }));
   const lines = ['# rdk submit', ''];
   const fail = (error, extra = {}) => ({ ok: false, error, output: `${lines.join('\n')}\n`, exitCode: 1, applied: [], ...extra });
+  const refuse = (guard, extra = {}) => {
+    lines.push(GUARD_LINES[guard.code]);
+    const coded = guard.code === 'plan_digest_required' || guard.code === 'plan_digest_mismatch' ? { code: guard.code } : {};
+    return fail(guard.error, { ...coded, ...extra });
+  };
 
-  if (options.apply) {
-    if (String(options.ack || '') !== effectiveAck(config)) {
-      lines.push(`Refusing to write: --ack must equal ${ACK_HINT}.`);
-      return fail(`refusing to write: --ack must equal ${ACK_HINT}`);
-    }
-    if (!options.reason || String(options.reason).trim().length < 5) {
-      lines.push('Refusing to write: pass --reason "<why this change is correct>" so the change is auditable.');
-      return fail('refusing to write: a non-trivial reason is required and is logged');
-    }
-    if (options.plan_digest === undefined || options.plan_digest === null || String(options.plan_digest).trim() === '') {
-      lines.push('Refusing to write: --plan-digest is required so the write binds to the approved preview.');
-      return fail('refusing to write: --plan-digest is required - run the dry-run preview first and pass its Plan digest with --plan-digest', { code: 'plan_digest_required' });
-    }
+  const early = assertWriteGuards({ options, config });
+  if (!early.ok) return refuse(early);
+
+  const channel = channelById(options.channel || 'awesome-list');
+  if (!channel) {
+    lines.push(`Unknown channel "${String(options.channel)}" - run \`rdk channels\` to list every channel id.`);
+    return fail(`unknown channel "${String(options.channel)}"; run \`rdk channels\``);
   }
+  const mechanism = mechanismById(channel.mechanism);
 
   if (options.search) {
     if (!gh(['--version']).ok) {
@@ -149,6 +185,10 @@ export async function submitCommand({ cwd, options = {}, config, ghRunner, gitRu
     return { ok: true, output: `${lines.join('\n')}\n`, exitCode: 0, applied: [] };
   }
 
+  if (channel.mechanism !== 'git-pr') {
+    return submitViaChannel({ cwd, options, config, loaded, channel, mechanism, fetchImpl, lines, fail, refuse });
+  }
+
   const targets = parseTargets(options.targets);
   if (targets.length === 0) {
     lines.push('No targets: pass --targets owner/name[,owner/name...] (run with --search to list candidates).');
@@ -173,14 +213,14 @@ export async function submitCommand({ cwd, options = {}, config, ghRunner, gitRu
     return fail('cannot resolve a GitHub repository URL (no --repo and no github.com origin remote)');
   }
 
-  const ledger = readSubmissions(cwd);
+  const ledger = readLedger(cwd);
   if (ledger === null) {
     lines.push('Could not parse .discoverability/submissions.json - fix it by hand or restore it from git.');
     return fail('could not parse .discoverability/submissions.json - fix it by hand or restore it from git');
   }
   const blocked = new Map(
     ledger
-      .filter((item) => item && typeof item.target === 'string' && BLOCKING_STATUSES.has(item.status))
+      .filter((item) => item && typeof item.target === 'string' && isBlocking(item))
       .map((item) => [item.target, item.status]),
   );
   const active = targets.filter((target) => !blocked.has(target));
@@ -196,16 +236,11 @@ export async function submitCommand({ cwd, options = {}, config, ghRunner, gitRu
 
   const name = config.project.name || 'project';
   const entry = buildEntry({ name, url, oneLiner: config.project.one_liner || config.project.description, entry: options.entry });
-  const plan = active.map((target) => {
-    const listRepo = target.split('/')[1];
-    return { target, category, position, entry, title: `Add ${name}`, branch: `rdk/${listRepo}/add-${slug(name)}`, project: name, url };
-  });
+  const plan = mechanism.plan({ targets: active, category, position, entry, name, url });
   const digest = planDigest(plan);
 
-  if (options.apply && String(options.plan_digest) !== digest) {
-    lines.push('Refusing to write: the plan changed since the approved preview (plan_digest mismatch).');
-    return fail('refusing to write: plan_digest mismatch - re-run the preview and approve the new plan', { code: 'plan_digest_mismatch', plan_digest: digest });
-  }
+  const bound = assertWriteGuards({ options, config, plan });
+  if (!bound.ok) return refuse(bound, bound.code === 'plan_digest_mismatch' ? { plan_digest: digest } : {});
 
   lines.push(`Project: ${name} (${url})`);
   lines.push('');
@@ -238,67 +273,19 @@ export async function submitCommand({ cwd, options = {}, config, ghRunner, gitRu
 
   const applied = [];
   for (const item of plan) {
-    lines.push('');
-    lines.push(`## ${item.target}`);
-    const listRepo = item.target.split('/')[1];
-    const fork = `${owner}/${listRepo}`;
-    const forked = gh(['repo', 'fork', item.target, '--clone=false']);
-    if (!forked.ok) {
-      lines.push(`❌ fork failed: ${forked.stderr.trim().slice(0, 200)}`);
-      return fail(`failed to fork ${item.target}: ${forked.stderr.trim().slice(0, 200)}`, { applied });
-    }
-    const work = mkdtempSync(join(tmpdir(), 'rdk-submit-'));
-    try {
-      const clone = git(['clone', '--depth=1', `https://github.com/${item.target}.git`, work], { timeout: 120000 });
-      if (!clone.ok) {
-        lines.push(`❌ clone failed: ${clone.stderr.trim().slice(0, 200)}`);
-        return fail(`failed to clone ${item.target}: ${clone.stderr.trim().slice(0, 200)}`, { applied });
-      }
-      const readmePath = join(work, 'README.md');
-      if (!existsSync(readmePath)) {
-        lines.push('❌ README.md not found at the repository root.');
-        return fail(`${item.target}: README.md not found at the repository root`, { applied });
-      }
-      const readme = readFileSync(readmePath, 'utf8');
-      if (readme.includes(item.url)) {
-        lines.push(`❌ ${item.target} already lists ${item.url}.`);
-        return fail(`${item.target} already lists ${item.url} - search the list before submitting`, { applied });
-      }
-      const insert = insertEntryIntoReadme(readme, item.category, item.entry, item.position);
-      if (!insert.ok) {
-        lines.push(`❌ ${insert.error}`);
-        return fail(`${item.target}: ${insert.error}`, { applied });
-      }
-      writeFileSync(readmePath, insert.readme);
-      const steps = [
-        ['checkout', '-b', item.branch],
-        ['add', 'README.md'],
-        ['commit', '-m', item.title],
-        ['push', `https://github.com/${fork}.git`, `${item.branch}:${item.branch}`],
-      ];
-      for (const stepArgs of steps) {
-        const step = git(['-C', work, ...stepArgs]);
-        if (!step.ok) {
-          lines.push(`❌ git ${stepArgs[0]} failed: ${step.stderr.trim().slice(0, 200)}`);
-          return fail(`${item.target}: git ${stepArgs[0]} failed: ${step.stderr.trim().slice(0, 200)}`, { applied });
-        }
-      }
-      const pr = gh(['pr', 'create', '-R', item.target, '--head', `${owner}:${item.branch}`, '--title', item.title, '--body', prBody(item)]);
-      if (!pr.ok) {
-        lines.push(`❌ gh pr create failed: ${pr.stderr.trim().slice(0, 200)}`);
-        return fail(`${item.target}: gh pr create failed: ${pr.stderr.trim().slice(0, 200)}`, { applied });
-      }
-      const prUrl = pr.stdout.trim().split('\n').pop().trim();
-      applied.push({ target: item.target, pr_url: prUrl, branch: item.branch, fork, submitted_at: new Date().toISOString(), status: 'open' });
-      lines.push(`✅ ${prUrl}`);
-    } finally {
-      rmSync(work, { recursive: true, force: true });
-    }
+    const executed = mechanism.execute({ item, owner, gh, git });
+    lines.push(...executed.lines);
+    if (!executed.ok) return fail(executed.error, { applied });
+    applied.push({
+      ...executed.record,
+      channel: channel.id,
+      mechanism: channel.mechanism,
+      artifact: channel.artifact,
+      dedupe_key: `${channel.id}:${executed.record.target}`,
+    });
   }
 
-  const ledgerPath = submissionsPath(cwd);
-  mkdirSync(dirname(ledgerPath), { recursive: true });
-  writeFileSync(ledgerPath, `${JSON.stringify([...ledger, ...applied], null, 2)}\n`);
+  appendRecords(cwd, applied);
   lines.push('');
   lines.push(`Reason logged: ${options.reason}`);
   lines.push(`Recorded ${applied.length} submission(s) in .discoverability/submissions.json.`);

@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { TOOLS, callTool, toolDescriptors, firstHeadingOf } from '../src/tools.js';
-import { parseCurlStatus } from 'repo-aeo';
+import { parseCurlStatus, CHANNELS } from 'repo-aeo';
 import { record, series, trend, listMetrics, historyPath } from '../src/history.js';
 
 const HISTORY_MODULE_URL = pathToFileURL(join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'history.js')).href;
@@ -347,6 +347,108 @@ test('distribution_check_submissions reads the ledger offline and degrades witho
     const corrupt = await callTool('distribution_check_submissions', { cwd: box.dir });
     assert.equal(corrupt.ok, false, 'committed campaign state is never silently rotated away');
     assert.match(corrupt.error, /parse/);
+  } finally {
+    box.cleanup();
+  }
+});
+
+test('distribution_check_submissions projects channel fields and recommends channels', async () => {
+  const box = sandbox();
+  try {
+    const empty = await callTool('distribution_check_submissions', { cwd: box.dir, include_recommendations: true });
+    assert.equal(empty.ok, true, 'an empty campaign is not an error');
+    assert.deepEqual(
+      empty.recommendations.channels.map((channel) => channel.id),
+      CHANNELS.map((channel) => channel.id),
+      'recommendations cover every channel even with no ledger',
+    );
+
+    mkdirSync(join(box.dir, '.discoverability'), { recursive: true });
+    writeFileSync(
+      join(box.dir, '.discoverability', 'submissions.json'),
+      JSON.stringify([
+        {
+          channel: 'awesome-list',
+          mechanism: 'git-pr',
+          artifact: 'readme-row',
+          dedupe_key: 'kirodotdev-labs/awesome-kiro:WhiteBite/repo-aeo',
+          target: 'kirodotdev-labs/awesome-kiro',
+          pr_url: 'https://github.com/example/nonexistent-repo/pull/1',
+          branch: 'rdk/awesome-kiro/add-repo-aeo',
+          fork: 'WhiteBite/awesome-kiro',
+          submitted_at: '2026-10-03T09:00:00Z',
+          status: 'open',
+        },
+        {
+          channel: 'skills-sh',
+          mechanism: 'passive',
+          artifact: 'none',
+          dedupe_key: 'skills-sh:WhiteBite/repo-aeo',
+          target: 'skills.sh',
+          submitted_at: '2026-10-01T09:00:00Z',
+          status: 'listed',
+        },
+        {
+          channel: 'mcp-official-registry',
+          mechanism: 'http-json',
+          artifact: 'server.json',
+          dedupe_key: 'mcp-official-registry:repo-aeo-mcp',
+          target: 'registry.modelcontextprotocol.io',
+          submitted_at: '2026-09-28T09:00:00Z',
+          status: 'submitted',
+        },
+      ]),
+    );
+
+    const payload = await callTool('distribution_check_submissions', { cwd: box.dir });
+    assert.equal(payload.ok, true);
+    assert.equal(payload.live, false);
+    assert.equal(payload.total, 3);
+    const [gitPr, crawl, registry] = payload.submissions;
+    assert.equal(gitPr.channel, 'awesome-list');
+    assert.equal(gitPr.mechanism, 'git-pr');
+    assert.equal(gitPr.artifact, 'readme-row');
+    assert.equal(gitPr.dedupe_key, 'kirodotdev-labs/awesome-kiro:WhiteBite/repo-aeo');
+    assert.equal(crawl.channel, 'skills-sh');
+    assert.equal(crawl.mechanism, 'passive');
+    assert.equal(crawl.artifact, 'none');
+    assert.equal(crawl.dedupe_key, 'skills-sh:WhiteBite/repo-aeo');
+    assert.equal(registry.channel, 'mcp-official-registry');
+    assert.equal(registry.mechanism, 'http-json');
+    assert.equal(registry.artifact, 'server.json');
+    assert.equal(registry.dedupe_key, 'mcp-official-registry:repo-aeo-mcp');
+    assert.equal(gitPr.status, 'open');
+    assert.equal(crawl.status, 'listed');
+    assert.equal(registry.status, 'submitted');
+    for (const row of payload.submissions) assert.equal(row.live_status, null, 'live:false never probes gh');
+    assert.equal(payload.summary.open, 1);
+    assert.equal(payload.summary.listed, 1);
+    assert.equal(payload.summary.submitted, 1);
+
+    // crawl- and registry-style channels are never routed through gh, even live
+    const livePayload = await callTool('distribution_check_submissions', { cwd: box.dir, live: true });
+    assert.equal(livePayload.ok, true);
+    assert.equal(livePayload.submissions[1].live_status, null, 'crawl-style rows keep their recorded state');
+    assert.equal(livePayload.submissions[2].live_status, null, 'registry-style rows keep their recorded state');
+    assert.equal(livePayload.submissions[1].status, 'listed');
+
+    const recommended = await callTool('distribution_check_submissions', { cwd: box.dir, include_recommendations: true });
+    const ids = recommended.recommendations.channels.map((channel) => channel.id);
+    for (const channel of CHANNELS) {
+      assert.ok(ids.includes(channel.id), `recommendations must cover channel ${channel.id}`);
+    }
+    for (const channel of recommended.recommendations.channels) {
+      assert.equal(typeof channel.mechanism, 'string');
+      assert.equal(typeof channel.applicable, 'boolean');
+      assert.equal(typeof channel.status, 'string');
+      assert.equal(typeof channel.next_action, 'string');
+    }
+    const awesome = recommended.recommendations.channels.find((channel) => channel.id === 'awesome-list');
+    assert.equal(awesome.status, 'open', 'the ledger feeds the per-channel status');
+
+    const both = await callTool('distribution_check_submissions', { cwd: box.dir, live: true, include_recommendations: true });
+    assert.equal(both.ok, true, 'live + recommendations stays read-only and offline-safe');
+    assert.ok(Array.isArray(both.recommendations.channels));
   } finally {
     box.cleanup();
   }

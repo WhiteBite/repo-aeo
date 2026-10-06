@@ -4,6 +4,7 @@ import { initCommand } from './commands/init.js';
 import { fixCommand } from './commands/fix.js';
 import { githubSyncCommand } from './commands/githubSync.js';
 import { submitCommand } from './commands/submit.js';
+import { channelsCommand } from './commands/channels.js';
 import { npmSurfaceCommand } from './commands/npmSurface.js';
 import { skillCommand } from './commands/skill.js';
 import { loadConfig } from './config.js';
@@ -19,7 +20,8 @@ Usage:
   rdk fix                  Show (or apply) safe autofixes
   rdk npm-surface          Audit the publishable package.json surface
   rdk github-sync          Push description/homepage/topics to GitHub (needs --apply --ack)
-  rdk submit               Propose the project to curated lists (needs --apply --ack)
+  rdk submit [--channel <id>]  Propose the project to curated lists (needs --apply --ack)
+  rdk channels             Show every distribution channel, applicability and next action
   rdk skill <install|uninstall|status>  Link the agent skill into harness skill dirs (--project: repo-local)
 
 Common flags:
@@ -105,6 +107,7 @@ const POSITIONAL_LIMITS = {
   'npm-surface': 1,
   'github-sync': 1,
   submit: 1,
+  channels: 1,
   skill: 2,
 };
 
@@ -192,7 +195,13 @@ export async function main(argv = process.argv.slice(2), io = {}) {
       }
       case 'submit': {
         const loaded = loadConfig(cwd);
-        const result = await submitCommand({ cwd, options: { ...flags, plan_digest: flags.planDigest }, config: loaded.config });
+        const result = await submitCommand({ cwd, loaded, options: { ...flags, plan_digest: flags.planDigest }, config: loaded.config });
+        if (!flags.quiet) log(result.output);
+        return result.exitCode;
+      }
+      case 'channels': {
+        const loaded = loadConfig(cwd);
+        const result = channelsCommand({ cwd, loaded });
         if (!flags.quiet) log(result.output);
         return result.exitCode;
       }
