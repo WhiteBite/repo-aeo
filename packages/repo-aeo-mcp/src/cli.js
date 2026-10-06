@@ -18,7 +18,7 @@ Usage:
   repo-aeo-mcp github-sync [--apply]          preview/write repo metadata (needs --ack --reason)
   repo-aeo-mcp freshness                      llms.txt drift check
   repo-aeo-mcp site [url]                     /llms.txt check on a domain
-  repo-aeo-mcp submissions [--live] [--recommend] distribution campaign ledger + channel recommendations
+  repo-aeo-mcp submissions [--live] [--recommend] [--adopt] [--sync] distribution campaign status + read-only previews
   repo-aeo-mcp history [metric]               stored metric history
   repo-aeo-mcp tools                          list MCP tool names
 
@@ -79,6 +79,10 @@ function parseFlags(argv) {
       flags.live = true;
     } else if (arg === '--recommend') {
       flags.recommend = true;
+    } else if (arg === '--adopt') {
+      flags.adopt = true;
+    } else if (arg === '--sync') {
+      flags.sync = true;
     } else if (arg === '--read-only') {
       flags.readOnly = true;
     } else if (arg === '-h' || arg === '--help') {
@@ -270,25 +274,43 @@ export async function main(argv = process.argv.slice(2), io = {}) {
       }
 
       case 'submissions': {
-        const payload = await call('distribution_check_submissions', { live: flags.live === true, include_recommendations: flags.recommend === true });
+        const payload = await call('distribution_check_submissions', {
+          live: flags.live === true,
+          include_recommendations: flags.recommend === true,
+          adopt: flags.adopt === true,
+          sync: flags.sync === true,
+        });
         print(payload, {
           json: flags.json,
           write,
-          render: (value) =>
-            value.ok
-              ? [
-                  value.total === 0
-                    ? 'no submissions recorded yet'
-                    : `${value.total} submission(s): ${Object.entries(value.summary).map(([status, count]) => `${count} ${status}`).join(', ')}`,
-                  ...value.submissions.map((entry) =>
-                    `  - ${entry.target}: ${entry.status}${entry.live_status ? ` (live ${entry.live_status})` : ''}${entry.pr_url ? ` ${entry.pr_url}` : ''}`),
-                  ...(value.recommendations
-                    ? ['channels:', ...value.recommendations.channels.map((channel) => `  - ${channel.id}: ${channel.next_action}`)]
-                    : []),
-                  ...(value.cleanup_forks.length ? [`forks ready to delete: ${value.cleanup_forks.join(', ')}`] : []),
-                  ...(value.note ? [value.note] : []),
-                ].join('\n')
-              : `submissions unavailable: ${value.error}`,
+          render: (value) => {
+            if (!value.ok) return `submissions unavailable: ${value.error}`;
+            const status = value.schema_version ? value : value.status;
+            const lines = [
+              status.summary.total === 0
+                ? 'no submissions recorded yet'
+                : `${status.summary.total} submission(s): ${Object.entries(status.summary.by_attention)
+                    .filter(([, count]) => count > 0)
+                    .map(([attention, count]) => `${count} ${attention}`)
+                    .join(', ')}`,
+              ...status.items.map((item) => {
+                const head = `  - ${item.target ?? 'unknown'} [${item.attention}]${item.state ? ` live ${item.state}` : ''}${item.pr_url ? ` ${item.pr_url}` : ''}`;
+                return item.command ? `${head}\n    ${item.command}` : head;
+              }),
+            ];
+            if (Array.isArray(value.preview)) {
+              lines.push(
+                ...value.preview.map((row) => (row.to !== undefined
+                  ? `  - ${row.key}: ${row.from} -> ${row.to}`
+                  : `  - ${row.target}: ${row.status} ${row.pr_url}`)),
+                `plan digest: ${value.plan_digest}`,
+              );
+            }
+            if (value.recommendations) {
+              lines.push('channels:', ...value.recommendations.channels.map((channel) => `  - ${channel.id}: ${channel.next_action}`));
+            }
+            return lines.join('\n');
+          },
         });
         return 0;
       }

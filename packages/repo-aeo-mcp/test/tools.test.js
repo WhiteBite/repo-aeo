@@ -297,19 +297,22 @@ test('competitor_scan_list_articles requires a search endpoint', async () => {
   }
 });
 
-test('distribution_check_submissions reads the ledger offline and degrades without gh', async () => {
+test('distribution_check_submissions returns the canonical status offline and degrades without gh', async () => {
   const box = sandbox();
   try {
     const empty = await callTool('distribution_check_submissions', { cwd: box.dir });
     assert.equal(empty.ok, true, 'a missing ledger is an empty campaign, not an error');
-    assert.equal(empty.total, 0);
-    assert.deepEqual(empty.submissions, []);
+    assert.equal(empty.schema_version, 'rdk-distribution/1');
+    assert.deepEqual(empty.items, []);
+    assert.equal(empty.summary.total, 0);
+    assert.equal(empty.summary.by_attention.none, 0);
 
     mkdirSync(join(box.dir, '.discoverability'), { recursive: true });
     writeFileSync(
       join(box.dir, '.discoverability', 'submissions.json'),
       JSON.stringify([
         {
+          channel: 'awesome-list',
           target: 'kirodotdev-labs/awesome-kiro',
           pr_url: 'https://github.com/example/nonexistent-repo/pull/1',
           branch: 'rdk/awesome-kiro/add-myproject',
@@ -317,31 +320,34 @@ test('distribution_check_submissions reads the ledger offline and degrades witho
           submitted_at: '2026-10-03T09:00:00Z',
           status: 'open',
         },
-        {
-          target: 'hashgraph-online/awesome-codex-plugins',
-          pr_url: 'https://github.com/example/nonexistent-repo/pull/2',
-          branch: 'rdk/awesome-codex-plugins/add-myproject',
-          fork: 'WhiteBite/awesome-codex-plugins',
-          submitted_at: '2026-09-30T09:00:00Z',
-          status: 'merged',
-        },
-        { target: 'some/curated-list', status: 'prepared' },
+        { target: 'some/curated-list', fork: 'WhiteBite/awesome-kiro', status: 'listed' },
+        { target: 'another/curated-list', status: 'prepared' },
       ]),
     );
 
     const payload = await callTool('distribution_check_submissions', { cwd: box.dir });
     assert.equal(payload.ok, true);
-    assert.equal(payload.total, 3);
-    assert.equal(payload.summary.open, 1);
-    assert.equal(payload.summary.merged, 1);
-    assert.equal(payload.summary.prepared, 1);
-    assert.deepEqual(payload.cleanup_forks, ['WhiteBite/awesome-codex-plugins']);
-    assert.equal(payload.submissions[0].live_status, null, 'no live probing unless requested');
+    assert.equal(payload.schema_version, 'rdk-distribution/1');
+    assert.equal(payload.items.length, 3);
+    assert.equal(payload.summary.total, 3);
+    assert.equal(payload.summary.by_attention.none, 2);
+    assert.equal(payload.summary.by_attention.listed, 1);
+    assert.equal(payload.summary.by_state.unknown, 3);
+    const [open, listed, prepared] = payload.items;
+    assert.equal(open.channel, 'awesome-list');
+    assert.equal(open.target, 'kirodotdev-labs/awesome-kiro');
+    assert.equal(open.pr_url, 'https://github.com/example/nonexistent-repo/pull/1');
+    assert.equal(open.attention, 'none');
+    assert.equal(open.state, null, 'no live probing unless requested');
+    assert.equal(listed.attention, 'listed');
+    assert.equal(listed.command, 'gh repo delete WhiteBite/awesome-kiro --yes');
+    assert.equal(prepared.attention, 'none');
 
-    // gh availability varies across run environments; both paths must leave live_status null
+    // gh availability varies across run environments; unreachable PRs must degrade to the recorded state
     const livePayload = await callTool('distribution_check_submissions', { cwd: box.dir, live: true });
     assert.equal(livePayload.ok, true);
-    assert.equal(livePayload.submissions[0].live_status, null);
+    assert.equal(livePayload.schema_version, 'rdk-distribution/1');
+    for (const item of livePayload.items) assert.equal(item.state, null, 'an unreachable PR keeps the recorded state');
 
     writeFileSync(join(box.dir, '.discoverability', 'submissions.json'), '{ not json');
     const corrupt = await callTool('distribution_check_submissions', { cwd: box.dir });
@@ -352,7 +358,7 @@ test('distribution_check_submissions reads the ledger offline and degrades witho
   }
 });
 
-test('distribution_check_submissions projects channel fields and recommends channels', async () => {
+test('distribution_check_submissions carries per-channel items and recommends channels', async () => {
   const box = sandbox();
   try {
     const empty = await callTool('distribution_check_submissions', { cwd: box.dir, include_recommendations: true });
@@ -402,35 +408,28 @@ test('distribution_check_submissions projects channel fields and recommends chan
 
     const payload = await callTool('distribution_check_submissions', { cwd: box.dir });
     assert.equal(payload.ok, true);
-    assert.equal(payload.live, false);
-    assert.equal(payload.total, 3);
-    const [gitPr, crawl, registry] = payload.submissions;
+    assert.equal(payload.items.length, 3);
+    const [gitPr, crawl, registry] = payload.items;
     assert.equal(gitPr.channel, 'awesome-list');
-    assert.equal(gitPr.mechanism, 'git-pr');
-    assert.equal(gitPr.artifact, 'readme-row');
-    assert.equal(gitPr.dedupe_key, 'kirodotdev-labs/awesome-kiro:WhiteBite/repo-aeo');
+    assert.equal(gitPr.target, 'kirodotdev-labs/awesome-kiro');
+    assert.equal(gitPr.pr_url, 'https://github.com/example/nonexistent-repo/pull/1');
     assert.equal(crawl.channel, 'skills-sh');
-    assert.equal(crawl.mechanism, 'passive');
-    assert.equal(crawl.artifact, 'none');
-    assert.equal(crawl.dedupe_key, 'skills-sh:WhiteBite/repo-aeo');
+    assert.equal(crawl.target, 'skills.sh');
     assert.equal(registry.channel, 'mcp-official-registry');
-    assert.equal(registry.mechanism, 'http-json');
-    assert.equal(registry.artifact, 'server.json');
-    assert.equal(registry.dedupe_key, 'mcp-official-registry:repo-aeo-mcp');
-    assert.equal(gitPr.status, 'open');
-    assert.equal(crawl.status, 'listed');
-    assert.equal(registry.status, 'submitted');
-    for (const row of payload.submissions) assert.equal(row.live_status, null, 'live:false never probes gh');
-    assert.equal(payload.summary.open, 1);
-    assert.equal(payload.summary.listed, 1);
-    assert.equal(payload.summary.submitted, 1);
+    assert.equal(registry.target, 'registry.modelcontextprotocol.io');
+    assert.equal(gitPr.attention, 'none');
+    assert.equal(crawl.attention, 'listed');
+    assert.equal(registry.attention, 'none');
+    for (const item of payload.items) assert.equal(item.state, null, 'live:false never probes gh');
+    assert.equal(payload.summary.by_attention.none, 2);
+    assert.equal(payload.summary.by_attention.listed, 1);
 
     // crawl- and registry-style channels are never routed through gh, even live
     const livePayload = await callTool('distribution_check_submissions', { cwd: box.dir, live: true });
     assert.equal(livePayload.ok, true);
-    assert.equal(livePayload.submissions[1].live_status, null, 'crawl-style rows keep their recorded state');
-    assert.equal(livePayload.submissions[2].live_status, null, 'registry-style rows keep their recorded state');
-    assert.equal(livePayload.submissions[1].status, 'listed');
+    assert.equal(livePayload.items[1].state, null, 'crawl-style rows keep their recorded state');
+    assert.equal(livePayload.items[2].state, null, 'registry-style rows keep their recorded state');
+    assert.equal(livePayload.items[1].attention, 'listed');
 
     const recommended = await callTool('distribution_check_submissions', { cwd: box.dir, include_recommendations: true });
     const ids = recommended.recommendations.channels.map((channel) => channel.id);
@@ -449,6 +448,52 @@ test('distribution_check_submissions projects channel fields and recommends chan
     const both = await callTool('distribution_check_submissions', { cwd: box.dir, live: true, include_recommendations: true });
     assert.equal(both.ok, true, 'live + recommendations stays read-only and offline-safe');
     assert.ok(Array.isArray(both.recommendations.channels));
+  } finally {
+    box.cleanup();
+  }
+});
+
+test('distribution_check_submissions adopt and sync are read-only previews', async () => {
+  const box = sandbox();
+  try {
+    mkdirSync(join(box.dir, '.discoverability'), { recursive: true });
+    const ledgerPath = join(box.dir, '.discoverability', 'submissions.json');
+    writeFileSync(
+      ledgerPath,
+      `${JSON.stringify(
+        [
+          {
+            channel: 'awesome-list',
+            mechanism: 'git-pr',
+            artifact: 'readme-row',
+            dedupe_key: 'kirodotdev-labs/awesome-kiro:WhiteBite/repo-aeo',
+            target: 'kirodotdev-labs/awesome-kiro',
+            pr_url: 'https://github.com/example/nonexistent-repo/pull/1',
+            branch: 'rdk/awesome-kiro/add-repo-aeo',
+            fork: 'WhiteBite/awesome-kiro',
+            submitted_at: '2026-10-03T09:00:00Z',
+            status: 'open',
+          },
+        ],
+        null,
+        2,
+      )}\n`,
+    );
+    const before = readFileSync(ledgerPath);
+
+    const adopted = await callTool('distribution_check_submissions', { cwd: box.dir, adopt: true });
+    assert.equal(adopted.ok, true);
+    assert.equal(adopted.status.schema_version, 'rdk-distribution/1');
+    assert.ok(Array.isArray(adopted.preview), 'adopt returns the preview rows');
+    assert.match(adopted.plan_digest, /^[0-9a-f]{64}$/, 'adopt returns the plan digest of the preview');
+    assert.equal(readFileSync(ledgerPath).compare(before), 0, 'adopt must not write the ledger');
+
+    const synced = await callTool('distribution_check_submissions', { cwd: box.dir, sync: true });
+    assert.equal(synced.ok, true);
+    assert.equal(synced.status.schema_version, 'rdk-distribution/1');
+    assert.ok(Array.isArray(synced.preview), 'sync returns the preview changes');
+    assert.match(synced.plan_digest, /^[0-9a-f]{64}$/, 'sync returns the plan digest of the preview');
+    assert.equal(readFileSync(ledgerPath).compare(before), 0, 'sync must not write the ledger');
   } finally {
     box.cleanup();
   }

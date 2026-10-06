@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PassThrough } from 'node:stream';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { main } from '../src/cli.js';
@@ -67,7 +67,7 @@ test('github-sync gets past the guard with an acknowledgement', async () => {
   }
 });
 
-test('submissions reports the ledger offline and flags forks ready for cleanup', async () => {
+test('submissions renders the canonical campaign status and surfaces commands', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'repo-aeo-mcp-submissions-'));
   try {
     const empty = await run(['submissions', '--cwd', dir]);
@@ -78,15 +78,44 @@ test('submissions reports the ledger offline and flags forks ready for cleanup',
     writeFileSync(
       join(dir, '.discoverability', 'submissions.json'),
       JSON.stringify([
-        { target: 'a/b', pr_url: 'https://github.com/a/b/pull/1', fork: 'u/b', status: 'open' },
-        { target: 'c/d', fork: 'u/d', status: 'merged' },
+        { target: 'a/b', pr_url: 'https://github.com/a/b/pull/1', status: 'open' },
+        { target: 'c/d', fork: 'u/d', status: 'listed' },
       ]),
     );
     const filled = await run(['submissions', '--cwd', dir]);
     assert.equal(filled.code, 0);
-    assert.match(filled.output, /2 submission\(s\): 1 open, 1 merged/);
-    assert.match(filled.output, /- a\/b: open .*pull\/1/);
-    assert.match(filled.output, /forks ready to delete: u\/d/);
+    assert.match(filled.output, /2 submission\(s\): 1 none, 1 listed/);
+    assert.match(filled.output, /- a\/b \[none\] .*pull\/1/);
+    assert.match(filled.output, /gh repo delete u\/d --yes/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('submissions --adopt and --sync print read-only previews with a plan digest', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'repo-aeo-mcp-submissions-preview-'));
+  try {
+    mkdirSync(join(dir, '.discoverability'), { recursive: true });
+    const ledgerPath = join(dir, '.discoverability', 'submissions.json');
+    writeFileSync(
+      ledgerPath,
+      `${JSON.stringify(
+        [{ channel: 'awesome-list', target: 'example/nonexistent-repo', pr_url: 'https://github.com/example/nonexistent-repo/pull/1', status: 'open' }],
+        null,
+        2,
+      )}\n`,
+    );
+    const before = readFileSync(ledgerPath);
+
+    const adopted = await run(['submissions', '--cwd', dir, '--adopt']);
+    assert.equal(adopted.code, 0);
+    assert.match(adopted.output, /plan digest: [0-9a-f]{64}/);
+    assert.equal(readFileSync(ledgerPath).compare(before), 0, 'adopt must not write the ledger');
+
+    const synced = await run(['submissions', '--cwd', dir, '--sync']);
+    assert.equal(synced.code, 0);
+    assert.match(synced.output, /plan digest: [0-9a-f]{64}/);
+    assert.equal(readFileSync(ledgerPath).compare(before), 0, 'sync must not write the ledger');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -6,10 +6,7 @@
  * Every tool is read-only except `github_sync_metadata`, which requires an
  * acknowledgement string and an auditable reason.
  */
-import { promisify } from 'node:util';
-import { execFile } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import {
   audit,
   loadConfig,
@@ -20,21 +17,31 @@ import {
   llmsFreshness,
   httpGetText,
   channelById,
-  projectStatus,
   recommend,
+  buildDistributionStatus,
+  readLedger,
+  applySync,
+  hydrateByProbe,
+  discoverOwnedPrs,
+  matchAdoptable,
+  adoptRows,
+  planDigest,
 } from 'repo-aeo';
 import { record, trend, series } from './history.js';
 
-const execFileAsync = promisify(execFile);
 const USER_AGENT = `repo-aeo-mcp/0.1 (+${TOOL_HOME})`;
 
 const httpGet = (url, options = {}) => httpGetText(url, { ...options, userAgent: USER_AGENT });
 
-function gh(args, cwd) {
-  return execFileAsync('gh', args, { cwd, timeout: 20000 }).then(
-    ({ stdout }) => ({ ok: true, stdout: String(stdout) }),
-    (error) => ({ ok: false, stderr: String(error.stderr || error.message || error), code: error.code }),
-  );
+// the repo-aeo engine invokes gh synchronously; an async runner would silently disable every live probe
+function gh(args, { cwd } = {}) {
+  try {
+    const result = spawnSync('gh', args, { cwd, timeout: 20000, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+    if (result.error) return { ok: false, stdout: '', stderr: String(result.error.message), code: null };
+    return { ok: result.status === 0, stdout: result.stdout ?? '', stderr: result.stderr ?? '', code: result.status };
+  } catch (error) {
+    return { ok: false, stdout: '', stderr: String(error && error.message), code: null };
+  }
 }
 
 function resolveCwd(args, context = {}) {
@@ -227,7 +234,7 @@ export const TOOLS = [
       const repo = args.repo || (git.host === 'github.com' && git.owner && git.repo ? `${git.owner}/${git.repo}` : null);
       if (!repo) return { ok: false, error: 'no repository resolved (pass repo=owner/name)' };
 
-      const result = await gh(
+      const result = gh(
         [
           'repo',
           'view',
@@ -256,7 +263,7 @@ export const TOOLS = [
             'securityPolicyUrl',
           ].join(','),
         ],
-        cwd,
+        { cwd },
       );
       if (!result.ok) {
         return { ok: false, repo, error: 'the gh CLI is unavailable or not authenticated', detail: result.stderr.slice(0, 200) };
@@ -543,7 +550,7 @@ export const TOOLS = [
     name: 'distribution_check_submissions',
     title: 'Distribution campaign status',
     description:
-      'Report the whole distribution campaign recorded in .discoverability/submissions.json across all channels (curated-list PRs, registries, directories, passive crawlers) with per-entry state, a status summary and fork-cleanup hints. live: true probes git-pr entries through the gh CLI while registry- and crawl-style entries keep their recorded state; include_recommendations: true adds which channels apply to this repository and the next action for each.',
+      'Report the canonical distribution campaign status built from .discoverability/submissions.json: per-item channel, target, live PR state, attention and the next command to run, plus a summary by attention. live: true probes git-pr entries through the gh CLI while registry- and crawl-style entries keep their recorded state; include_recommendations: true adds which channels apply to this repository; adopt: true and sync: true return read-only previews with a plan_digest and never write the ledger.',
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     inputSchema: {
       type: 'object',
@@ -551,104 +558,41 @@ export const TOOLS = [
         cwd: { type: 'string', description: 'Repository directory holding .discoverability/submissions.json.' },
         live: { type: 'boolean', default: false, description: 'Probe the live state of git-pr submissions via gh (default false: report the recorded state).' },
         include_recommendations: { type: 'boolean', default: false, description: 'Also recommend distribution channels: which apply to this repository, their campaign status and the next action (default false).' },
+        adopt: { type: 'boolean', default: false, description: 'Preview adopting unrecorded rdk/* pull requests into the ledger; read-only, never writes (default false).' },
+        sync: { type: 'boolean', default: false, description: 'Preview syncing recorded statuses with live PR states; read-only, never writes (default false).' },
       },
       additionalProperties: false,
     },
     async run(args, context = {}) {
       const cwd = resolveCwd(args, context);
-      const path = join(cwd, '.discoverability', 'submissions.json');
-      const includeRecommendations = args.include_recommendations === true;
-      if (!existsSync(path)) {
-        const payload = {
-          ok: true,
-          cwd,
-          live: args.live === true,
-          total: 0,
-          submissions: [],
-          summary: {},
-          cleanup_forks: [],
-          hint: 'no submissions logged yet - append entries to .discoverability/submissions.json as the distribution playbook describes',
-        };
-        if (includeRecommendations) payload.recommendations = recommend(cwd, loadConfig(cwd));
-        return payload;
+      const ledger = readLedger(cwd);
+      if (ledger === null) {
+        return { ok: false, cwd, error: 'could not parse .discoverability/submissions.json', fix: 'the file is committed campaign state - fix it by hand or restore it from git' };
       }
-      let entries;
-      try {
-        entries = JSON.parse(readFileSync(path, 'utf8'));
-      } catch (error) {
-        return { ok: false, cwd, error: `could not parse .discoverability/submissions.json: ${error.message}`, fix: 'the file is committed campaign state - fix it by hand or restore it from git' };
-      }
-      if (!Array.isArray(entries)) {
-        return { ok: false, cwd, error: '.discoverability/submissions.json must hold a JSON array of submissions', fix: 'see the schema in references/distribution-playbook.md' };
-      }
-
-      const live = args.live === true;
-      let ghAvailable = null;
-      // only channels with a gh-pr probe have a PR to view; registry- and crawl-style rows keep their recorded state
-      const ghProbeUrlOf = (entry) => {
-        const channel = typeof entry.channel === 'string' && entry.channel !== '' ? channelById(entry.channel) : null;
-        if (channel && channel.probe !== 'gh-pr') return null;
-        return typeof entry.pr_url === 'string' && entry.pr_url !== '' ? entry.pr_url : null;
-      };
-      const liveStateOf = async (entry) => {
-        if (!live || ghAvailable === false) return null;
-        const prUrl = ghProbeUrlOf(entry);
-        if (prUrl === null) return null;
-        const result = await gh(['pr', 'view', prUrl, '--json', 'state'], cwd);
-        if (!result.ok) {
-          if (result.code === 'ENOENT') ghAvailable = false;
-          return null;
-        }
-        try {
-          const state = JSON.parse(result.stdout).state;
-          return typeof state === 'string' ? state.toLowerCase() : null;
-        } catch {
-          return null;
-        }
-      };
-
-      const rows = [];
-      for (const entry of entries) {
-        const source = entry && typeof entry === 'object' ? entry : {};
-        const liveState = await liveStateOf(source);
-        const recorded = typeof source.status === 'string' && source.status !== ''
-          ? source.status
-          : source.pr_url ? 'unknown' : 'prepared';
-        const status = projectStatus({ status: recorded }, liveState === null ? null : { state: liveState });
-        rows.push({
-          channel: typeof source.channel === 'string' ? source.channel : null,
-          mechanism: typeof source.mechanism === 'string' ? source.mechanism : null,
-          artifact: typeof source.artifact === 'string' ? source.artifact : null,
-          dedupe_key: typeof source.dedupe_key === 'string' ? source.dedupe_key : null,
-          target: typeof source.target === 'string' ? source.target : null,
-          pr_url: typeof source.pr_url === 'string' ? source.pr_url : null,
-          branch: typeof source.branch === 'string' ? source.branch : null,
-          fork: typeof source.fork === 'string' ? source.fork : null,
-          submitted_at: typeof source.submitted_at === 'string' ? source.submitted_at : null,
-          status,
-          live_status: liveState,
-        });
-      }
-
-      const summary = {};
-      for (const row of rows) summary[row.status] = (summary[row.status] || 0) + 1;
-      const cleanupForks = [...new Set(rows.filter((row) => (row.status === 'merged' || row.status === 'listed' || row.status === 'closed') && row.fork).map((row) => row.fork))];
-      const payload = {
-        ok: true,
+      const status = buildDistributionStatus({
         cwd,
-        live,
-        total: rows.length,
-        submissions: rows,
-        summary,
-        cleanup_forks: cleanupForks,
-      };
-      if (includeRecommendations) payload.recommendations = recommend(cwd, loadConfig(cwd));
-      if (ghAvailable === false) {
-        payload.note = 'the gh CLI is not installed - reporting recorded statuses only; install gh to probe live PR states with live: true';
+        loaded: loadConfig(cwd),
+        live: args.live === true,
+        gh,
+        now: () => new Date().toISOString(),
+      });
+      if (args.adopt === true) {
+        const targets = [...new Set(ledger.map((row) => row && row.target).filter((target) => typeof target === 'string' && target !== ''))];
+        const rows = adoptRows(ledger, matchAdoptable(discoverOwnedPrs({ gh, cwd, targets })));
+        return { ok: true, status, preview: rows, plan_digest: planDigest(rows) };
       }
-      if (cleanupForks.length > 0) {
-        payload.hint = 'forks of merged/closed submissions can be deleted (gh repo delete <fork> --yes; scope: gh auth refresh -h github.com -s delete_repo)';
+      if (args.sync === true) {
+        const hydratedByKey = {};
+        for (const row of ledger) {
+          const probeKind = channelById(row.channel)?.probe || (row.pr_url ? 'gh-pr' : null);
+          const hydrated = hydrateByProbe({ probe: { kind: probeKind, ref: row.pr_url || null }, entry: row, gh, cwd });
+          if (hydrated && hydrated.ok && hydrated.normalized) hydratedByKey[row.dedupe_key || row.pr_url] = hydrated.normalized;
+        }
+        const { changes } = applySync(ledger, hydratedByKey, { at: new Date().toISOString() });
+        return { ok: true, status, preview: changes, plan_digest: planDigest(changes) };
       }
+      const payload = { ok: true, ...status };
+      if (args.include_recommendations === true) payload.recommendations = recommend(cwd, loadConfig(cwd));
       return payload;
     },
   },
