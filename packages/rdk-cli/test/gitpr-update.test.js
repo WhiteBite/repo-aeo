@@ -84,7 +84,7 @@ test('gitPr.execute pushes to the existing fork branch when an open PR matches t
   const result = execute({ item: ITEM, owner: 'WhiteBite', gh, git });
   assert.equal(result.ok, true, result.error);
   const fetches = git.calls.filter((args) => args.includes('fetch'));
-  assert.deepEqual(fetches.map((args) => args.slice(2)), [['fetch', 'https://github.com/WhiteBite/list.git', ITEM.branch]]);
+  assert.deepEqual(fetches.map((args) => args.slice(2)), [['fetch', 'https://github.com/WhiteBite/list.git', `${ITEM.branch}:${ITEM.branch}`]]);
   const checkouts = git.calls.filter((args) => args.includes('checkout'));
   assert.deepEqual(checkouts.map((args) => args.slice(2)), [['checkout', ITEM.branch]]);
   const pushes = git.calls.filter((args) => args.includes('push'));
@@ -125,6 +125,18 @@ test('gitPr.execute refuses and records nothing when the update push fails', () 
   assert.equal(result.ok, false);
   assert.match(result.error, /git push failed/);
   assert.equal(result.record, undefined);
+});
+
+test('gitPr.execute refuses without cloning or creating when gh pr list fails', () => {
+  const gh = ghStub({
+    'repo fork': () => ({ ok: true, stdout: '', stderr: '', code: 0 }),
+  });
+  const git = gitStub({ onClone: wroteBranchReadme });
+  const result = execute({ item: ITEM, owner: 'WhiteBite', gh, git });
+  assert.equal(result.ok, false);
+  assert.match(result.error, /could not check for an existing pull request/);
+  assert.equal(gh.calls.some((args) => args[0] === 'pr' && args[1] === 'create'), false);
+  assert.equal(git.calls.length, 0);
 });
 
 test('removeEntryByUrl removes the line for the URL and is a no-op when absent', () => {

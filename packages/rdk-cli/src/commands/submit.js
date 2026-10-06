@@ -6,7 +6,7 @@
 import { run } from '../util/proc.js';
 import { resolveRepo } from './githubSync.js';
 import { ACK_HINT, assertWriteGuards, planDigest } from '../distribution/guard.js';
-import { appendRecords, isBlocking, readLedger, submissionsPath } from '../distribution/ledger.js';
+import { appendRecords, isBlocking, readLedger, submissionsPath, upsertRecords } from '../distribution/ledger.js';
 import { applicableChannels, channelById } from '../distribution/channels.js';
 import { mechanismById } from '../distribution/mechanisms/registry.js';
 import { artifactInventory } from '../distribution/recommend.js';
@@ -285,7 +285,8 @@ export async function submitCommand({ cwd, options = {}, config, loaded, ghRunne
     });
   }
 
-  appendRecords(cwd, applied);
+  if (applied.some((record) => record.updated === true)) upsertRecords(cwd, applied);
+  else appendRecords(cwd, applied);
   lines.push('');
   lines.push(`Reason logged: ${options.reason}`);
   lines.push(`Recorded ${applied.length} submission(s) in .discoverability/submissions.json.`);

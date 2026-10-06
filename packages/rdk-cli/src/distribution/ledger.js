@@ -43,10 +43,24 @@ export function writeLedger(cwd, rows) {
   if (readLedger(cwd) === null) return null;
   const path = submissionsPath(cwd);
   mkdirSync(dirname(path), { recursive: true });
-  const tmp = `${path}.tmp`;
+  const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
   writeFileSync(tmp, `${JSON.stringify(rows, null, 2)}\n`);
   renameSync(tmp, path);
   return rows;
+}
+
+/** Replaces rows whose dedupe_key or pr_url matches (shallow merge), appends the rest; null means the existing ledger is unparsable and was left untouched. */
+export function upsertRecords(cwd, rows) {
+  const existing = readLedger(cwd);
+  if (existing === null) return null;
+  const next = [...existing];
+  for (const row of rows) {
+    const key = row.dedupe_key || row.pr_url;
+    const idx = next.findIndex((entry) => (entry.dedupe_key || entry.pr_url) === key);
+    if (idx === -1) next.push(row);
+    else next[idx] = { ...next[idx], ...row };
+  }
+  return writeLedger(cwd, next);
 }
 
 /** Maps a hydrated PR onto a ledger status transition; null means no transition. */
@@ -70,7 +84,7 @@ export function applySync(rows, hydratedByKey, { at }) {
     if (next === null || next === row.status) return row;
     changes.push({ key, from: row.status, to: next });
     const updated = { ...row, status: next, synced_at: at };
-    if (hydrated.close_reason !== undefined) updated.close_reason = hydrated.close_reason;
+    if (typeof hydrated.close_reason === 'string' && hydrated.close_reason !== '') updated.close_reason = hydrated.close_reason;
     return updated;
   });
   return { rows: nextRows, changes };

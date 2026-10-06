@@ -146,6 +146,7 @@ test('submit --apply opens the PR and records it in the ledger', async () => {
     const gh = ghStub({
       'api user': () => ({ ok: true, stdout: 'WhiteBite\n', stderr: '', code: 0 }),
       'repo fork': () => ({ ok: true, stdout: '✓ Created fork WhiteBite/list\n', stderr: '', code: 0 }),
+      'pr list': () => ({ ok: true, stdout: '[]', stderr: '', code: 0 }),
       'pr create': () => ({ ok: true, stdout: 'https://github.com/owner/list/pull/42\n', stderr: '', code: 0 }),
     });
     const git = gitStub({
@@ -195,6 +196,45 @@ test('submit --apply opens the PR and records it in the ledger', async () => {
     const ledger = JSON.parse(readFileSync(join(dir, '.discoverability', 'submissions.json'), 'utf8'));
     assert.equal(ledger.length, 1);
     assert.equal(ledger[0].status, 'open');
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('submit --apply updates an existing PR and replaces the ledger row instead of duplicating it', async () => {
+  const { dir, config } = repo();
+  try {
+    mkdirSync(join(dir, '.discoverability'), { recursive: true });
+    writeFileSync(join(dir, '.discoverability', 'submissions.json'), JSON.stringify([
+      { target: 'owner/list', channel: 'awesome-list', dedupe_key: 'awesome-list:owner/list', pr_url: 'https://github.com/owner/list/pull/9', status: 'needs_changes' },
+    ]));
+    const gh = ghStub({
+      'api user': () => ({ ok: true, stdout: 'WhiteBite\n', stderr: '', code: 0 }),
+      'repo fork': () => ({ ok: true, stdout: '', stderr: '', code: 0 }),
+      'pr list': () => ({ ok: true, stdout: JSON.stringify([{ url: 'https://github.com/owner/list/pull/9' }]), stderr: '', code: 0 }),
+    });
+    const readme = LIST_README.replace(
+      '- [Beta](https://github.com/a/beta) — Second.',
+      '- [Beta](https://github.com/a/beta) — Second.\n- [demo-project](https://github.com/owner/demo) — Old one-liner.',
+    );
+    const git = gitStub({ onClone: (work) => { mkdirSync(work, { recursive: true }); writeFileSync(join(work, 'README.md'), readme); } });
+    const preview = await submitCommand({ cwd: dir, options: { targets: 'owner/list', category: 'Tools', repo: 'owner/demo' }, config, ghRunner: gh, gitRunner: git });
+    const result = await submitCommand({
+      cwd: dir,
+      options: { apply: true, ack: 'I_ACK_RDK_GITHUB_WRITE', reason: 'unit test update', plan_digest: preview.plan_digest, targets: 'owner/list', category: 'Tools', repo: 'owner/demo' },
+      config,
+      ghRunner: gh,
+      gitRunner: git,
+    });
+    assert.equal(result.ok, true, result.output);
+    assert.match(result.output, /✅ updated https:\/\/github\.com\/owner\/list\/pull\/9/);
+    assert.equal(result.applied.length, 1);
+    assert.equal(result.applied[0].updated, true);
+    const ledger = JSON.parse(readFileSync(join(dir, '.discoverability', 'submissions.json'), 'utf8'));
+    assert.equal(ledger.length, 1);
+    assert.equal(ledger[0].status, 'open');
+    assert.equal(ledger[0].pr_url, 'https://github.com/owner/list/pull/9');
+    assert.equal(ledger[0].dedupe_key, 'awesome-list:owner/list');
   } finally {
     removeRepo(dir);
   }
@@ -277,6 +317,7 @@ test('submit detects a target that already lists the project', async () => {
     const gh = ghStub({
       'api user': () => ({ ok: true, stdout: 'WhiteBite\n', stderr: '', code: 0 }),
       'repo fork': () => ({ ok: true, stdout: '', stderr: '', code: 0 }),
+      'pr list': () => ({ ok: true, stdout: '[]', stderr: '', code: 0 }),
     });
     const preview = await submitCommand({ cwd: dir, options: { targets: 'owner/list', category: 'Tools', repo: 'owner/demo' }, config, ghRunner: gh, gitRunner: gitStub() });
     const result = await submitCommand({
@@ -301,6 +342,7 @@ test('rmSync cleanup: a failed clone leaves no ledger entry', async () => {
     const gh = ghStub({
       'api user': () => ({ ok: true, stdout: 'WhiteBite\n', stderr: '', code: 0 }),
       'repo fork': () => ({ ok: true, stdout: '', stderr: '', code: 0 }),
+      'pr list': () => ({ ok: true, stdout: '[]', stderr: '', code: 0 }),
     });
     const preview = await submitCommand({ cwd: dir, options: { targets: 'owner/list', category: 'Tools', repo: 'owner/demo' }, config, ghRunner: gh, gitRunner: gitStub() });
     const result = await submitCommand({

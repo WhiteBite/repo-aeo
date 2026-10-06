@@ -100,17 +100,19 @@ function prBody(item) {
   return `Adds ${item.project} to "${item.category}".\n\n${item.entry}\n\nRepository: ${item.url}\n`;
 }
 
+/** Resolves the open PR for the head branch; { ok: false } means the check itself failed, url null means no open PR. */
 function openPrUrl({ item, owner, gh }) {
   const listed = gh(['pr', 'list', '-R', item.target, '--head', `${owner}:${item.branch}`, '--state', 'open', '--json', 'url']);
-  if (!listed.ok) return null;
+  if (!listed.ok) return { ok: false, error: listed.stderr.trim().slice(0, 200) };
+  let parsed;
   try {
-    const parsed = JSON.parse(listed.stdout);
-    if (!Array.isArray(parsed)) return null;
-    const hit = parsed.find((pr) => pr && typeof pr.url === 'string' && pr.url !== '');
-    return hit ? hit.url : null;
+    parsed = JSON.parse(listed.stdout);
   } catch {
-    return null;
+    parsed = null;
   }
+  if (!Array.isArray(parsed)) return { ok: false, error: 'unparsable gh pr list output' };
+  const hit = parsed.find((pr) => pr && typeof pr.url === 'string' && pr.url !== '');
+  return { ok: true, url: hit ? hit.url : null };
 }
 
 function updateExistingPr({ item, git, lines, fail, fork, prUrl }) {
@@ -122,7 +124,7 @@ function updateExistingPr({ item, git, lines, fail, fork, prUrl }) {
       return fail(`failed to clone ${item.target}: ${clone.stderr.trim().slice(0, 200)}`);
     }
     const steps = [
-      ['fetch', `https://github.com/${fork}.git`, item.branch],
+      ['fetch', `https://github.com/${fork}.git`, `${item.branch}:${item.branch}`],
       ['checkout', item.branch],
     ];
     for (const stepArgs of steps) {
@@ -184,7 +186,11 @@ export function execute({ item, owner, gh, git }) {
     return fail(`failed to fork ${item.target}: ${forked.stderr.trim().slice(0, 200)}`);
   }
   const existing = openPrUrl({ item, owner, gh });
-  if (existing !== null) return updateExistingPr({ item, git, lines, fail, fork, prUrl: existing });
+  if (!existing.ok) {
+    lines.push(`❌ gh pr list failed: ${existing.error}`);
+    return fail(`could not check for an existing pull request against ${item.target}: ${existing.error}`);
+  }
+  if (existing.url !== null) return updateExistingPr({ item, git, lines, fail, fork, prUrl: existing.url });
   const work = mkdtempSync(join(tmpdir(), 'rdk-submit-'));
   try {
     const clone = git(['clone', '--depth=1', `https://github.com/${item.target}.git`, work], { timeout: 120000 });

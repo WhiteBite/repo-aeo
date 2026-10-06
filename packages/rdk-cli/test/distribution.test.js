@@ -5,7 +5,7 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { assertWriteGuards, DEFAULT_ACK, planDigest } from '../src/distribution/guard.js';
 import { CHANNELS, CHANNEL_DESCRIPTOR_FIELDS, channelById, applicableChannels } from '../src/distribution/channels.js';
-import { appendRecords, applySync, isBlocking, projectStatus, readLedger, syncTransition, writeLedger } from '../src/distribution/ledger.js';
+import { appendRecords, applySync, isBlocking, projectStatus, readLedger, syncTransition, upsertRecords, writeLedger } from '../src/distribution/ledger.js';
 import { artifactInventory, recommend } from '../src/distribution/recommend.js';
 import { describe as describeGitPr, plan as planGitPr, probe as probeGitPr } from '../src/distribution/mechanisms/gitPr.js';
 import { loadConfig } from '../src/config.js';
@@ -94,6 +94,33 @@ test('appendRecords creates and extends the ledger, and never repairs an unparsa
 
     writeFileSync(join(dir, '.discoverability', 'submissions.json'), '{ not json');
     assert.equal(appendRecords(dir, [{ target: 'e/f' }]), null);
+    assert.equal(readFileSync(join(dir, '.discoverability', 'submissions.json'), 'utf8'), '{ not json');
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('upsertRecords replaces matching rows, appends new ones and never repairs an unparsable ledger', () => {
+  const dir = makeRepo({});
+  try {
+    appendRecords(dir, [
+      { dedupe_key: 'awesome-list:a/b', target: 'a/b', status: 'needs_changes', pr_url: 'https://github.com/a/b/pull/1' },
+      { pr_url: 'https://github.com/c/d/pull/2', target: 'c/d', status: 'open' },
+    ]);
+    const written = upsertRecords(dir, [
+      { dedupe_key: 'awesome-list:a/b', target: 'a/b', status: 'open', updated: true },
+      { pr_url: 'https://github.com/c/d/pull/2', status: 'submitted' },
+      { dedupe_key: 'awesome-list:e/f', target: 'e/f', status: 'open' },
+    ]);
+    assert.deepEqual(written, [
+      { dedupe_key: 'awesome-list:a/b', target: 'a/b', status: 'open', pr_url: 'https://github.com/a/b/pull/1', updated: true },
+      { pr_url: 'https://github.com/c/d/pull/2', target: 'c/d', status: 'submitted' },
+      { dedupe_key: 'awesome-list:e/f', target: 'e/f', status: 'open' },
+    ]);
+    assert.deepEqual(readLedger(dir), written);
+
+    writeFileSync(join(dir, '.discoverability', 'submissions.json'), '{ not json');
+    assert.equal(upsertRecords(dir, [{ dedupe_key: 'k' }]), null);
     assert.equal(readFileSync(join(dir, '.discoverability', 'submissions.json'), 'utf8'), '{ not json');
   } finally {
     removeRepo(dir);
@@ -317,27 +344,31 @@ test('syncTransition maps merged/closed/changes-requested to listed/closed/needs
   assert.equal(syncTransition({}), null);
 });
 
-test('applySync is idempotent and marks synced_at only on changed rows', () => {
+test('applySync is idempotent, skips a null close_reason and marks synced_at only on changed rows', () => {
   const at = '2026-10-06T00:00:00.000Z';
   const rows = [
     { dedupe_key: 'k1', pr_url: 'https://github.com/o/l/pull/1', status: 'submitted' },
     { dedupe_key: 'k2', pr_url: 'https://github.com/o/l/pull/2', status: 'submitted' },
     { dedupe_key: 'k3', pr_url: 'https://github.com/o/l/pull/3', status: 'open' },
+    { dedupe_key: 'k4', pr_url: 'https://github.com/o/l/pull/4', status: 'submitted' },
   ];
   const hydratedByKey = {
-    k1: { merged: true },
+    k1: { merged: true, close_reason: null },
     k2: { state: 'CLOSED', close_reason: 'NOT_PLANNING' },
-    k3: { state: 'OPEN' },
+    k3: { state: 'OPEN', close_reason: null },
+    k4: { state: 'CLOSED', close_reason: null },
   };
 
   const first = applySync(rows, hydratedByKey, { at });
   assert.deepEqual(first.changes, [
     { key: 'k1', from: 'submitted', to: 'listed' },
     { key: 'k2', from: 'submitted', to: 'closed' },
+    { key: 'k4', from: 'submitted', to: 'closed' },
   ]);
   assert.deepEqual(first.rows[0], { dedupe_key: 'k1', pr_url: 'https://github.com/o/l/pull/1', status: 'listed', synced_at: at });
   assert.deepEqual(first.rows[1], { dedupe_key: 'k2', pr_url: 'https://github.com/o/l/pull/2', status: 'closed', synced_at: at, close_reason: 'NOT_PLANNING' });
   assert.deepEqual(first.rows[2], rows[2]);
+  assert.deepEqual(first.rows[3], { dedupe_key: 'k4', pr_url: 'https://github.com/o/l/pull/4', status: 'closed', synced_at: at });
 
   const second = applySync(first.rows, hydratedByKey, { at });
   assert.deepEqual(second.changes, []);
