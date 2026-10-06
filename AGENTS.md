@@ -16,6 +16,7 @@ node packages/rdk-cli/bin/rdk.js audit --online   # adds link checks + GitHub AP
 node packages/rdk-cli/bin/rdk.js fix --dry-run    # preview safe autofixes
 node packages/rdk-cli/bin/rdk.js fix --apply      # write the safe autofixes
 node packages/rdk-cli/bin/rdk.js npm-surface      # package.json publish surface
+node packages/rdk-cli/bin/rdk.js track           # campaign dashboard: live status, adopt, sync
 node packages/repo-aeo-mcp/bin/repo-aeo-mcp.js score   # MCP server in CLI mode (score + trend)
 node packages/repo-aeo-mcp/bin/repo-aeo-mcp.js serve   # MCP server on stdio
 ```

@@ -320,6 +320,152 @@ export declare function isBlocking(record: Submission): boolean;
  */
 export declare function projectStatus(record: Submission, probeResult: { state: string } | null): string | null;
 
+export declare function writeLedger(cwd: string, rows: Submission[]): Submission[] | null;
+export declare function upsertRecords(cwd: string, rows: Submission[]): Submission[] | null;
+export declare function syncTransition(hydrated: NormalizedPr): string | null;
+export declare function applySync(
+  rows: Submission[],
+  hydratedByKey: Record<string, NormalizedPr>,
+  args: { at: string },
+): { rows: Submission[]; changes: Array<{ key: string; from: string; to: string }> };
+
+export type AttentionState = 'action_required' | 'awaiting_review' | 'approved' | 'stale' | 'none' | 'listed' | 'terminal';
+
+export interface DistributionItem {
+  channel: string | null;
+  target: string | null;
+  pr_url: string | null;
+  state: string | null;
+  is_draft: boolean | null;
+  review_decision: string | null;
+  merge_state: string | null;
+  checks: { pass: number; fail: number; pending: number };
+  attention: AttentionState;
+  needed: string[];
+  why: string;
+  action: string;
+  command: string;
+}
+
+export interface DistributionStatus {
+  schema_version: string;
+  generated_at: string;
+  summary: { total: number; by_attention: Record<string, number>; by_state: Record<string, number> };
+  items: DistributionItem[];
+}
+
+export declare const DISTRIBUTION_SCHEMA: string;
+export declare function buildDistributionStatus(args: {
+  cwd: string;
+  loaded?: ReturnType<typeof loadConfig> | null;
+  options?: Record<string, unknown>;
+  gh?: (args: string[], opts?: { cwd?: string }) => { ok: boolean; stdout?: string; stderr?: string };
+  git?: (args: string[], options?: { timeout?: number }) => { ok: boolean; stdout?: string; stderr?: string };
+  fetchImpl?: (url: string, init?: Record<string, unknown>) => Promise<{ ok: boolean; status?: number; text?: () => Promise<string> }>;
+  now?: () => string;
+  live?: boolean;
+}): DistributionStatus;
+export declare function renderDistributionStatus(status: DistributionStatus): string;
+
+export interface NormalizedPr {
+  state: string | null;
+  is_draft: boolean;
+  review_decision: string | null;
+  merge_state: string | null;
+  merged: boolean;
+  checks: { pass: number; fail: number; pending: number };
+  reviews: Array<{ state: unknown; authorAssociation: unknown }>;
+  comments: Array<{ createdAt: unknown; authorAssociation: unknown; body: string }>;
+  last_push: string | null;
+  updatedAt: string | null;
+  close_reason: string | null;
+  url: string | null;
+}
+
+export declare function normalizeGhPrView(raw: Record<string, unknown>): NormalizedPr;
+export declare function hydrateGitPr(args: {
+  entry: Submission;
+  gh: (args: string[], opts?: { cwd?: string }) => { ok: boolean; stdout?: string; stderr?: string };
+  cwd: string;
+}): { ok: boolean; normalized?: NormalizedPr; raw?: unknown; error?: string };
+export declare function hydrateByProbe(args: {
+  probe: { kind: string | null; ref: string | null };
+  entry: Submission;
+  gh?: (args: string[], opts?: { cwd?: string }) => { ok: boolean; stdout?: string; stderr?: string };
+  cwd?: string;
+}): { ok: boolean; normalized?: NormalizedPr; raw?: unknown; error?: string; recorded?: boolean; kind?: string };
+
+export declare function evaluateAttention(
+  hydrated: NormalizedPr | null,
+  entry: Submission | null,
+  ctx: { hasLive?: boolean; now?: string; staleDays?: number },
+): AttentionState;
+export declare function neededFor(attention: AttentionState, hydrated: NormalizedPr | null): string[];
+export declare function commandFor(
+  item: { channel?: string | null; target?: string | null; pr_url?: string | null; attention?: string; fork?: string },
+  ctx: Record<string, unknown>,
+): string;
+export declare function countChecks(rollup: unknown): { pass: number; fail: number; pending: number };
+export declare function isMaintainer(association: unknown): boolean;
+
+export interface TrackingCache {
+  schema_version: string;
+  snapshots: Record<string, Record<string, unknown>>;
+}
+
+export declare function trackingCachePath(cwd?: string): string;
+export declare function readTrackingCache(cwd?: string): TrackingCache;
+export declare function writeTrackingCache(cwd: string, cache: TrackingCache): string;
+export declare function snapshotKey(entry: Submission): string;
+
+export interface OwnedPr {
+  url: string;
+  target: string;
+  number: number | null;
+  state: string | null;
+  isDraft: boolean;
+  headRefName?: string;
+}
+
+export interface AdoptablePr {
+  url: string;
+  target: string;
+  branch: string;
+  number: number | null;
+  state: string | null;
+}
+
+export declare function discoverOwnedPrs(args: {
+  gh: (args: string[], opts?: { cwd?: string }) => { ok: boolean; stdout?: string; stderr?: string };
+  cwd: string;
+  targets?: string[];
+}): OwnedPr[];
+export declare function matchAdoptable(prs: OwnedPr[]): AdoptablePr[];
+export declare function adoptRows(ledger: Submission[], adoptable: AdoptablePr[]): Submission[];
+export declare function applyAdopt(cwd: string, rows: Submission[]): Submission[] | null;
+
+export declare function trackCommand(args: {
+  cwd: string;
+  options?: Record<string, unknown>;
+  config?: RdkConfig;
+  loaded?: ReturnType<typeof loadConfig> | null;
+  ghRunner?: (args: string[], opts?: { cwd?: string; timeout?: number }) => { ok: boolean; stdout?: string; stderr?: string };
+  gitRunner?: (args: string[], options?: { timeout?: number }) => { ok: boolean; stdout?: string; stderr?: string };
+  fetchImpl?: (url: string, init?: Record<string, unknown>) => Promise<{ ok: boolean; status?: number; text?: () => Promise<string> }>;
+  now?: () => string;
+}): Promise<{
+  ok: boolean;
+  output: string;
+  error?: string | null;
+  code?: string | null;
+  exitCode: number;
+  status?: DistributionStatus;
+  plan?: unknown[];
+  plan_digest?: string | null;
+  adopted?: Submission[];
+  changes?: Array<{ key: string; from: string; to: string }>;
+}>;
+
 export interface ArtifactInventory {
   has_npm_package: boolean;
   has_docs_site: boolean;

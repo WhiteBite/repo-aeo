@@ -23,6 +23,7 @@ npx repo-aeo --help
 | `rdk github-sync` | pushes description/homepage/topics to GitHub | with `--apply --ack --reason --plan-digest` |
 | `rdk channels` | lists every distribution channel: mechanism, applicability, recorded status, next action | never |
 | `rdk submit` | runs a distribution channel `--channel <id>` (default `awesome-list`): previews, then submits and records it under the guard | with `--apply --ack --reason --plan-digest` |
+| `rdk track` | campaign dashboard over `.discoverability/submissions.json`: live status (`--json`), adopt pre-ledger `rdk/*` PRs (`--adopt`), sync recorded statuses from live probes (`--sync`) | `--adopt`/`--sync` with `--apply --ack --reason --plan-digest` |
 | `rdk skill install` | links the agent skill into OpenCode/Claude/Codex skill dirs (`uninstall`, `status`, `--project`) | with the subcommand |
 
 ## Output formats

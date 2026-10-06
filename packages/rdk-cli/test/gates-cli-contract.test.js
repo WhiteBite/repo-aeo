@@ -9,6 +9,7 @@ import { makeRepo, removeRepo } from './helpers.js';
 import { parseArgs } from '../src/cli.js';
 import { DEFAULT_ACK, githubSyncCommand } from '../src/commands/githubSync.js';
 import { submitCommand } from '../src/commands/submit.js';
+import { trackCommand } from '../src/commands/track.js';
 import { loadConfig } from '../src/config.js';
 import { listFiles } from '../src/util/fs.js';
 
@@ -308,6 +309,61 @@ const BEHAVIOUR = {
     });
     assert.equal(result.exitCode, 1);
     assert.match(result.error, /gh/);
+  },
+
+  '--json': async () => {
+    await withRepo({ 'package.json': JSON.stringify(PKG) }, async (dir) => {
+      const result = rdk(['track', '--json'], dir);
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      assert.equal(JSON.parse(result.stdout).schema_version, 'rdk-distribution/1');
+    });
+  },
+
+  '--adopt': async () => {
+    // spawnSync('gh') resolves the real gh.exe on win32, so the proof stubs the runner in-process
+    const dir = makeRepo({ 'package.json': JSON.stringify(PKG) });
+    try {
+      const result = await trackCommand({
+        cwd: dir,
+        options: { adopt: true },
+        config: loadConfig(dir).config,
+        ghRunner: () => ({
+          ok: true,
+          stdout: JSON.stringify([
+            { url: 'https://github.com/owner/list/pull/7', repository: { nameWithOwner: 'owner/list' }, number: 7, state: 'OPEN', headRefName: 'rdk/list/add-demo' },
+          ]),
+          stderr: '',
+          code: 0,
+        }),
+      });
+      assert.equal(result.exitCode, 0, result.output);
+      assert.match(result.output, /Plan digest: [0-9a-f]{64}/);
+    } finally {
+      removeRepo(dir);
+    }
+  },
+
+  '--sync': async () => {
+    const dir = makeRepo({
+      'package.json': JSON.stringify(PKG),
+      '.discoverability/submissions.json': JSON.stringify([
+        { channel: 'awesome-list', target: 'owner/list', pr_url: 'https://github.com/owner/list/pull/7', status: 'submitted', dedupe_key: 'awesome-list:owner/list' },
+      ]),
+    });
+    try {
+      const result = await trackCommand({
+        cwd: dir,
+        options: { sync: true },
+        config: loadConfig(dir).config,
+        ghRunner: (args) => (args[0] === 'pr' && args[1] === 'view'
+          ? { ok: true, stdout: JSON.stringify({ state: 'MERGED', mergedAt: '2026-01-01T00:00:00Z', url: 'https://github.com/owner/list/pull/7' }), stderr: '', code: 0 }
+          : { ok: false, stdout: '', stderr: 'stubbed failure', code: 1 }),
+      });
+      assert.equal(result.exitCode, 0, result.output);
+      assert.match(result.output, /Plan digest: [0-9a-f]{64}/);
+    } finally {
+      removeRepo(dir);
+    }
   },
 
   '--project': async () => {

@@ -192,6 +192,25 @@ test('stray positional arguments are rejected with exit 1', () => {
   }
 });
 
+test('rdk track is registered: help mentions it, a ledger-less repo prints the dashboard, a stray positional fails', () => {
+  const help = rdk(['--help'], process.cwd());
+  assert.equal(help.status, 0);
+  assert.match(help.stdout, /rdk track/);
+
+  const dir = makeRepo({ 'package.json': JSON.stringify({ name: 'track-demo', description: 'track registration demo' }) });
+  try {
+    const result = rdk(['track'], dir);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout, /# rdk track/);
+
+    const stray = rdk(['track', 'extra'], dir);
+    assert.equal(stray.status, 1);
+    assert.match(stray.stderr, /unexpected argument "extra" for command "track"/);
+  } finally {
+    removeRepo(dir);
+  }
+});
+
 test('valid invocations are unaffected by the stray-argument guard', () => {
   const dir = makeRepo({
     'package.json': JSON.stringify({ name: 'valid-calls', description: 'valid invocation demo' }),

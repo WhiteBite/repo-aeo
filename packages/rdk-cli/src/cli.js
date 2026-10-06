@@ -4,6 +4,7 @@ import { initCommand } from './commands/init.js';
 import { fixCommand } from './commands/fix.js';
 import { githubSyncCommand } from './commands/githubSync.js';
 import { submitCommand } from './commands/submit.js';
+import { trackCommand } from './commands/track.js';
 import { channelsCommand } from './commands/channels.js';
 import { npmSurfaceCommand } from './commands/npmSurface.js';
 import { skillCommand } from './commands/skill.js';
@@ -21,6 +22,7 @@ Usage:
   rdk npm-surface          Audit the publishable package.json surface
   rdk github-sync          Push description/homepage/topics to GitHub (needs --apply --ack)
   rdk submit [--channel <id>]  Propose the project to curated lists (needs --apply --ack)
+  rdk track [--json] [--adopt] [--sync]  Campaign dashboard: live status, adopt existing PRs, sync the ledger
   rdk channels             Show every distribution channel, applicability and next action
   rdk skill <install|uninstall|status>  Link the agent skill into harness skill dirs (--project: repo-local)
 
@@ -108,6 +110,7 @@ const POSITIONAL_LIMITS = {
   'github-sync': 1,
   submit: 1,
   channels: 1,
+  track: 1,
   skill: 2,
 };
 
@@ -196,6 +199,12 @@ export async function main(argv = process.argv.slice(2), io = {}) {
       case 'submit': {
         const loaded = loadConfig(cwd);
         const result = await submitCommand({ cwd, loaded, options: { ...flags, plan_digest: flags.planDigest }, config: loaded.config });
+        if (!flags.quiet) log(result.output);
+        return result.exitCode;
+      }
+      case 'track': {
+        const loaded = loadConfig(cwd);
+        const result = await trackCommand({ cwd, options: { ...flags, plan_digest: flags.planDigest }, config: loaded.config, loaded });
         if (!flags.quiet) log(result.output);
         return result.exitCode;
       }
