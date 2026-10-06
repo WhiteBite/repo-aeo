@@ -159,8 +159,8 @@ npx repo-aeo submit --channel mcp-official-registry \
 ```
 
 The record carries the listing URL; a later live check can move the status to
-`listed`. `submissions --live` currently probes only git-pr rows, so registry
-rows keep their recorded state until updated.
+`listed`. `rdk track` probes only `gh-pr` rows, so registry rows keep their
+recorded state until updated.
 
 ## Web-form channels (web-form)
 
@@ -206,9 +206,9 @@ PRs; the manual fallback works without it:
 - **PR**: open the compare URL directly —
   `https://github.com/<owner>/<list>/compare/main...<user>:<branch>` —
   which lands on a prefilled PR form.
-- **Status**: `repo-aeo-mcp submissions` without `--live` reports the
-  recorded state from `submissions.json`; nothing else in the kit requires
-  gh on the submission path.
+- **Status**: `rdk track` without gh reports the recorded state from
+  `submissions.json`; nothing else in the kit requires gh on the submission
+  path.
 
 ## Fork hygiene
 
@@ -223,38 +223,73 @@ PRs; the manual fallback works without it:
 
 ## Track the campaign
 
-`.discoverability/submissions.json` (committed, unlike `cache/`) is the
-campaign ledger; every submission is appended before the PR is opened. Rows
-carry `channel`, `mechanism`, `artifact`, `dedupe_key`, `target` and a
-status moving `prepared -> submitted -> listed`, with terminal negatives
-`rejected|closed|unlisted|failed` that allow one retry:
-
-```json
-[
-  {
-    "channel": "awesome-list",
-    "mechanism": "git-pr",
-    "artifact": "readme-row",
-    "dedupe_key": "awesome-list:kirodotdev-labs/awesome-kiro",
-    "target": "kirodotdev-labs/awesome-kiro",
-    "pr_url": "https://github.com/kirodotdev-labs/awesome-kiro/pull/123",
-    "branch": "rdk/awesome-kiro/add-myproject",
-    "fork": "WhiteBite/awesome-kiro",
-    "submitted_at": "2026-10-03T09:00:00Z",
-    "status": "open"
-  }
-]
-```
-
-Check it before choosing targets — submitting to a list that already has an
-open PR for the project is spam. Read the state back with:
+Two storage dimensions, deliberately split. `.discoverability/submissions.json`
+is the committed campaign ledger: the truth about what was submitted, appended
+at submit time and rewritten only by `rdk track --sync` under the guard.
+`.discoverability/cache/tracking.json` is a gitignored volatile cache of live
+probe snapshots: safe to lose, never the source of truth.
 
 ```bash
-npx repo-aeo-mcp submissions          # recorded state, offline
-npx repo-aeo-mcp submissions --live   # probe PR states via gh
+npx repo-aeo track                    # read-only dashboard, no writes
+npx repo-aeo track --json             # canonical JSON only
 ```
 
-`--live` needs gh; without it the tool reports the recorded statuses.
+Each rendered item carries an attention state —
+`action_required|awaiting_review|approved|stale|none|listed|terminal` — plus a
+`needed` list (`address_review`, `fix_checks`, `rebase`, ...) and, when
+something is due, the exact guarded `command` to run next. Work the queue: on
+`action_required` address the review via the emitted command; merged items
+read `listed`, closed ones `terminal`.
+
+PRs opened by hand or by an earlier run that never landed in the ledger are
+adopted by branch convention (`rdk/<listRepo>/add-<slug>`):
+
+```bash
+npx repo-aeo track --adopt            # preview: matching PRs + plan digest
+npx repo-aeo track --adopt \
+  --apply --ack <ACK> --reason "why" --plan-digest <DIGEST>
+```
+
+Adoption is idempotent: rows already recorded by `pr_url` or `dedupe_key` are
+skipped, so a re-run says "nothing to adopt".
+
+Recorded statuses drift from reality as reviews happen. `--sync` probes every
+ledger row with a PR url and rewrites stale statuses from the live state
+(`open -> listed` on merge, `-> closed` on close, `-> needs_changes` on a
+maintainer changes-request), stamping `synced_at` and keeping the closing
+comment as `close_reason`:
+
+```bash
+npx repo-aeo track --sync             # preview: transitions + plan digest
+npx repo-aeo track --sync \
+  --apply --ack <ACK> --reason "why" --plan-digest <DIGEST>
+```
+
+Both writes go through the same guard chain as `submit`; without it the
+ledger stays untouched. Never hand-edit the committed ledger to match a
+probe — run `--sync` under the guard so the change is auditable.
+
+Check the ledger before choosing targets — submitting to a list that already
+has an open PR for the project is spam. A row looks like:
+
+```json
+{
+  "channel": "awesome-list",
+  "mechanism": "git-pr",
+  "artifact": "readme-row",
+  "dedupe_key": "awesome-list:kirodotdev-labs/awesome-kiro",
+  "target": "kirodotdev-labs/awesome-kiro",
+  "pr_url": "https://github.com/kirodotdev-labs/awesome-kiro/pull/123",
+  "branch": "rdk/awesome-kiro/add-myproject",
+  "fork": "WhiteBite/awesome-kiro",
+  "submitted_at": "2026-10-03T09:00:00Z",
+  "status": "open"
+}
+```
+
+Statuses move `prepared -> submitted -> listed`, with terminal negatives
+`rejected|closed|unlisted|failed` that allow one retry. Live probes need gh;
+without it `track` reports the recorded states.
 
 ## Safety rails
 

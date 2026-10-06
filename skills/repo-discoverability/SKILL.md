@@ -41,6 +41,14 @@ report is derived from files in the repository, never invented.
    curated lists, registry submissions) go out only after the human approves
    the exact plan; record every submission in
    `.discoverability/submissions.json`.
+7. **Track the campaign.** `rdk track` is read-only by default and prints the
+   canonical status with a per-item action queue. PRs opened outside the ledger
+   are pulled in with `rdk track --adopt`; live probe results rewrite recorded
+   statuses only through `rdk track --sync`. Both mutate
+   `.discoverability/submissions.json` and need the same guard chain as
+   `submit`: `--apply --ack <ACK> --reason "<why>" --plan-digest <DIGEST>`.
+   Never hand-edit the committed ledger to match a probe; let `--sync` do it
+   under the guard.
 
 ## The five phases
 
@@ -112,6 +120,8 @@ node packages/rdk-cli/bin/rdk.js submit --channel <id>      # offline preview of
 # after human review of the preview:
 node packages/rdk-cli/bin/rdk.js submit --channel <id> \
   --apply --ack <ACK> --reason "<why>" --plan-digest <DIGEST>
+node packages/rdk-cli/bin/rdk.js track                       # read-only campaign dashboard (submit -> track loop)
+node packages/rdk-cli/bin/rdk.js track --json               # canonical JSON only
 ```
 
 `channels` is read-only and prints, for each channel, whether it applies to
@@ -132,10 +142,19 @@ default channel is `awesome-list`. Mechanisms differ in what RDK may do:
 Every executed or prepared submission lands in
 `.discoverability/submissions.json` with `channel`, `mechanism`, `artifact`,
 `dedupe_key`, `target` and a status (`prepared|submitted|listed`, terminal
-negatives `rejected|closed|unlisted|failed`). Read
-`references/channels.md` for the channel matrix and
-`references/distribution-playbook.md` before the first submission: entry
-conventions, fork mechanics, per-mechanism procedure and pacing.
+negatives `rejected|closed|unlisted|failed`).
+
+After submitting, close the loop with `rdk track`: it projects the ledger
+through live probes into one status list where each item carries an attention
+state (`action_required|awaiting_review|approved|stale|none|listed|terminal`)
+and, when something is due, the exact guarded command to run next. On
+`action_required` address the review via that emitted `command`; once the PR
+merges or closes, `rdk track --sync` (under the same guard chain) rewrites the
+recorded status so the ledger reflects it. PRs opened by hand outside the
+ledger come in with `rdk track --adopt`. Read
+`references/distribution-playbook.md` before the first submission and for the
+full tracking procedure: entry conventions, fork mechanics, per-mechanism
+procedure and pacing. `references/channels.md` is the channel matrix.
 
 ## What "good" looks like (checklist)
 
