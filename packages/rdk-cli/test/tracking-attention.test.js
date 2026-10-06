@@ -68,6 +68,11 @@ test('countChecks maps every conclusion and state bucket', () => {
   assert.deepEqual(countChecks([]), { pass: 0, fail: 0, pending: 0 });
 });
 
+test('countChecks counts an unknown completed conclusion as fail', () => {
+  assert.deepEqual(countChecks([{ status: 'COMPLETED', conclusion: 'NEW_CONCLUSION' }]), { pass: 0, fail: 1, pending: 0 });
+  assert.deepEqual(countChecks([{ status: 'COMPLETED', conclusion: null }]), { pass: 0, fail: 1, pending: 0 });
+});
+
 test('evaluateAttention action_required: changes requested decision', () => {
   assert.equal(evaluateAttention(hydrated({ review_decision: 'CHANGES_REQUESTED' }), ENTRY, CTX), 'action_required');
 });
@@ -90,6 +95,11 @@ test('evaluateAttention action_required: maintainer comment newer than last push
   const comments = [{ createdAt: '2026-10-05T00:00:00.000Z', authorAssociation: 'COLLABORATOR' }];
   const state = hydrated({ comments, last_push: '2026-10-01T00:00:00.000Z' });
   assert.equal(evaluateAttention(state, ENTRY, CTX), 'action_required');
+});
+
+test('evaluateAttention action_required: maintainer comment when last push is unknown', () => {
+  const comments = [{ createdAt: '2026-10-05T00:00:00.000Z', authorAssociation: 'COLLABORATOR' }];
+  assert.equal(evaluateAttention(hydrated({ comments }), ENTRY, CTX), 'action_required');
 });
 
 test('evaluateAttention ignores a non-maintainer comment newer than last push', () => {

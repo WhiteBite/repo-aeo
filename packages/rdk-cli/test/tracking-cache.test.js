@@ -33,6 +33,27 @@ test('readTrackingCache returns an empty snapshot set when missing and rotates a
   }
 });
 
+test('readTrackingCache rotates a structurally invalid file aside and starts empty', () => {
+  const cwd = makeRepo();
+  try {
+    mkdirSync(join(cwd, '.discoverability', 'cache'), { recursive: true });
+    writeFileSync(trackingCachePath(cwd), '{}', 'utf8');
+
+    let result;
+    assert.doesNotThrow(() => {
+      result = readTrackingCache(cwd);
+    });
+    assert.deepEqual(result, { schema_version: 'rdk-tracking/1', snapshots: {} });
+
+    const rotated = readdirSync(join(cwd, '.discoverability', 'cache')).filter((name) => /^tracking\.json\.corrupt-/.test(name));
+    assert.equal(rotated.length, 1);
+    assert.equal(readFileSync(join(cwd, '.discoverability', 'cache', rotated[0]), 'utf8'), '{}');
+    assert.ok(!existsSync(trackingCachePath(cwd)));
+  } finally {
+    removeRepo(cwd);
+  }
+});
+
 test('writeTrackingCache is atomic and readTrackingCache round-trips', () => {
   const cwd = makeRepo();
   try {

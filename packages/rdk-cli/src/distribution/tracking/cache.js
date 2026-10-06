@@ -19,28 +19,29 @@ export function trackingCachePath(cwd = process.cwd()) {
 export function readTrackingCache(cwd = process.cwd()) {
   const path = trackingCachePath(cwd);
   if (!existsSync(path)) return emptyCache();
+  let parsed = null;
+  let valid = false;
   try {
-    const parsed = JSON.parse(readFileSync(path, 'utf8'));
-    if (parsed && typeof parsed === 'object' && parsed.snapshots && typeof parsed.snapshots === 'object') {
-      return { schema_version: parsed.schema_version || SCHEMA_VERSION, snapshots: parsed.snapshots };
-    }
-    return emptyCache();
+    parsed = JSON.parse(readFileSync(path, 'utf8'));
+    valid = Boolean(parsed && typeof parsed === 'object' && parsed.snapshots && typeof parsed.snapshots === 'object');
   } catch {
-    try {
-      renameSync(path, join(dirname(path), `tracking.json.corrupt-${Date.now()}`));
-    } catch {
-      // best-effort forensics: rotating the corrupt file aside must never fail the read
-    }
-    return emptyCache();
+    valid = false;
   }
+  if (valid) return { schema_version: parsed.schema_version || SCHEMA_VERSION, snapshots: parsed.snapshots };
+  try {
+    renameSync(path, join(dirname(path), `tracking.json.corrupt-${Date.now()}`));
+  } catch {
+    // best-effort forensics: rotating the corrupt file aside must never fail the read
+  }
+  return emptyCache();
 }
 
 export function writeTrackingCache(cwd, cache) {
   const path = trackingCachePath(cwd);
   mkdirSync(dirname(path), { recursive: true });
   const temp = join(dirname(path), `tracking.json.${process.pid}.${Date.now()}.tmp`);
-  writeFileSync(temp, `${JSON.stringify(cache, null, 2)}\n`, 'utf8');
   try {
+    writeFileSync(temp, `${JSON.stringify(cache, null, 2)}\n`, 'utf8');
     renameSync(temp, path);
   } catch (error) {
     try {

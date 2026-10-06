@@ -25,7 +25,23 @@ const MERGED_RAW = {
   comments: [{ createdAt: '2026-09-30T08:00:00Z', authorAssociation: 'CONTRIBUTOR', body: 'ship it' }],
   commits: [{ committedDate: '2026-10-04T12:00:00Z' }, { committedDate: '2026-10-05T12:00:00Z' }],
   updatedAt: '2026-10-06T00:00:00Z',
-  stateReason: null,
+  url: PR_URL,
+};
+
+const CLOSED_RAW = {
+  state: 'CLOSED',
+  isDraft: false,
+  reviewDecision: null,
+  mergeStateStatus: 'DIRTY',
+  mergedAt: null,
+  statusCheckRollup: [],
+  comments: [
+    { createdAt: '2026-09-28T08:00:00Z', authorAssociation: 'CONTRIBUTOR', body: 'any update?' },
+    { createdAt: '2026-09-29T08:00:00Z', authorAssociation: 'MEMBER', body: 'closing: out of scope' },
+    { createdAt: '2026-09-30T08:00:00Z', authorAssociation: 'NONE', body: 'understood' },
+  ],
+  commits: [],
+  updatedAt: '2026-09-30T09:00:00Z',
   url: PR_URL,
 };
 
@@ -39,7 +55,7 @@ test('normalizeGhPrView parses merged, reviewDecision, mixed rollups and maintai
   assert.equal(normalized.merge_state, 'CLEAN');
   assert.deepEqual(normalized.checks, countChecks(MIXED_ROLLUP));
   assert.deepEqual(normalized.reviews, [{ state: 'APPROVED', authorAssociation: 'MEMBER' }]);
-  assert.deepEqual(normalized.comments, [{ createdAt: '2026-09-30T08:00:00Z', authorAssociation: 'CONTRIBUTOR' }]);
+  assert.deepEqual(normalized.comments, [{ createdAt: '2026-09-30T08:00:00Z', authorAssociation: 'CONTRIBUTOR', body: 'ship it' }]);
   assert.equal(normalized.last_push, '2026-10-05T12:00:00Z');
   assert.equal(normalized.updatedAt, '2026-10-06T00:00:00Z');
   assert.equal(normalized.close_reason, null);
@@ -54,6 +70,33 @@ test('normalizeGhPrView parses merged, reviewDecision, mixed rollups and maintai
   assert.deepEqual(open.reviews, [{ state: 'COMMENTED', authorAssociation: 'NONE' }]);
   assert.equal(open.last_push, '2026-10-06T00:00:00Z');
   assert.equal(open.review_decision, null);
+  assert.equal(open.close_reason, null);
+});
+
+test('normalizeGhPrView derives close_reason from the last maintainer comment on a closed pull request', () => {
+  const normalized = normalizeGhPrView(CLOSED_RAW);
+
+  assert.equal(normalized.state, 'CLOSED');
+  assert.equal(normalized.merged, false);
+  assert.equal(normalized.close_reason, 'closing: out of scope');
+  assert.deepEqual(normalized.comments, [
+    { createdAt: '2026-09-28T08:00:00Z', authorAssociation: 'CONTRIBUTOR', body: 'any update?' },
+    { createdAt: '2026-09-29T08:00:00Z', authorAssociation: 'MEMBER', body: 'closing: out of scope' },
+    { createdAt: '2026-09-30T08:00:00Z', authorAssociation: 'NONE', body: 'understood' },
+  ]);
+});
+
+test('normalizeGhPrView close_reason falls back to the last comment, truncates at 500 chars and is null without comments', () => {
+  const noMaintainer = normalizeGhPrView({
+    ...CLOSED_RAW,
+    comments: [
+      { createdAt: '2026-09-28T08:00:00Z', authorAssociation: 'CONTRIBUTOR', body: 'first' },
+      { createdAt: '2026-09-29T08:00:00Z', authorAssociation: 'NONE', body: 'x'.repeat(600) },
+    ],
+  });
+  assert.equal(noMaintainer.close_reason, 'x'.repeat(500));
+
+  assert.equal(normalizeGhPrView({ ...CLOSED_RAW, comments: [] }).close_reason, null);
 });
 
 test('hydrateGitPr calls gh pr view with the frozen field list and returns a normalized item', () => {

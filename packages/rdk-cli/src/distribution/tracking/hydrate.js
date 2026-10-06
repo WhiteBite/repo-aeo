@@ -4,7 +4,7 @@
  * to the recorded state whenever the runner is missing, fails or emits
  * unparsable output. Never throws.
  */
-import { countChecks } from './attention.js';
+import { countChecks, isMaintainer } from './attention.js';
 
 const GH_PR_FIELDS = 'state,isDraft,reviewDecision,latestReviews,reviews,comments,statusCheckRollup,mergeStateStatus,mergeable,labels,updatedAt,closedAt,mergedAt,url,commits';
 
@@ -17,6 +17,20 @@ function lastPush(raw) {
   return latest ?? raw.updatedAt ?? null;
 }
 
+function closeReason(raw) {
+  if (raw.state !== 'CLOSED') return null;
+  let maintainer = null;
+  let last = null;
+  for (const comment of raw.comments ?? []) {
+    if (!comment) continue;
+    last = comment;
+    if (isMaintainer(comment.authorAssociation)) maintainer = comment;
+  }
+  const chosen = maintainer || last;
+  const body = chosen ? chosen.body : null;
+  return typeof body === 'string' ? body.slice(0, 500) : null;
+}
+
 export function normalizeGhPrView(raw) {
   return {
     state: raw.state ?? null,
@@ -26,10 +40,10 @@ export function normalizeGhPrView(raw) {
     merged: raw.mergedAt != null,
     checks: countChecks(raw.statusCheckRollup),
     reviews: (raw.latestReviews ?? raw.reviews ?? []).map((r) => ({ state: r.state, authorAssociation: r.authorAssociation })),
-    comments: (raw.comments ?? []).map((c) => ({ createdAt: c.createdAt, authorAssociation: c.authorAssociation })),
+    comments: (raw.comments ?? []).map((c) => ({ createdAt: c.createdAt, authorAssociation: c.authorAssociation, body: c.body ?? '' })),
     last_push: lastPush(raw),
     updatedAt: raw.updatedAt ?? null,
-    close_reason: raw.stateReason ?? null,
+    close_reason: closeReason(raw),
     url: raw.url ?? null,
   };
 }

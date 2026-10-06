@@ -1,6 +1,5 @@
 const MAINTAINERS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 const CHECK_PASS = new Set(['SUCCESS', 'NEUTRAL', 'SKIPPED', 'STALE']);
-const CHECK_FAIL = new Set(['FAILURE', 'ACTION_REQUIRED', 'TIMED_OUT', 'CANCELLED', 'STARTUP_FAILURE']);
 const CONTEXT_FAIL = new Set(['ERROR', 'FAILURE']);
 const CONTEXT_PENDING = new Set(['EXPECTED', 'PENDING']);
 const TERMINAL_STATUSES = new Set(['rejected', 'closed', 'unlisted', 'failed']);
@@ -18,7 +17,7 @@ export function countChecks(rollup) {
     if (typeof node.status === 'string') {
       if (node.status !== 'COMPLETED') counts.pending += 1;
       else if (CHECK_PASS.has(node.conclusion)) counts.pass += 1;
-      else if (CHECK_FAIL.has(node.conclusion)) counts.fail += 1;
+      else counts.fail += 1;
       continue;
     }
     if (typeof node.state === 'string') {
@@ -38,7 +37,7 @@ function changesRequested(state) {
 
 function maintainerCommentAfterPush(state) {
   const comments = Array.isArray(state.comments) ? state.comments : [];
-  return comments.some((comment) => comment && isMaintainer(comment.authorAssociation) && comment.createdAt > state.last_push);
+  return comments.some((comment) => comment && isMaintainer(comment.authorAssociation) && comment.createdAt > (state.last_push || ''));
 }
 
 function ageInDays(then, now) {
