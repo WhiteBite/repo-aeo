@@ -285,8 +285,13 @@ export async function submitCommand({ cwd, options = {}, config, loaded, ghRunne
     });
   }
 
-  if (applied.some((record) => record.updated === true)) upsertRecords(cwd, applied);
-  else appendRecords(cwd, applied);
+  const persisted = applied.map((record) => {
+    const copy = { ...record };
+    delete copy.updated;
+    return copy;
+  });
+  if (applied.some((record) => record.updated === true)) upsertRecords(cwd, persisted);
+  else appendRecords(cwd, persisted);
   lines.push('');
   lines.push(`Reason logged: ${options.reason}`);
   lines.push(`Recorded ${applied.length} submission(s) in .discoverability/submissions.json.`);

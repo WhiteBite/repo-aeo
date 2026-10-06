@@ -235,6 +235,7 @@ test('submit --apply updates an existing PR and replaces the ledger row instead 
     assert.equal(ledger[0].status, 'open');
     assert.equal(ledger[0].pr_url, 'https://github.com/owner/list/pull/9');
     assert.equal(ledger[0].dedupe_key, 'awesome-list:owner/list');
+    assert.equal(ledger[0].updated, undefined);
   } finally {
     removeRepo(dir);
   }

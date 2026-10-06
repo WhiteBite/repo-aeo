@@ -127,6 +127,27 @@ test('upsertRecords replaces matching rows, appends new ones and never repairs a
   }
 });
 
+test('upsertRecords matches an incoming pr_url-only row against an existing dedupe_key row', () => {
+  const dir = makeRepo({});
+  try {
+    appendRecords(dir, [
+      { dedupe_key: 'awesome-list:a/b', target: 'a/b', status: 'needs_changes', pr_url: 'https://github.com/a/b/pull/1' },
+    ]);
+    const written = upsertRecords(dir, [
+      { pr_url: 'https://github.com/a/b/pull/1', status: 'open' },
+    ]);
+    assert.equal(written.length, 1);
+    assert.deepEqual(written[0], {
+      dedupe_key: 'awesome-list:a/b',
+      target: 'a/b',
+      status: 'open',
+      pr_url: 'https://github.com/a/b/pull/1',
+    });
+  } finally {
+    removeRepo(dir);
+  }
+});
+
 test('isBlocking blocks in-flight and landed statuses and frees the terminal negatives', () => {
   for (const status of ['prepared', 'submitted', 'open', 'merged', 'listed']) {
     assert.equal(isBlocking({ status }), true, status);

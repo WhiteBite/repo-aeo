@@ -55,8 +55,9 @@ export function upsertRecords(cwd, rows) {
   if (existing === null) return null;
   const next = [...existing];
   for (const row of rows) {
-    const key = row.dedupe_key || row.pr_url;
-    const idx = next.findIndex((entry) => (entry.dedupe_key || entry.pr_url) === key);
+    const idx = next.findIndex((entry) =>
+      (row.dedupe_key && entry.dedupe_key === row.dedupe_key) ||
+      (row.pr_url && entry.pr_url === row.pr_url));
     if (idx === -1) next.push(row);
     else next[idx] = { ...next[idx], ...row };
   }
