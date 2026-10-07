@@ -2,10 +2,23 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { POLICY, describe, plan, buildChecklist, execute, probe } from '../src/distribution/mechanisms/cliPublish.js';
+import { POLICY, describe, plan, buildChecklist, execute, probe, verify } from '../src/distribution/mechanisms/cliPublish.js';
 import { makeRepo, removeRepo } from './helpers.js';
 
 const MODULE_PATH = join(import.meta.dirname, '..', 'src', 'distribution', 'mechanisms', 'cliPublish.js');
+
+function stubFetch(responses) {
+  const calls = [];
+  const fetchImpl = async (url, init = {}) => {
+    const res = typeof responses === 'function' ? responses(url, init, calls.length) : responses[calls.length];
+    calls.push({ url, init });
+    return res;
+  };
+  return { fetchImpl, calls };
+}
+
+const okJson = (body) => ({ ok: true, status: 200, text: async () => body });
+const errHttp = (status, body = '') => ({ ok: false, status, text: async () => body });
 
 test('POLICY is listings-only and never runs publish commands', () => {
   assert.deepEqual(POLICY, { mode: 'listings-only', runs_publish_commands: false });
@@ -72,6 +85,41 @@ test('probe returns the registry url as ref and null without it', () => {
   assert.deepEqual(probe({ registry_url: 'https://registry.npmjs.org/pkg' }), { kind: 'registry-read', ref: 'https://registry.npmjs.org/pkg' });
   assert.deepEqual(probe({}), { kind: 'registry-read', ref: null });
   assert.deepEqual(probe(null), { kind: 'registry-read', ref: null });
+});
+
+test('verify reads the npm registry and encodes a scoped package', async () => {
+  const record = { package: '@scope/pkg', version: '1.0.0', registry_url: 'https://registry.npmjs.org/@scope/pkg' };
+  const { fetchImpl, calls } = stubFetch([okJson('{"versions":{"1.0.0":{}}}')]);
+  const result = await verify({ record, fetchImpl });
+  assert.deepEqual(result, { status: 'listed' });
+  assert.ok(calls[0].url.includes('%40scope%2Fpkg'));
+  assert.equal(calls[0].init.headers.accept, 'application/vnd.npm.install-v1+json');
+});
+
+test('verify returns unlisted when the requested version is not in the registry payload', async () => {
+  const record = { package: 'pkg', version: '1.0.0', registry_url: 'https://registry.npmjs.org/pkg' };
+  const { fetchImpl } = stubFetch([okJson('{"versions":{"0.9.0":{}},"dist-tags":{"latest":"0.9.0"}}')]);
+  assert.deepEqual(await verify({ record, fetchImpl }), { status: 'unlisted' });
+});
+
+test('verify returns unlisted on 404', async () => {
+  const record = { package: 'pkg', version: '1.0.0' };
+  const { fetchImpl } = stubFetch([errHttp(404, '{"error":"Not found"}')]);
+  assert.deepEqual(await verify({ record, fetchImpl }), { status: 'unlisted' });
+});
+
+test('verify returns unlisted when fetch throws', async () => {
+  const record = { package: 'pkg', version: '1.0.0' };
+  const { fetchImpl } = stubFetch(() => {
+    throw new Error('offline');
+  });
+  assert.deepEqual(await verify({ record, fetchImpl }), { status: 'unlisted' });
+});
+
+test('verify returns unlisted without a package and never fetches', async () => {
+  const { fetchImpl, calls } = stubFetch([okJson('{}')]);
+  assert.deepEqual(await verify({ record: { version: '1.0.0' }, fetchImpl }), { status: 'unlisted' });
+  assert.equal(calls.length, 0);
 });
 
 test('module source has no process-spawning capability at all', () => {

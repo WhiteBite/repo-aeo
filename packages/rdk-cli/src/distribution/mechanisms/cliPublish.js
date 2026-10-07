@@ -84,3 +84,46 @@ export function probe(record) {
   const ref = record && typeof record.registry_url === 'string' && record.registry_url !== '' ? record.registry_url : null;
   return { kind: 'registry-read', ref };
 }
+
+const ABBREVIATED_ACCEPT = 'application/vnd.npm.install-v1+json';
+
+function verifyFetchUrl(record) {
+  if (typeof record.registry_url === 'string' && record.registry_url !== '') {
+    return record.registry_url.includes(record.package)
+      ? record.registry_url.replace(record.package, encodeURIComponent(record.package))
+      : record.registry_url;
+  }
+  return `https://registry.npmjs.org/${encodeURIComponent(record.package)}`;
+}
+
+/**
+ * Verifies registry presence: GETs the abbreviated metadata document for the
+ * record's package through the injected fetchImpl (global fetch only when none
+ * is injected) and resolves to { status: 'listed' | 'unlisted' }. The version
+ * counts as listed when it appears in `versions` or equals `dist-tags.latest`;
+ * without a recorded version any package document with a `versions` map is
+ * listed. Absent identity, non-2xx, transport and parse failures resolve to
+ * 'unlisted' instead of throwing.
+ */
+export async function verify({ record, fetchImpl } = {}) {
+  const fetcher = typeof fetchImpl === 'function' ? fetchImpl : fetch;
+  try {
+    const pkg = record && record.package;
+    if (typeof pkg !== 'string' || pkg === '') return { status: 'unlisted' };
+    const version = typeof record.version === 'string' && record.version !== '' ? record.version : null;
+    const response = await fetcher(verifyFetchUrl(record), { headers: { accept: ABBREVIATED_ACCEPT } });
+    if (!response || response.ok === false) return { status: 'unlisted' };
+    if (typeof response.status !== 'number' || response.status < 200 || response.status >= 300) {
+      return { status: 'unlisted' };
+    }
+    const body = JSON.parse(await response.text());
+    const versions = body && body.versions;
+    if (!versions || typeof versions !== 'object') return { status: 'unlisted' };
+    if (!version) return { status: 'listed' };
+    if (Object.hasOwn(versions, version)) return { status: 'listed' };
+    const latest = body['dist-tags'] && body['dist-tags'].latest;
+    return { status: latest === version ? 'listed' : 'unlisted' };
+  } catch {
+    return { status: 'unlisted' };
+  }
+}
