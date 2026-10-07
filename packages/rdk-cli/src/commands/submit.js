@@ -6,7 +6,7 @@
 import { run } from '../util/proc.js';
 import { resolveRepo } from './githubSync.js';
 import { ACK_HINT, assertWriteGuards, planDigest } from '../distribution/guard.js';
-import { appendRecords, isBlocking, readLedger, submissionsPath, upsertRecords } from '../distribution/ledger.js';
+import { isBlocking, readLedger, submissionsPath, upsertRecords } from '../distribution/ledger.js';
 import { applicableChannels, channelById } from '../distribution/channels.js';
 import { mechanismById } from '../distribution/mechanisms/registry.js';
 import { artifactInventory } from '../distribution/recommend.js';
@@ -132,7 +132,7 @@ async function submitViaChannel({ cwd, options, config, loaded, channel, mechani
     }
   }
 
-  if (applied.length > 0) appendRecords(cwd, applied);
+  if (applied.length > 0) upsertRecords(cwd, applied);
   lines.push('');
   lines.push(`Reason logged: ${options.reason}`);
   lines.push(`Recorded ${applied.length} submission(s) in .discoverability/submissions.json.`);
@@ -290,8 +290,7 @@ export async function submitCommand({ cwd, options = {}, config, loaded, ghRunne
     delete copy.updated;
     return copy;
   });
-  if (applied.some((record) => record.updated === true)) upsertRecords(cwd, persisted);
-  else appendRecords(cwd, persisted);
+  upsertRecords(cwd, persisted);
   lines.push('');
   lines.push(`Reason logged: ${options.reason}`);
   lines.push(`Recorded ${applied.length} submission(s) in .discoverability/submissions.json.`);

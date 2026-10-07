@@ -569,6 +569,9 @@ export const TOOLS = [
       if (ledger === null) {
         return { ok: false, cwd, error: 'could not parse .discoverability/submissions.json', fix: 'the file is committed campaign state - fix it by hand or restore it from git' };
       }
+      if (args.adopt === true && args.sync === true) {
+        return { ok: false, cwd, error: 'pass either adopt or sync, not both' };
+      }
       const status = buildDistributionStatus({
         cwd,
         loaded: loadConfig(cwd),

@@ -241,6 +241,39 @@ test('submit --apply updates an existing PR and replaces the ledger row instead 
   }
 });
 
+test('submit --apply retrying after a closed PR replaces the stale ledger row instead of duplicating it', async () => {
+  const { dir, config } = repo();
+  try {
+    mkdirSync(join(dir, '.discoverability'), { recursive: true });
+    writeFileSync(join(dir, '.discoverability', 'submissions.json'), JSON.stringify([
+      { target: 'owner/list', channel: 'awesome-list', dedupe_key: 'awesome-list:owner/list', pr_url: 'https://github.com/owner/list/pull/9', status: 'closed' },
+    ]));
+    const gh = ghStub({
+      'api user': () => ({ ok: true, stdout: 'WhiteBite\n', stderr: '', code: 0 }),
+      'repo fork': () => ({ ok: true, stdout: '', stderr: '', code: 0 }),
+      'pr list': () => ({ ok: true, stdout: JSON.stringify([{ url: 'https://github.com/owner/list/pull/9', state: 'CLOSED' }]), stderr: '', code: 0 }),
+      'pr create': () => ({ ok: true, stdout: 'https://github.com/owner/list/pull/44\n', stderr: '', code: 0 }),
+    });
+    const git = gitStub({ onClone: (work) => { mkdirSync(work, { recursive: true }); writeFileSync(join(work, 'README.md'), LIST_README); } });
+    const preview = await submitCommand({ cwd: dir, options: { targets: 'owner/list', category: 'Tools', repo: 'owner/demo' }, config, ghRunner: gh, gitRunner: git });
+    const result = await submitCommand({
+      cwd: dir,
+      options: { apply: true, ack: 'I_ACK_RDK_GITHUB_WRITE', reason: 'unit test retry', plan_digest: preview.plan_digest, targets: 'owner/list', category: 'Tools', repo: 'owner/demo' },
+      config,
+      ghRunner: gh,
+      gitRunner: git,
+    });
+    assert.equal(result.ok, true, result.output);
+    const ledger = JSON.parse(readFileSync(join(dir, '.discoverability', 'submissions.json'), 'utf8'));
+    assert.equal(ledger.length, 1, 'the retry must replace the stale closed row, not append a second one');
+    assert.equal(ledger[0].status, 'open');
+    assert.equal(ledger[0].pr_url, 'https://github.com/owner/list/pull/44');
+    assert.equal(ledger[0].dedupe_key, 'awesome-list:owner/list');
+  } finally {
+    removeRepo(dir);
+  }
+});
+
 test('submit --apply refuses a stale plan digest', async () => {
   const { dir, config } = repo();
   try {

@@ -111,7 +111,9 @@ function existingPr({ item, owner, gh }) {
     parsed = null;
   }
   if (!Array.isArray(parsed)) return { ok: false, error: 'unparsable gh pr list output' };
-  const hit = parsed.find((pr) => pr && typeof pr.url === 'string' && pr.url !== '');
+  const entries = parsed.filter((pr) => pr && typeof pr.url === 'string' && pr.url !== '');
+  const open = entries.find((pr) => pr.state === 'OPEN');
+  const hit = open || entries[0];
   return { ok: true, pr: hit ? { url: hit.url, state: hit.state } : null };
 }
 
@@ -191,8 +193,8 @@ export function execute({ item, owner, gh, git }) {
     return fail(`could not check for an existing pull request against ${item.target}: ${existing.error}`);
   }
   if (existing.pr && existing.pr.state === 'OPEN') return updateExistingPr({ item, git, lines, fail, fork, prUrl: existing.pr.url });
-  if (existing.pr) {
-    // best-effort: a closed/merged PR leaves the fork branch behind and the fresh push would be non-fast-forward
+  if (existing.pr && existing.pr.state === 'CLOSED') {
+    // best-effort: the closed PR leaves the fork branch behind and the fresh push would be non-fast-forward
     git(['push', `https://github.com/${fork}.git`, '--delete', item.branch], { timeout: 60000 });
   }
   const work = mkdtempSync(join(tmpdir(), 'rdk-submit-'));

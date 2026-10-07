@@ -535,9 +535,39 @@ test('distribution_check_submissions sync preview leaves non-gh-pr rows recorded
     const synced = await callTool('distribution_check_submissions', { cwd: box.dir, sync: true });
     assert.equal(synced.ok, true);
     assert.ok(Array.isArray(synced.preview), 'sync returns the preview changes');
-    const keys = synced.preview.map((change) => change.key);
-    assert.ok(!keys.includes('mcp-directory-form:submit'), 'a web-form row is not hydratable and keeps its recorded status');
+    assert.deepEqual(synced.preview, [], 'nothing hydrates offline, so the preview is empty and no row is rewritten');
     assert.equal(readFileSync(ledgerPath).compare(before), 0, 'sync must not write the ledger');
+  } finally {
+    box.cleanup();
+  }
+});
+
+test('distribution_check_submissions refuses adopt and sync together', async () => {
+  const box = sandbox();
+  try {
+    mkdirSync(join(box.dir, '.discoverability'), { recursive: true });
+    const ledgerPath = join(box.dir, '.discoverability', 'submissions.json');
+    writeFileSync(
+      ledgerPath,
+      `${JSON.stringify(
+        [
+          {
+            channel: 'awesome-list',
+            mechanism: 'git-pr',
+            artifact: 'readme-row',
+            dedupe_key: 'awesome-list:owner/list',
+            target: 'owner/list',
+            pr_url: 'https://github.com/owner/list/pull/9',
+            status: 'open',
+          },
+        ],
+        null,
+        2,
+      )}\n`,
+    );
+    const refused = await callTool('distribution_check_submissions', { cwd: box.dir, adopt: true, sync: true });
+    assert.equal(refused.ok, false);
+    assert.equal(refused.error, 'pass either adopt or sync, not both');
   } finally {
     box.cleanup();
   }

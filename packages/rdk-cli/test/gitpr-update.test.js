@@ -142,6 +142,28 @@ test('gitPr.execute deletes the stale fork branch and opens a new PR when the on
   assert.equal(result.record.updated, undefined);
 });
 
+test('gitPr.execute prefers the open PR over a closed one when gh pr list returns both', () => {
+  const gh = ghStub({
+    'repo fork': () => ({ ok: true, stdout: '', stderr: '', code: 0 }),
+    'pr list': () => ({
+      ok: true,
+      stdout: JSON.stringify([
+        { url: 'https://github.com/owner/list/pull/9', state: 'CLOSED' },
+        { url: 'https://github.com/owner/list/pull/10', state: 'OPEN' },
+      ]),
+      stderr: '',
+      code: 0,
+    }),
+  });
+  const git = gitStub({ onClone: wroteBranchReadme });
+  const result = execute({ item: ITEM, owner: 'WhiteBite', gh, git });
+  assert.equal(result.ok, true, result.error);
+  assert.equal(result.record.pr_url, 'https://github.com/owner/list/pull/10');
+  assert.equal(result.record.updated, true);
+  assert.equal(git.calls.some((args) => args.includes('--delete')), false);
+  assert.equal(gh.calls.some((args) => args[0] === 'pr' && args[1] === 'create'), false);
+});
+
 test('gitPr.execute refuses and records nothing when the update push fails', () => {
   const gh = ghStub({
     'repo fork': () => ({ ok: true, stdout: '', stderr: '', code: 0 }),
