@@ -54,10 +54,10 @@ function planFor({ cwd, options, config, loaded, channel, mechanism }) {
   return mechanism.plan({ channel });
 }
 
-function executeFor({ mechanism, channel, item, cwd, config, fetchImpl }) {
+function executeFor({ mechanism, channel, item, cwd, config, fetchImpl, url }) {
   if (channel.mechanism === 'http-json') return mechanism.execute({ item, channel, fetchImpl, env: process.env });
   if (channel.mechanism === 'web-form' || channel.mechanism === 'cli-publish') return mechanism.execute({ item, channel, cwd, config });
-  return mechanism.execute({ item, channel });
+  return mechanism.execute({ item, channel, url });
 }
 
 async function submitViaChannel({ cwd, options, config, loaded, channel, mechanism, fetchImpl, lines, fail, refuse }) {
@@ -115,8 +115,10 @@ async function submitViaChannel({ cwd, options, config, loaded, channel, mechani
   }
 
   const applied = [];
+  const repoSlug = resolveRepo(cwd, options);
+  const url = repoSlug ? `https://github.com/${repoSlug}` : null;
   for (const item of active) {
-    const executed = await executeFor({ mechanism, channel, item, cwd, config, fetchImpl });
+    const executed = await executeFor({ mechanism, channel, item, cwd, config, fetchImpl, url });
     lines.push(...executed.lines);
     if (!executed.ok) return fail(executed.error, { applied });
     if (executed.record) {

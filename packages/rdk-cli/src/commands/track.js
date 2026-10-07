@@ -59,12 +59,10 @@ function adoptMode({ cwd, options, config, ledger, gh, lines, fail, refuse }) {
   return { ok: true, output: `${lines.join('\n')}\n`, exitCode: 0, plan: rows, plan_digest: digest, adopted: rows };
 }
 
-function syncMode({ cwd, options, config, ledger, gh, lines, fail, refuse, now }) {
+async function syncMode({ cwd, options, config, ledger, gh, fetchImpl, lines, fail, refuse, now }) {
   const hydratedByKey = {};
   for (const row of ledger) {
-    const descriptor = row.channel ? channelById(row.channel) : null;
-    const probeKind = (descriptor && descriptor.probe) || (row.pr_url ? 'gh-pr' : null);
-    const hydrated = hydrateByProbe({ probe: { kind: probeKind, ref: row.pr_url || null }, entry: row, gh, cwd });
+    const hydrated = await hydrateByProbe({ entry: row, channel: channelById(row.channel), gh, fetchImpl, cwd, now });
     if (hydrated && hydrated.ok && hydrated.normalized) hydratedByKey[row.dedupe_key || row.pr_url] = hydrated.normalized;
   }
 
@@ -121,7 +119,7 @@ export async function trackCommand({ cwd, options = {}, config, loaded, ghRunner
   }
 
   if (options.adopt) return adoptMode({ cwd, options, config, ledger, gh, lines, fail, refuse });
-  if (options.sync) return syncMode({ cwd, options, config, ledger, gh, lines, fail, refuse, now });
+  if (options.sync) return syncMode({ cwd, options, config, ledger, gh, fetchImpl, lines, fail, refuse, now });
 
   const status = await buildDistributionStatus({ cwd, loaded, gh, git: gitRunner, fetchImpl, now });
   if (options.json) return { ok: true, output: `${JSON.stringify(status, null, 2)}\n`, exitCode: 0, status };

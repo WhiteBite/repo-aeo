@@ -365,6 +365,12 @@ test('syncTransition maps merged/closed/changes-requested to listed/closed/needs
   assert.equal(syncTransition({}), null);
 });
 
+test('syncTransition maps a presence probe result before the PR branches', () => {
+  assert.equal(syncTransition({ presence: 'listed', checked_at: '2026-10-06T00:00:00.000Z', url: 'https://x' }), 'listed');
+  assert.equal(syncTransition({ presence: 'unlisted', checked_at: '2026-10-06T00:00:00.000Z', url: null }), 'unlisted');
+  assert.equal(syncTransition({ presence: 'listed', merged: false, state: 'OPEN' }), 'listed');
+});
+
 test('applySync is idempotent, skips a null close_reason and marks synced_at only on changed rows', () => {
   const at = '2026-10-06T00:00:00.000Z';
   const rows = [

@@ -113,6 +113,12 @@ test('evaluateAttention maps live merge and close states', () => {
   assert.equal(evaluateAttention(hydrated({ state: 'CLOSED' }), ENTRY, CTX), 'terminal');
 });
 
+test('evaluateAttention maps a live presence to listed or terminal', () => {
+  assert.equal(evaluateAttention({ presence: 'listed', checked_at: NOW, url: 'https://x' }, ENTRY, CTX), 'listed');
+  assert.equal(evaluateAttention({ presence: 'unlisted', checked_at: NOW, url: null }, ENTRY, CTX), 'terminal');
+  assert.equal(evaluateAttention({ presence: 'listed', checked_at: NOW, url: 'https://x' }, ENTRY, { hasLive: false, now: NOW }), 'none');
+});
+
 test('evaluateAttention approves an approved green pull request', () => {
   const state = hydrated({ review_decision: 'APPROVED', checks: { pass: 2, fail: 0, pending: 0 } });
   assert.equal(evaluateAttention(state, ENTRY, CTX), 'approved');
@@ -157,6 +163,13 @@ test('neededFor returns the single code for the remaining states', () => {
   assert.deepEqual(neededFor('stale', hydrated()), ['refresh']);
   assert.deepEqual(neededFor('none', hydrated()), []);
   assert.deepEqual(neededFor('terminal', hydrated()), []);
+});
+
+test('neededFor drops fork cleanup when the listed state came from a presence probe', () => {
+  assert.deepEqual(neededFor('listed', { presence: 'listed', checked_at: NOW, url: 'https://x' }), []);
+  assert.deepEqual(neededFor('listed', { presence: 'unlisted', checked_at: NOW, url: null }), []);
+  assert.deepEqual(neededFor('listed', hydrated({ state: 'MERGED', merged: true })), ['cleanup_fork']);
+  assert.deepEqual(neededFor('listed', null), ['cleanup_fork']);
 });
 
 test('commandFor emits the guarded update command for action_required', () => {

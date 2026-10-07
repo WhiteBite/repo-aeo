@@ -64,8 +64,10 @@ export function upsertRecords(cwd, rows) {
   return writeLedger(cwd, next);
 }
 
-/** Maps a hydrated PR onto a ledger status transition; null means no transition. */
+/** Maps a hydrated PR or presence onto a ledger status transition; null means no transition. */
 export function syncTransition(hydrated) {
+  if (hydrated.presence === 'listed') return 'listed';
+  if (hydrated.presence === 'unlisted') return 'unlisted';
   if (hydrated.merged) return 'listed';
   if (hydrated.state === 'CLOSED') return 'closed';
   if (hydrated.review_decision === 'CHANGES_REQUESTED') return 'needs_changes';

@@ -322,10 +322,10 @@ export declare function projectStatus(record: Submission, probeResult: { state: 
 
 export declare function writeLedger(cwd: string, rows: Submission[]): Submission[] | null;
 export declare function upsertRecords(cwd: string, rows: Submission[]): Submission[] | null;
-export declare function syncTransition(hydrated: NormalizedPr): string | null;
+export declare function syncTransition(hydrated: NormalizedPr | NormalizedPresence): string | null;
 export declare function applySync(
   rows: Submission[],
-  hydratedByKey: Record<string, NormalizedPr>,
+  hydratedByKey: Record<string, NormalizedPr | NormalizedPresence>,
   args: { at: string },
 ): { rows: Submission[]; changes: Array<{ key: string; from: string; to: string }> };
 
@@ -340,6 +340,9 @@ export interface DistributionItem {
   review_decision: string | null;
   merge_state: string | null;
   checks: { pass: number; fail: number; pending: number };
+  presence: string | null;
+  url: string | null;
+  checked_at: string | null;
   attention: AttentionState;
   needed: string[];
   why: string;
@@ -364,7 +367,7 @@ export declare function buildDistributionStatus(args: {
   fetchImpl?: (url: string, init?: Record<string, unknown>) => Promise<{ ok: boolean; status?: number; text?: () => Promise<string> }>;
   now?: () => string;
   live?: boolean;
-}): DistributionStatus;
+}): Promise<DistributionStatus>;
 export declare function renderDistributionStatus(status: DistributionStatus): string;
 
 export interface NormalizedPr {
@@ -382,6 +385,12 @@ export interface NormalizedPr {
   url: string | null;
 }
 
+export interface NormalizedPresence {
+  presence: 'listed' | 'unlisted';
+  checked_at: string;
+  url: string | null;
+}
+
 export declare function normalizeGhPrView(raw: Record<string, unknown>): NormalizedPr;
 export declare function hydrateGitPr(args: {
   entry: Submission;
@@ -389,18 +398,20 @@ export declare function hydrateGitPr(args: {
   cwd: string;
 }): { ok: boolean; normalized?: NormalizedPr; raw?: unknown; error?: string };
 export declare function hydrateByProbe(args: {
-  probe: { kind: string | null; ref: string | null };
   entry: Submission;
+  channel?: ChannelDescriptor | null;
   gh?: (args: string[], opts?: { cwd?: string }) => { ok: boolean; stdout?: string; stderr?: string };
+  fetchImpl?: (url: string, init?: Record<string, unknown>) => Promise<{ ok: boolean; status?: number; text?: () => Promise<string> }>;
   cwd?: string;
-}): { ok: boolean; normalized?: NormalizedPr; raw?: unknown; error?: string; recorded?: boolean; kind?: string };
+  now?: () => string;
+}): Promise<{ ok: boolean; kind?: string | null; normalized?: NormalizedPr | NormalizedPresence; raw?: unknown; error?: string; recorded?: boolean }>;
 
 export declare function evaluateAttention(
-  hydrated: NormalizedPr | null,
+  hydrated: NormalizedPr | NormalizedPresence | null,
   entry: Submission | null,
   ctx: { hasLive?: boolean; now?: string; staleDays?: number },
 ): AttentionState;
-export declare function neededFor(attention: AttentionState, hydrated: NormalizedPr | null): string[];
+export declare function neededFor(attention: AttentionState, hydrated: NormalizedPr | NormalizedPresence | null): string[];
 export declare function commandFor(
   item: { channel?: string | null; target?: string | null; pr_url?: string | null; attention?: string; fork?: string },
   ctx: Record<string, unknown>,

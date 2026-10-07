@@ -1,10 +1,8 @@
-/**
- * Live hydration of recorded submissions: turns a `gh pr view --json` payload
- * into the normalized snapshot shape via the injected gh runner, and degrades
- * to the recorded state whenever the runner is missing, fails or emits
- * unparsable output. Never throws.
- */
+/** Live hydration of recorded submissions: gh-pr via the gh runner, fetch channels via their verifiers; never throws. */
 import { countChecks, isMaintainer } from './attention.js';
+import * as passive from '../mechanisms/passive.js';
+import * as httpJson from '../mechanisms/httpJson.js';
+import * as cliPublish from '../mechanisms/cliPublish.js';
 
 const GH_PR_FIELDS = 'state,isDraft,reviewDecision,latestReviews,reviews,comments,statusCheckRollup,mergeStateStatus,mergeable,labels,updatedAt,closedAt,mergedAt,url,commits';
 
@@ -62,7 +60,39 @@ export function hydrateGitPr({ entry, gh, cwd }) {
   }
 }
 
-export function hydrateByProbe({ probe, entry, gh, cwd }) {
-  if (probe.kind === 'gh-pr') return hydrateGitPr({ entry, gh, cwd });
-  return { ok: false, recorded: true, kind: probe.kind };
+function presenceUrl(kind, entry, channel) {
+  if (kind === 'crawl') return (channel && channel.checkUrl) || null;
+  if (kind === 'http-search') {
+    return entry && typeof entry.server_name === 'string' && entry.server_name !== ''
+      ? `https://registry.modelcontextprotocol.io/v0.1/servers/${encodeURIComponent(entry.server_name)}/versions/latest`
+      : null;
+  }
+  if (kind === 'registry-read') return (entry && entry.registry_url) || null;
+  return null;
+}
+
+async function verifyPresence(kind, { entry, channel, fetchImpl }) {
+  if (kind === 'crawl') return passive.verify({ record: entry, channel, fetchImpl });
+  if (kind === 'http-search') return httpJson.verify({ record: entry, fetchImpl });
+  return cliPublish.verify({ record: entry, fetchImpl });
+}
+
+export async function hydrateByProbe({ entry, channel, gh, fetchImpl, cwd, now = () => new Date().toISOString() }) {
+  const kind = (channel && channel.probe) || (entry && entry.pr_url ? 'gh-pr' : null);
+  try {
+    if (kind === 'gh-pr') {
+      if (!entry || !entry.pr_url) return { ok: false, kind, recorded: true };
+      return { ...hydrateGitPr({ entry, gh, cwd }), kind };
+    }
+    if (kind === 'crawl' || kind === 'http-search' || kind === 'registry-read') {
+      const verified = await verifyPresence(kind, { entry, channel, fetchImpl });
+      if (!verified || typeof verified.status !== 'string') {
+        return { ok: false, kind, error: `${kind} verifier returned no status` };
+      }
+      return { ok: true, kind, normalized: { presence: verified.status, checked_at: now(), url: presenceUrl(kind, entry, channel) } };
+    }
+    return { ok: false, kind, recorded: true };
+  } catch (error) {
+    return { ok: false, kind, error: `${kind} probe failed: ${error && error.message ? error.message : String(error)}` };
+  }
 }

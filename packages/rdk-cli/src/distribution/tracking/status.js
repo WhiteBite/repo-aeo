@@ -38,14 +38,13 @@ function whyFor(attention, needed) {
   return 'no live state';
 }
 
-function projectRow(row, { cwd, gh, live, generated_at }) {
+async function projectRow(row, { cwd, gh, fetchImpl, live, generated_at, now }) {
   const descriptor = row.channel ? channelById(row.channel) : null;
-  const probeKind = (descriptor && descriptor.probe) || (row.pr_url ? 'gh-pr' : null);
 
   let normalized = null;
   let hasLive = false;
-  if (live && probeKind) {
-    const hydrated = hydrateByProbe({ probe: { kind: probeKind, ref: row.pr_url || null }, entry: row, gh, cwd });
+  if (live) {
+    const hydrated = await hydrateByProbe({ entry: row, channel: descriptor, gh, fetchImpl, cwd, now });
     hasLive = Boolean(hydrated && hydrated.ok && hydrated.normalized);
     normalized = hasLive ? hydrated.normalized : null;
   }
@@ -54,6 +53,8 @@ function projectRow(row, { cwd, gh, live, generated_at }) {
   const needed = neededFor(attention, normalized || {});
   const action = needed[0] || attention;
   const command = commandFor({ channel: row.channel, target: row.target, pr_url: row.pr_url, attention, fork: row.fork }, {});
+  const presence = normalized && typeof normalized.presence === 'string' ? normalized : null;
+  const pr = normalized && !presence ? normalized : null;
 
   return {
     hasLive,
@@ -62,11 +63,14 @@ function projectRow(row, { cwd, gh, live, generated_at }) {
       channel: row.channel ?? null,
       target: row.target ?? null,
       pr_url: row.pr_url ?? null,
-      state: normalized ? normalized.state : null,
-      is_draft: normalized ? normalized.is_draft : null,
-      review_decision: normalized ? normalized.review_decision : null,
-      merge_state: normalized ? normalized.merge_state : null,
-      checks: normalized ? normalized.checks : { pass: 0, fail: 0, pending: 0 },
+      state: pr ? pr.state : null,
+      is_draft: pr ? pr.is_draft : null,
+      review_decision: pr ? pr.review_decision : null,
+      merge_state: pr ? pr.merge_state : null,
+      checks: pr ? pr.checks : { pass: 0, fail: 0, pending: 0 },
+      presence: presence ? presence.presence : null,
+      url: presence ? presence.url : null,
+      checked_at: presence ? presence.checked_at : null,
       attention,
       needed,
       why: whyFor(attention, needed),
@@ -76,7 +80,7 @@ function projectRow(row, { cwd, gh, live, generated_at }) {
   };
 }
 
-export function buildDistributionStatus({ cwd, loaded, options = {}, gh, git, fetchImpl, now = () => new Date().toISOString(), live = true }) {
+export async function buildDistributionStatus({ cwd, loaded, options = {}, gh, git, fetchImpl, now = () => new Date().toISOString(), live = true }) {
   const generated_at = now();
   const rows = readLedger(cwd) || [];
   const by_attention = emptyCounts(ATTENTION_KEYS);
@@ -86,19 +90,21 @@ export function buildDistributionStatus({ cwd, loaded, options = {}, gh, git, fe
   const items = [];
 
   for (const row of rows) {
-    const { hasLive, normalized, item } = projectRow(row, { cwd, gh, live, generated_at });
+    const { hasLive, normalized, item } = await projectRow(row, { cwd, gh, fetchImpl, live, generated_at, now });
     items.push(item);
     if (by_attention[item.attention] !== undefined) by_attention[item.attention] += 1;
     by_state[stateBucket(item.state)] += 1;
     if (hasLive) {
-      cache.snapshots[snapshotKey(row)] = {
-        state: normalized.state,
-        review_decision: normalized.review_decision,
-        checks: normalized.checks,
-        close_reason: normalized.close_reason,
-        last_push: normalized.last_push,
-        fetched_at: generated_at,
-      };
+      cache.snapshots[snapshotKey(row)] = normalized.presence
+        ? { presence: normalized.presence, url: normalized.url, checked_at: normalized.checked_at, fetched_at: generated_at }
+        : {
+            state: normalized.state,
+            review_decision: normalized.review_decision,
+            checks: normalized.checks,
+            close_reason: normalized.close_reason,
+            last_push: normalized.last_push,
+            fetched_at: generated_at,
+          };
       cacheDirty = true;
     }
   }
@@ -116,7 +122,8 @@ export function buildDistributionStatus({ cwd, loaded, options = {}, gh, git, fe
 export function renderDistributionStatus(status) {
   const lines = ['# distribution'];
   for (const item of status.items) {
-    lines.push(`- ${item.target ?? ''} [${item.attention}]`);
+    const suffix = item.presence && item.url ? ` ${item.url}` : '';
+    lines.push(`- ${item.target ?? ''} [${item.attention}]${suffix}`);
     if (item.pr_url) lines.push(item.pr_url);
     if (item.command) lines.push(item.command);
   }

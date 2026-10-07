@@ -48,6 +48,9 @@ function ageInDays(then, now) {
 
 export function evaluateAttention(hydrated, entry, ctx) {
   const { hasLive, now, staleDays = 7 } = ctx || {};
+  if (hasLive && hydrated && typeof hydrated.presence === 'string') {
+    return hydrated.presence === 'listed' ? 'listed' : 'terminal';
+  }
   if (!hasLive || !hydrated) {
     const status = entry && entry.status;
     if (status === 'listed') return 'listed';
@@ -79,7 +82,7 @@ export function neededFor(attention, hydrated) {
   }
   if (attention === 'awaiting_review') return ['await_review'];
   if (attention === 'approved') return ['merge'];
-  if (attention === 'listed') return ['cleanup_fork'];
+  if (attention === 'listed') return hydrated && typeof hydrated.presence === 'string' ? [] : ['cleanup_fork'];
   if (attention === 'stale') return ['refresh'];
   return [];
 }

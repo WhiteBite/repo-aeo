@@ -46,6 +46,9 @@ function gh(args, { cwd } = {}) {
 
 const ghFor = (context) => (context && typeof context.gh === 'function' ? context.gh : gh);
 
+// undefined keeps the verifiers' global-fetch fallback for real clients
+const fetchFor = (context) => (context && typeof context.fetchImpl === 'function' ? context.fetchImpl : undefined);
+
 function resolveCwd(args, context = {}) {
   if (typeof args.cwd === 'string' && args.cwd !== '') return args.cwd;
   if (typeof context.cwd === 'string' && context.cwd !== '') return context.cwd;
@@ -552,16 +555,16 @@ export const TOOLS = [
     name: 'distribution_check_submissions',
     title: 'Distribution campaign status',
     description:
-      'Report the canonical distribution campaign status built from .discoverability/submissions.json: per-item channel, target, live PR state, attention and the next command to run, plus a summary by attention. live: true probes git-pr entries through the gh CLI while registry- and crawl-style entries keep their recorded state; include_recommendations: true adds which channels apply to this repository; adopt: true and sync: true return read-only previews with a plan_digest and never write the ledger.',
+      'Report the canonical distribution campaign status built from .discoverability/submissions.json: per-item channel, target, live PR state, live presence (listed/unlisted) for crawl- and registry-style channels, attention and the next command to run, plus a summary by attention. live: true probes git-pr entries through the gh CLI and verifies non-PR channels for live presence; include_recommendations: true adds which channels apply to this repository; adopt: true and sync: true return read-only previews with a plan_digest and never write the ledger.',
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     inputSchema: {
       type: 'object',
       properties: {
         cwd: { type: 'string', description: 'Repository directory holding .discoverability/submissions.json.' },
-        live: { type: 'boolean', default: false, description: 'Probe the live state of git-pr submissions via gh (default false: report the recorded state).' },
+        live: { type: 'boolean', default: false, description: 'Probe live state: git-pr submissions via gh, crawl- and registry-style channels via their presence checks (default false: report the recorded state).' },
         include_recommendations: { type: 'boolean', default: false, description: 'Also recommend distribution channels: which apply to this repository, their campaign status and the next action (default false).' },
         adopt: { type: 'boolean', default: false, description: 'Preview adopting unrecorded rdk/* pull requests into the ledger; read-only, never writes (default false).' },
-        sync: { type: 'boolean', default: false, description: 'Preview syncing recorded statuses with live PR states; read-only, never writes (default false).' },
+        sync: { type: 'boolean', default: false, description: 'Preview syncing recorded statuses with live PR states and presence checks; read-only, never writes (default false).' },
       },
       additionalProperties: false,
     },
@@ -574,11 +577,12 @@ export const TOOLS = [
       if (args.adopt === true && args.sync === true) {
         return { ok: false, cwd, error: 'pass either adopt or sync, not both' };
       }
-      const status = buildDistributionStatus({
+      const status = await buildDistributionStatus({
         cwd,
         loaded: loadConfig(cwd),
         live: args.live === true,
         gh: ghFor(context),
+        fetchImpl: fetchFor(context),
         now: () => new Date().toISOString(),
       });
       if (args.adopt === true) {
@@ -589,8 +593,7 @@ export const TOOLS = [
       if (args.sync === true) {
         const hydratedByKey = {};
         for (const row of ledger) {
-          const probeKind = channelById(row.channel)?.probe || (row.pr_url ? 'gh-pr' : null);
-          const hydrated = hydrateByProbe({ probe: { kind: probeKind, ref: row.pr_url || null }, entry: row, gh: ghFor(context), cwd });
+          const hydrated = await hydrateByProbe({ entry: row, channel: channelById(row.channel), gh: ghFor(context), fetchImpl: fetchFor(context), cwd });
           if (hydrated && hydrated.ok && hydrated.normalized) hydratedByKey[row.dedupe_key || row.pr_url] = hydrated.normalized;
         }
         const { changes } = applySync(ledger, hydratedByKey, { at: new Date().toISOString() });

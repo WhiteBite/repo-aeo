@@ -53,12 +53,12 @@ function ledgerRepo(rows) {
   });
 }
 
-test('buildDistributionStatus emits the schema, injected generated_at, a zero-filled summary and items', () => {
+test('buildDistributionStatus emits the schema, injected generated_at, a zero-filled summary and items', async () => {
   const cwd = ledgerRepo([{ channel: 'awesome-list', target: 'owner/list', pr_url: PR1, status: 'submitted' }]);
   try {
     const { gh } = ghStub({ [PR1]: raw({ url: PR1 }) });
 
-    const status = buildDistributionStatus({ cwd, loaded: {}, gh, live: true, now: () => NOW });
+    const status = await buildDistributionStatus({ cwd, loaded: {}, gh, live: true, now: () => NOW });
 
     assert.equal(status.schema_version, DISTRIBUTION_SCHEMA);
     assert.equal(status.generated_at, NOW);
@@ -85,14 +85,14 @@ test('buildDistributionStatus emits the schema, injected generated_at, a zero-fi
   }
 });
 
-test('buildDistributionStatus marks an open changes-requested row action_required with a guarded command', () => {
+test('buildDistributionStatus marks an open changes-requested row action_required with a guarded command', async () => {
   const cwd = ledgerRepo([{ channel: 'awesome-list', target: 'owner/list', pr_url: PR1, status: 'submitted' }]);
   try {
     const { gh } = ghStub({
       [PR1]: raw({ reviewDecision: 'CHANGES_REQUESTED', latestReviews: [{ state: 'CHANGES_REQUESTED', authorAssociation: 'MEMBER' }], url: PR1 }),
     });
 
-    const status = buildDistributionStatus({ cwd, loaded: {}, gh, live: true, now: () => NOW });
+    const status = await buildDistributionStatus({ cwd, loaded: {}, gh, live: true, now: () => NOW });
     const item = status.items[0];
 
     assert.equal(item.attention, 'action_required');
@@ -110,7 +110,7 @@ test('buildDistributionStatus marks an open changes-requested row action_require
   }
 });
 
-test('buildDistributionStatus maps recorded ledger status when live is off', () => {
+test('buildDistributionStatus maps recorded ledger status when live is off', async () => {
   const cwd = ledgerRepo([
     { channel: 'awesome-list', target: 'a/b', pr_url: PR1, status: 'listed' },
     { channel: 'awesome-list', target: 'c/d', pr_url: PR2, status: 'closed' },
@@ -118,7 +118,7 @@ test('buildDistributionStatus maps recorded ledger status when live is off', () 
     { channel: 'mcp-directory-form', target: 'mcp.so', status: 'prepared' },
   ]);
   try {
-    const status = buildDistributionStatus({ cwd, loaded: {}, live: false, now: () => NOW });
+    const status = await buildDistributionStatus({ cwd, loaded: {}, live: false, now: () => NOW });
 
     assert.deepEqual(status.items.map((item) => item.attention), ['listed', 'terminal', 'none', 'none']);
     assert.equal(status.items[0].why, 'listed (merged)');
@@ -132,7 +132,7 @@ test('buildDistributionStatus maps recorded ledger status when live is off', () 
   }
 });
 
-test('buildDistributionStatus keeps non-gh-pr probe kinds on the recorded state and never calls gh', () => {
+test('buildDistributionStatus verifies non-gh-pr channels live without ever calling gh', async () => {
   const cwd = ledgerRepo([
     { channel: 'mcp-official-registry', target: 'mcp.so', status: 'submitted' },
     { channel: 'awesome-list', target: 'owner/list', pr_url: PR1, status: 'submitted' },
@@ -141,21 +141,68 @@ test('buildDistributionStatus keeps non-gh-pr probe kinds on the recorded state 
     const { gh, calls } = ghStub({
       [PR1]: raw({ state: 'MERGED', mergedAt: '2026-10-01T00:00:00Z', url: PR1 }),
     });
+    const unusedFetch = async () => {
+      throw new Error('fetch must not be called for a record without server_name');
+    };
 
-    const status = buildDistributionStatus({ cwd, loaded: {}, gh, live: true, now: () => NOW });
+    const status = await buildDistributionStatus({ cwd, loaded: {}, gh, fetchImpl: unusedFetch, live: true, now: () => NOW });
 
     assert.equal(calls.length, 1);
     assert.deepEqual(calls[0].args, ['pr', 'view', PR1, '-R', 'owner/list', '--json', 'state,isDraft,reviewDecision,latestReviews,reviews,comments,statusCheckRollup,mergeStateStatus,mergeable,labels,updatedAt,closedAt,mergedAt,url,commits']);
-    assert.equal(status.items[0].attention, 'none');
+    assert.equal(status.items[0].attention, 'terminal');
+    assert.equal(status.items[0].presence, 'unlisted');
     assert.equal(status.items[0].state, null);
     assert.equal(status.items[1].attention, 'listed');
     assert.equal(status.items[1].state, 'MERGED');
+    assert.equal(status.items[1].presence, null);
   } finally {
     removeRepo(cwd);
   }
 });
 
-test('buildDistributionStatus is read-only to the committed ledger and upserts live snapshots into the cache', () => {
+test('buildDistributionStatus verifies crawl presence through the injected fetch and snapshots it', async () => {
+  const rows = [{ channel: 'skills-sh', target: 'skills-sh', url: 'https://github.com/owner/repo', status: 'prepared', dedupe_key: 'skills-sh:skills-sh' }];
+  const cwd = ledgerRepo(rows);
+  try {
+    const boom = () => {
+      throw new Error('gh must not be called for a crawl row');
+    };
+    const fetchCalls = [];
+    const fetchImpl = async (url) => {
+      fetchCalls.push(url);
+      return { ok: true, status: 200, text: async () => 'crawl me: https://github.com/owner/repo' };
+    };
+
+    const status = await buildDistributionStatus({ cwd, loaded: {}, gh: boom, fetchImpl, live: true, now: () => NOW });
+
+    assert.deepEqual(fetchCalls, ['https://www.skills.sh/sitemap-skills-1.xml']);
+    const item = status.items[0];
+    assert.equal(item.state, null);
+    assert.equal(item.is_draft, null);
+    assert.equal(item.review_decision, null);
+    assert.equal(item.merge_state, null);
+    assert.deepEqual(item.checks, { pass: 0, fail: 0, pending: 0 });
+    assert.equal(item.presence, 'listed');
+    assert.equal(item.url, 'https://www.skills.sh/sitemap-skills-1.xml');
+    assert.equal(item.checked_at, NOW);
+    assert.equal(item.attention, 'listed');
+    assert.deepEqual(item.needed, []);
+    assert.equal(status.summary.by_attention.listed, 1);
+    assert.equal(status.summary.by_state.unknown, 1);
+
+    const cache = readTrackingCache(cwd);
+    assert.deepEqual(cache.snapshots[snapshotKey(rows[0])], {
+      presence: 'listed',
+      url: 'https://www.skills.sh/sitemap-skills-1.xml',
+      checked_at: NOW,
+      fetched_at: NOW,
+    });
+  } finally {
+    removeRepo(cwd);
+  }
+});
+
+test('buildDistributionStatus is read-only to the committed ledger and upserts live snapshots into the cache', async () => {
   const rows = [{ channel: 'awesome-list', target: 'owner/list', pr_url: PR1, status: 'submitted' }];
   const cwd = ledgerRepo(rows);
   try {
@@ -165,7 +212,7 @@ test('buildDistributionStatus is read-only to the committed ledger and upserts l
       [PR1]: raw({ reviewDecision: 'APPROVED', mergeStateStatus: 'CLEAN', url: PR1 }),
     });
 
-    buildDistributionStatus({ cwd, loaded: {}, gh, live: true, now: () => NOW });
+    await buildDistributionStatus({ cwd, loaded: {}, gh, live: true, now: () => NOW });
 
     assert.equal(readFileSync(ledgerPath, 'utf8'), before);
     assert.ok(!existsSync(join(cwd, '.discoverability', 'cache', 'tracking.json.corrupt-0')));
@@ -187,7 +234,7 @@ test('buildDistributionStatus is read-only to the committed ledger and upserts l
   }
 });
 
-test('buildDistributionStatus summary counts match the items', () => {
+test('buildDistributionStatus summary counts match the items', async () => {
   const cwd = ledgerRepo([
     { channel: 'awesome-list', target: 'a', pr_url: PR1, status: 'submitted' },
     { channel: 'awesome-list', target: 'b', pr_url: PR2, status: 'submitted' },
@@ -206,8 +253,11 @@ test('buildDistributionStatus summary counts match the items', () => {
       [PR5]: raw({ state: 'MERGED', mergedAt: '2026-10-01T00:00:00Z', url: PR5 }),
       [PR6]: raw({ state: 'CLOSED', url: PR6 }),
     });
+    const unusedFetch = async () => {
+      throw new Error('fetch must not be called for a record without package identity');
+    };
 
-    const status = buildDistributionStatus({ cwd, loaded: {}, gh, live: true, now: () => NOW });
+    const status = await buildDistributionStatus({ cwd, loaded: {}, gh, fetchImpl: unusedFetch, live: true, now: () => NOW });
 
     assert.deepEqual(status.items.map((item) => item.attention), [
       'action_required',
@@ -216,16 +266,16 @@ test('buildDistributionStatus summary counts match the items', () => {
       'stale',
       'listed',
       'terminal',
-      'none',
+      'terminal',
     ]);
     assert.deepEqual(status.summary.by_attention, {
       action_required: 1,
       awaiting_review: 1,
       approved: 1,
       stale: 1,
-      none: 1,
+      none: 0,
       listed: 1,
-      terminal: 1,
+      terminal: 2,
     });
     assert.deepEqual(status.summary.by_state, { open: 4, merged: 1, closed: 1, unknown: 1 });
 
@@ -247,11 +297,11 @@ test('buildDistributionStatus summary counts match the items', () => {
   }
 });
 
-test('renderDistributionStatus prints a header, a target line and the pr_url and command when present', () => {
+test('renderDistributionStatus prints a header, a target line and the pr_url and command when present', async () => {
   const cwd = ledgerRepo([{ channel: 'awesome-list', target: 'owner/list', pr_url: PR1, status: 'submitted' }]);
   try {
     const { gh } = ghStub({ [PR1]: raw({ reviewDecision: 'CHANGES_REQUESTED', url: PR1 }) });
-    const status = buildDistributionStatus({ cwd, loaded: {}, gh, live: true, now: () => NOW });
+    const status = await buildDistributionStatus({ cwd, loaded: {}, gh, live: true, now: () => NOW });
 
     const text = renderDistributionStatus(status);
 
@@ -259,6 +309,24 @@ test('renderDistributionStatus prints a header, a target line and the pr_url and
     assert.ok(text.includes('- owner/list [action_required]'));
     assert.ok(text.includes(PR1));
     assert.ok(text.includes('--apply --ack'));
+  } finally {
+    removeRepo(cwd);
+  }
+});
+
+test('renderDistributionStatus prints the url on the target line for presence items', async () => {
+  const rows = [{ channel: 'skills-sh', target: 'skills.sh', url: 'https://github.com/owner/repo', status: 'prepared', dedupe_key: 'skills-sh:skills.sh' }];
+  const cwd = ledgerRepo(rows);
+  try {
+    const boom = () => {
+      throw new Error('gh must not be called for a crawl row');
+    };
+    const fetchImpl = async () => ({ ok: true, status: 200, text: async () => 'https://github.com/owner/repo' });
+    const status = await buildDistributionStatus({ cwd, loaded: {}, gh: boom, fetchImpl, live: true, now: () => NOW });
+
+    const text = renderDistributionStatus(status);
+
+    assert.ok(text.includes('- skills.sh [listed] https://www.skills.sh/sitemap-skills-1.xml'));
   } finally {
     removeRepo(cwd);
   }

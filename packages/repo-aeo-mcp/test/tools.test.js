@@ -467,6 +467,7 @@ test('distribution_check_submissions carries per-channel items and recommends ch
           artifact: 'none',
           dedupe_key: 'skills-sh:WhiteBite/repo-aeo',
           target: 'skills.sh',
+          url: 'https://github.com/WhiteBite/repo-aeo',
           submitted_at: '2026-10-01T09:00:00Z',
           status: 'listed',
         },
@@ -476,6 +477,7 @@ test('distribution_check_submissions carries per-channel items and recommends ch
           artifact: 'server.json',
           dedupe_key: 'mcp-official-registry:repo-aeo-mcp',
           target: 'registry.modelcontextprotocol.io',
+          server_name: 'repo-aeo-mcp',
           submitted_at: '2026-09-28T09:00:00Z',
           status: 'submitted',
         },
@@ -500,12 +502,29 @@ test('distribution_check_submissions carries per-channel items and recommends ch
     assert.equal(payload.summary.by_attention.none, 2);
     assert.equal(payload.summary.by_attention.listed, 1);
 
-    // crawl- and registry-style channels are never routed through gh, even live
-    const livePayload = await callTool('distribution_check_submissions', { cwd: box.dir, live: true });
+    // crawl- and registry-style channels are verified for live presence, never through gh
+    const fetchCalls = [];
+    const fetchImpl = async (url) => {
+      fetchCalls.push(url);
+      if (url === 'https://www.skills.sh/sitemap-skills-1.xml') {
+        return { ok: true, status: 200, text: async () => 'https://github.com/WhiteBite/repo-aeo' };
+      }
+      return { ok: true, status: 200, text: async () => '{}' };
+    };
+    const livePayload = await callTool('distribution_check_submissions', { cwd: box.dir, live: true }, { fetchImpl });
     assert.equal(livePayload.ok, true);
-    assert.equal(livePayload.items[1].state, null, 'crawl-style rows keep their recorded state');
-    assert.equal(livePayload.items[2].state, null, 'registry-style rows keep their recorded state');
+    assert.deepEqual(fetchCalls, [
+      'https://www.skills.sh/sitemap-skills-1.xml',
+      'https://registry.modelcontextprotocol.io/v0.1/servers/repo-aeo-mcp/versions/latest',
+    ]);
+    assert.equal(livePayload.items[1].state, null, 'presence rows carry no PR state');
+    assert.equal(livePayload.items[1].presence, 'listed');
     assert.equal(livePayload.items[1].attention, 'listed');
+    assert.equal(livePayload.items[1].url, 'https://www.skills.sh/sitemap-skills-1.xml');
+    assert.equal(livePayload.items[2].state, null, 'registry rows carry no PR state');
+    assert.equal(livePayload.items[2].presence, 'listed');
+    assert.equal(livePayload.items[2].attention, 'listed');
+    assert.equal(livePayload.items[2].url, 'https://registry.modelcontextprotocol.io/v0.1/servers/repo-aeo-mcp/versions/latest');
 
     const recommended = await callTool('distribution_check_submissions', { cwd: box.dir, include_recommendations: true });
     const ids = recommended.recommendations.channels.map((channel) => channel.id);
@@ -521,7 +540,7 @@ test('distribution_check_submissions carries per-channel items and recommends ch
     const awesome = recommended.recommendations.channels.find((channel) => channel.id === 'awesome-list');
     assert.equal(awesome.status, 'open', 'the ledger feeds the per-channel status');
 
-    const both = await callTool('distribution_check_submissions', { cwd: box.dir, live: true, include_recommendations: true });
+    const both = await callTool('distribution_check_submissions', { cwd: box.dir, live: true, include_recommendations: true }, { fetchImpl });
     assert.equal(both.ok, true, 'live + recommendations stays read-only and offline-safe');
     assert.ok(Array.isArray(both.recommendations.channels));
   } finally {

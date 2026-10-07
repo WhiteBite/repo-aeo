@@ -138,24 +138,149 @@ test('hydrateGitPr degrades to a recorded state when gh is missing or errors', (
   assert.ok(garbage.error.length > 0);
 });
 
-test('hydrateByProbe keeps non-gh-pr probe kinds on their recorded state', () => {
-  const entry = { target: 'foo/bar', pr_url: PR_URL };
-  const cwd = process.cwd();
+test('hydrateByProbe dispatches crawl, http-search and registry-read to their verifiers and never calls gh', async () => {
+  const NOW = '2026-10-06T00:00:00.000Z';
   const unusedGh = () => {
-    throw new Error('gh must not be called for non-gh-pr probes');
+    throw new Error('gh must not be called for fetch probe kinds');
+  };
+  const fetchCalls = [];
+  const fetchImpl = async (url, init = {}) => {
+    fetchCalls.push({ url, init });
+    if (url === 'https://x/sitemap.xml') return { ok: true, status: 200, text: async () => 'see https://github.com/foo/bar and /foo/bar/ inside' };
+    if (url === 'https://registry.modelcontextprotocol.io/v0.1/servers/demo-project/versions/latest') return { ok: true, status: 200, text: async () => '{}' };
+    if (url === 'https://registry.npmjs.org/demo-project') return { ok: true, status: 200, text: async () => JSON.stringify({ versions: { '1.2.3': {} } }) };
+    throw new Error(`unexpected fetch: ${url}`);
   };
 
-  const webForm = hydrateByProbe({ probe: { kind: 'web-form', ref: null }, entry, gh: unusedGh, cwd });
-  assert.deepEqual(webForm, { ok: false, recorded: true, kind: 'web-form' });
+  const crawl = await hydrateByProbe({
+    entry: { channel: 'skills-sh', target: 'skills-sh', url: 'https://github.com/foo/bar', status: 'prepared' },
+    channel: { id: 'skills-sh', probe: 'crawl', checkUrl: 'https://x/sitemap.xml' },
+    gh: unusedGh,
+    fetchImpl,
+    now: () => NOW,
+  });
+  assert.deepEqual(crawl, {
+    ok: true,
+    kind: 'crawl',
+    normalized: { presence: 'listed', checked_at: NOW, url: 'https://x/sitemap.xml' },
+  });
 
-  const httpJson = hydrateByProbe({ probe: { kind: 'http-json', ref: 'https://x/api' }, entry, gh: unusedGh, cwd });
-  assert.deepEqual(httpJson, { ok: false, recorded: true, kind: 'http-json' });
+  const httpSearch = await hydrateByProbe({
+    entry: { channel: 'mcp-official-registry', target: 'mcp-official-registry', server_name: 'demo-project', status: 'submitted' },
+    channel: { id: 'mcp-official-registry', probe: 'http-search' },
+    gh: unusedGh,
+    fetchImpl,
+    now: () => NOW,
+  });
+  assert.deepEqual(httpSearch, {
+    ok: true,
+    kind: 'http-search',
+    normalized: {
+      presence: 'listed',
+      checked_at: NOW,
+      url: 'https://registry.modelcontextprotocol.io/v0.1/servers/demo-project/versions/latest',
+    },
+  });
 
+  const registryRead = await hydrateByProbe({
+    entry: { channel: 'npm-registry', target: 'npm-registry', package: 'demo-project', version: '1.2.3', registry_url: 'https://registry.npmjs.org/demo-project', status: 'prepared' },
+    channel: { id: 'npm-registry', probe: 'registry-read' },
+    gh: unusedGh,
+    fetchImpl,
+    now: () => NOW,
+  });
+  assert.deepEqual(registryRead, {
+    ok: true,
+    kind: 'registry-read',
+    normalized: { presence: 'listed', checked_at: NOW, url: 'https://registry.npmjs.org/demo-project' },
+  });
+
+  assert.equal(fetchCalls.length, 3);
+});
+
+test('hydrateByProbe wraps an unlisted verifier result as ok with presence unlisted', async () => {
+  const NOW = '2026-10-06T00:00:00.000Z';
+  const unusedGh = () => {
+    throw new Error('gh must not be called for fetch probe kinds');
+  };
+  const fetchImpl = async () => ({ ok: true, status: 200, text: async () => 'nothing relevant here' });
+
+  const crawl = await hydrateByProbe({
+    entry: { channel: 'skills-sh', target: 'skills-sh', url: 'https://github.com/foo/bar', status: 'prepared' },
+    channel: { id: 'skills-sh', probe: 'crawl', checkUrl: 'https://x/sitemap.xml' },
+    gh: unusedGh,
+    fetchImpl,
+    now: () => NOW,
+  });
+  assert.equal(crawl.ok, true);
+  assert.equal(crawl.kind, 'crawl');
+  assert.equal(crawl.normalized.presence, 'unlisted');
+  assert.equal(crawl.normalized.url, 'https://x/sitemap.xml');
+  assert.equal(crawl.normalized.checked_at, NOW);
+});
+
+test('hydrateByProbe keeps none and unknown probe kinds on their recorded state', async () => {
+  const unusedGh = () => {
+    throw new Error('gh must not be called for recorded probe kinds');
+  };
+  const unusedFetch = async () => {
+    throw new Error('fetch must not be called for recorded probe kinds');
+  };
+
+  const none = await hydrateByProbe({
+    entry: { channel: 'mcp-directory-form', target: 'mcp.so', status: 'prepared' },
+    channel: { id: 'mcp-directory-form', probe: 'none' },
+    gh: unusedGh,
+    fetchImpl: unusedFetch,
+  });
+  assert.deepEqual(none, { ok: false, kind: 'none', recorded: true });
+
+  const unknown = await hydrateByProbe({
+    entry: { channel: 'carrier-pigeon', target: 'somewhere', status: 'prepared' },
+    channel: { id: 'carrier-pigeon', probe: 'smoke-signal' },
+    gh: unusedGh,
+    fetchImpl: unusedFetch,
+  });
+  assert.deepEqual(unknown, { ok: false, kind: 'smoke-signal', recorded: true });
+
+  const noChannelNoPr = await hydrateByProbe({ entry: { target: 'a/b', status: 'prepared' }, channel: null, gh: unusedGh, fetchImpl: unusedFetch });
+  assert.deepEqual(noChannelNoPr, { ok: false, kind: null, recorded: true });
+});
+
+test('hydrateByProbe delegates gh-pr to hydrateGitPr with the unchanged normalized PR shape', async () => {
+  const entry = { target: 'foo/bar', pr_url: PR_URL };
+  const cwd = process.cwd();
   const gh = (args) => {
     assert.deepEqual(args, ['pr', 'view', PR_URL, '-R', 'foo/bar', '--json', GH_PR_FIELDS]);
     return { ok: true, stdout: JSON.stringify(MERGED_RAW), stderr: '', code: 0 };
   };
-  const delegated = hydrateByProbe({ probe: { kind: 'gh-pr', ref: PR_URL }, entry, gh, cwd });
+
+  const delegated = await hydrateByProbe({ entry, channel: null, gh, cwd });
   assert.equal(delegated.ok, true);
+  assert.equal(delegated.kind, 'gh-pr');
   assert.deepEqual(delegated.normalized, normalizeGhPrView(MERGED_RAW));
+  assert.deepEqual(delegated.raw, MERGED_RAW);
+
+  const viaDescriptor = await hydrateByProbe({ entry, channel: { id: 'awesome-list', probe: 'gh-pr' }, gh, cwd });
+  assert.equal(viaDescriptor.ok, true);
+  assert.equal(viaDescriptor.kind, 'gh-pr');
+  assert.deepEqual(viaDescriptor.normalized, normalizeGhPrView(MERGED_RAW));
+
+  const noRef = await hydrateByProbe({ entry: { target: 'foo/bar' }, channel: { id: 'awesome-list', probe: 'gh-pr' }, gh, cwd });
+  assert.deepEqual(noRef, { ok: false, kind: 'gh-pr', recorded: true });
+});
+
+test('hydrateByProbe never throws when a gh probe fails', async () => {
+  const entry = { target: 'foo/bar', pr_url: PR_URL };
+  const cwd = process.cwd();
+
+  const failed = await hydrateByProbe({ entry, channel: null, gh: () => ({ ok: false, code: 1, stdout: '', stderr: 'boom' }), cwd });
+  assert.equal(failed.ok, false);
+  assert.equal(failed.kind, 'gh-pr');
+  assert.ok(failed.error.length > 0);
+
+  const garbage = await hydrateByProbe({ entry, channel: null, gh: () => ({ ok: true, stdout: 'not json', stderr: '', code: 0 }), cwd });
+  assert.equal(garbage.ok, false);
+  assert.equal(garbage.kind, 'gh-pr');
+  assert.ok(garbage.error.length > 0);
 });

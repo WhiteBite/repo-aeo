@@ -261,6 +261,31 @@ test('track --sync --apply moves a changes-requested PR from submitted to needs_
   }
 });
 
+test('track --sync forwards the injected fetch and previews prepared -> listed for a crawl row', async () => {
+  const rows = [{ channel: 'skills-sh', target: 'skills.sh', url: 'https://github.com/owner/repo', status: 'prepared', dedupe_key: 'skills-sh:skills.sh' }];
+  const cwd = ledgerRepo(rows);
+  try {
+    const boom = () => {
+      throw new Error('gh must not be called for a crawl row');
+    };
+    const fetchCalls = [];
+    const fetchImpl = async (url) => {
+      fetchCalls.push(url);
+      return { ok: true, status: 200, text: async () => 'https://github.com/owner/repo' };
+    };
+
+    const preview = await trackCommand({ cwd, options: { sync: true }, config: {}, ghRunner: boom, fetchImpl, now: () => NOW });
+    assert.equal(preview.ok, true, preview.output);
+    assert.deepEqual(fetchCalls, ['https://www.skills.sh/sitemap-skills-1.xml']);
+    assert.match(preview.output, /skills-sh:skills\.sh: prepared -> listed/);
+    assert.match(preview.output, /Plan digest: [0-9a-f]{64}/);
+    assert.match(preview.output, /Dry run/);
+    assert.equal(readFileSync(ledgerPath(cwd), 'utf8'), `${JSON.stringify(rows, null, 2)}\n`);
+  } finally {
+    removeRepo(cwd);
+  }
+});
+
 test('track refuses --adopt together with --sync instead of preferring one', async () => {
   const rows = [{ channel: 'awesome-list', target: 'owner/list', pr_url: PR1, status: 'submitted', dedupe_key: 'awesome-list:owner/list' }];
   const cwd = ledgerRepo(rows);
