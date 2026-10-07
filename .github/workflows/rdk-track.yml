@@ -1,0 +1,88 @@
+name: rdk-track
+
+on:
+  schedule:
+    - cron: '23 7 * * 2'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: rdk-track
+  cancel-in-progress: false
+
+jobs:
+  track:
+    name: Distribution tracking
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: rdk track --json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node packages/rdk-cli/bin/rdk.js track --json > track.json
+
+      - name: Upsert the tracking issue
+        uses: actions/github-script@v7
+        with:
+          retries: 3
+          script: |
+            const fs = require('fs');
+            const status = JSON.parse(fs.readFileSync('track.json', 'utf8'));
+            const label = 'rdk-tracking';
+
+            const attentionRows = Object.entries(status.summary.by_attention)
+              .map(([attention, count]) => `| ${attention} | ${count} |`);
+            const needsAction = (status.items || []).filter((item) => item.attention === 'action_required');
+            const actionRows = needsAction.length === 0
+              ? ['Nothing needs action.']
+              : needsAction.map((item) => `- **${item.target}**: ${item.why}\n  - command: \`${item.command}\``);
+            const body = [
+              `# rdk track (${status.generated_at})`,
+              '',
+              '## Attention summary',
+              '',
+              '| attention | submissions |',
+              '| --- | --- |',
+              ...attentionRows,
+              '',
+              '## Needs action',
+              '',
+              ...actionRows,
+              '',
+              '_Updated automatically by the rdk-track workflow._',
+            ].join('\n');
+
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: label,
+            });
+            const existing = issues.find((issue) => !issue.pull_request);
+
+            if (existing) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: 'rdk track: distribution campaign dashboard',
+                body,
+                labels: [label],
+              });
+            }
