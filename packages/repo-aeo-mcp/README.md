@@ -50,7 +50,7 @@ docker run -i -v "$PWD:/repo" -w /repo repo-aeo-mcp serve
 | `llms_txt_check_freshness` | Whether `llms.txt` is older than its sources, and by how much. |
 | `site_check_llms_txt` | Whether a docs site actually serves `/llms.txt`, with size and first heading. |
 | `competitor_scan_list_articles` | Who is mentioned in "top N tools" listicles for your keywords (needs `RDK_SEARCH_ENDPOINT`). |
-| `distribution_check_submissions` | Which curated lists the project is submitted to, per-entry PR state and fork-cleanup hints. |
+| `distribution_check_submissions` | The canonical distribution campaign status (schema `rdk-distribution/1`): per-item attention and next command, plus channel recommendations and read-only `adopt`/`sync` previews. |
 | `github_sync_metadata` | Writes description/homepage/topics from `.discoverability/project.yml` to GitHub. **The only write tool.** |
 
 ### Safety model
@@ -75,9 +75,10 @@ The server reads the repository it is pointed at; nothing else is required.
 | `RDK_SEARCH_ENDPOINT` | unset | JSON search API accepting `?q=` and returning `{ results: [{ title, url, snippet }] }`. Enables `competitor_scan_list_articles`. |
 
 History lives in `.discoverability/cache/metrics.json` and is git-ignored.
-The distribution ledger lives in `.discoverability/submissions.json` and is
-meant to be committed; `submissions --live` probes PR states through `gh`
-and falls back to the recorded state when `gh` is not installed.
+The distribution campaign lives in `.discoverability/submissions.json` and is
+meant to be committed; `submissions` returns the canonical status, `--live`
+probes git-pr rows through `gh`, `--recommend` adds channel recommendations,
+and `--adopt`/`--sync` return read-only previews with a `plan_digest`.
 
 ## Command line
 

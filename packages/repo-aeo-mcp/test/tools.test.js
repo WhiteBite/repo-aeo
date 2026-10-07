@@ -499,6 +499,50 @@ test('distribution_check_submissions adopt and sync are read-only previews', asy
   }
 });
 
+test('distribution_check_submissions sync preview leaves non-gh-pr rows recorded and does not write the ledger', async () => {
+  const box = sandbox();
+  try {
+    mkdirSync(join(box.dir, '.discoverability'), { recursive: true });
+    const ledgerPath = join(box.dir, '.discoverability', 'submissions.json');
+    writeFileSync(
+      ledgerPath,
+      `${JSON.stringify(
+        [
+          {
+            channel: 'awesome-list',
+            mechanism: 'git-pr',
+            artifact: 'readme-row',
+            dedupe_key: 'kirodotdev-labs/awesome-kiro:WhiteBite/repo-aeo',
+            target: 'kirodotdev-labs/awesome-kiro',
+            pr_url: 'https://github.com/example/nonexistent-repo/pull/1',
+            status: 'submitted',
+          },
+          {
+            channel: 'mcp-directory-form',
+            mechanism: 'web-form',
+            artifact: 'form-payload',
+            dedupe_key: 'mcp-directory-form:submit',
+            target: 'mcp.so',
+            status: 'submitted',
+          },
+        ],
+        null,
+        2,
+      )}\n`,
+    );
+
+    const before = readFileSync(ledgerPath);
+    const synced = await callTool('distribution_check_submissions', { cwd: box.dir, sync: true });
+    assert.equal(synced.ok, true);
+    assert.ok(Array.isArray(synced.preview), 'sync returns the preview changes');
+    const keys = synced.preview.map((change) => change.key);
+    assert.ok(!keys.includes('mcp-directory-form:submit'), 'a web-form row is not hydratable and keeps its recorded status');
+    assert.equal(readFileSync(ledgerPath).compare(before), 0, 'sync must not write the ledger');
+  } finally {
+    box.cleanup();
+  }
+});
+
 test('an unknown tool name is reported, not thrown', async () => {
   const payload = await callTool('nope_does_not_exist', {});
   assert.equal(payload.ok, false);

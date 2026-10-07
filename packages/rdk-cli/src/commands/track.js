@@ -109,6 +109,11 @@ export async function trackCommand({ cwd, options = {}, config, loaded, ghRunner
     return fail(guard.error, { ...coded, ...extra });
   };
 
+  if (options.adopt && options.sync) {
+    lines.push('Pass either --adopt or --sync, not both.');
+    return fail('pass either --adopt or --sync, not both');
+  }
+
   const ledger = readLedger(cwd);
   if (ledger === null) {
     lines.push('Could not parse .discoverability/submissions.json - fix it by hand or restore it from git.');

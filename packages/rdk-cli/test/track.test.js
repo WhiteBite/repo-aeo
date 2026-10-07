@@ -225,6 +225,61 @@ test('track --sync --apply rewrites only changed statuses, logs the reason and i
   }
 });
 
+test('track --sync --apply moves a changes-requested PR from submitted to needs_changes', async () => {
+  const rows = [{ channel: 'awesome-list', target: 'owner/list', pr_url: PR1, status: 'submitted', dedupe_key: 'awesome-list:owner/list' }];
+  const cwd = ledgerRepo(rows);
+  try {
+    const gh = ghStub({
+      view: { [PR1]: () => okJson(raw({ state: 'OPEN', reviewDecision: 'CHANGES_REQUESTED', url: PR1 })) },
+    });
+
+    const preview = await trackCommand({ cwd, options: { sync: true }, config: {}, ghRunner: gh, now: () => NOW });
+    assert.equal(preview.ok, true);
+    assert.match(preview.output, /awesome-list:owner\/list: submitted -> needs_changes/);
+
+    const applied = await trackCommand({
+      cwd,
+      options: { sync: true, apply: true, ack: ACK, reason: 'unit test needs_changes sync', plan_digest: preview.plan_digest },
+      config: {},
+      ghRunner: gh,
+      now: () => NOW,
+    });
+    assert.equal(applied.ok, true, applied.output);
+    assert.match(applied.output, /awesome-list:owner\/list: submitted -> needs_changes/);
+    assert.match(applied.output, /Reason logged: unit test needs_changes sync/);
+    const ledger = JSON.parse(readFileSync(ledgerPath(cwd), 'utf8'));
+    assert.deepEqual(ledger[0], {
+      channel: 'awesome-list',
+      target: 'owner/list',
+      pr_url: PR1,
+      status: 'needs_changes',
+      dedupe_key: 'awesome-list:owner/list',
+      synced_at: NOW,
+    });
+  } finally {
+    removeRepo(cwd);
+  }
+});
+
+test('track refuses --adopt together with --sync instead of preferring one', async () => {
+  const rows = [{ channel: 'awesome-list', target: 'owner/list', pr_url: PR1, status: 'submitted', dedupe_key: 'awesome-list:owner/list' }];
+  const cwd = ledgerRepo(rows);
+  try {
+    const boom = () => {
+      throw new Error('gh must not be called when the mode flags conflict');
+    };
+
+    const result = await trackCommand({ cwd, options: { adopt: true, sync: true }, config: {}, ghRunner: boom, now: () => NOW });
+    assert.equal(result.ok, false);
+    assert.equal(result.exitCode, 1);
+    assert.match(result.error, /pass either --adopt or --sync, not both/);
+    assert.match(result.output, /Pass either --adopt or --sync, not both\./);
+    assert.equal(JSON.parse(readFileSync(ledgerPath(cwd), 'utf8')).length, 1);
+  } finally {
+    removeRepo(cwd);
+  }
+});
+
 test('track reports an unparsable ledger and never repairs it', async () => {
   const cwd = makeRepo({ '.discoverability/submissions.json': '{ not json' });
   try {

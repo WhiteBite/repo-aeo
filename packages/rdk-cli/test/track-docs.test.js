@@ -13,3 +13,8 @@ for (const rel of ['SKILL.md', join('references', 'distribution-playbook.md')]) 
     assert.ok(text.includes('--plan-digest'), `${rel} must document the --plan-digest guard`);
   });
 }
+
+test('references/channels.md references rdk track', () => {
+  const text = readFileSync(join(SKILL_DIR, 'references', 'channels.md'), 'utf8');
+  assert.ok(text.includes('rdk track'), 'channels.md must reference the "rdk track" command');
+});

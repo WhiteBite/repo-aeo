@@ -16,8 +16,8 @@ Statuses in `.discoverability/submissions.json` move `prepared -> submitted
 -> open -> listed`, with `needs_changes` marking a maintainer
 changes-request; `rejected|closed|unlisted|failed` are terminal negatives that
 allow one retry. `rdk channels` prints applicability, recorded status and the
-next action per channel; `rdk submit --channel <id>` defaults to
-`awesome-list`. The descriptor's `probe` field selects the live hydrator: only
+next action per channel; `rdk track` reports the live campaign status and the
+guarded action queue; `rdk submit --channel <id>` defaults to `awesome-list`. The descriptor's `probe` field selects the live hydrator: only
 `gh-pr` has one (`gh pr view`), so rows on other probe kinds keep their
 recorded state until a human or `rdk submit` updates them.
 
