@@ -506,7 +506,7 @@ test('distribution_check_submissions carries per-channel items and recommends ch
     const fetchCalls = [];
     const fetchImpl = async (url) => {
       fetchCalls.push(url);
-      if (url === 'https://www.skills.sh/sitemap-skills-1.xml') {
+      if (url === 'https://www.skills.sh/sitemap.xml') {
         return { ok: true, status: 200, text: async () => 'https://github.com/WhiteBite/repo-aeo' };
       }
       return { ok: true, status: 200, text: async () => '{}' };
@@ -514,13 +514,13 @@ test('distribution_check_submissions carries per-channel items and recommends ch
     const livePayload = await callTool('distribution_check_submissions', { cwd: box.dir, live: true }, { fetchImpl });
     assert.equal(livePayload.ok, true);
     assert.deepEqual(fetchCalls, [
-      'https://www.skills.sh/sitemap-skills-1.xml',
+      'https://www.skills.sh/sitemap.xml',
       'https://registry.modelcontextprotocol.io/v0.1/servers/repo-aeo-mcp/versions/latest',
     ]);
     assert.equal(livePayload.items[1].state, null, 'presence rows carry no PR state');
     assert.equal(livePayload.items[1].presence, 'listed');
     assert.equal(livePayload.items[1].attention, 'listed');
-    assert.equal(livePayload.items[1].url, 'https://www.skills.sh/sitemap-skills-1.xml');
+    assert.equal(livePayload.items[1].url, 'https://www.skills.sh/sitemap.xml');
     assert.equal(livePayload.items[2].state, null, 'registry rows carry no PR state');
     assert.equal(livePayload.items[2].presence, 'listed');
     assert.equal(livePayload.items[2].attention, 'listed');

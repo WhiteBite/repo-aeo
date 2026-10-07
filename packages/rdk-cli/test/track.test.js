@@ -301,7 +301,7 @@ test('track --sync forwards the injected fetch and previews prepared -> listed f
 
     const preview = await trackCommand({ cwd, options: { sync: true }, config: {}, ghRunner: boom, fetchImpl, now: () => NOW });
     assert.equal(preview.ok, true, preview.output);
-    assert.deepEqual(fetchCalls, ['https://www.skills.sh/sitemap-skills-1.xml']);
+    assert.deepEqual(fetchCalls, ['https://www.skills.sh/sitemap.xml']);
     assert.match(preview.output, /skills-sh:skills\.sh: prepared -> listed/);
     assert.match(preview.output, /Plan digest: [0-9a-f]{64}/);
     assert.match(preview.output, /Dry run/);

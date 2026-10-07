@@ -59,14 +59,20 @@ export function probe(record) {
 }
 
 const GITHUB_REPO_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)/;
+const SITEMAP_LOC = /<loc>([^<]*)<\/loc>/g;
+// sanity bound: a bloated or hostile index must not force unbounded shard fetches
+const MAX_SITEMAP_SHARDS = 50;
 
-/**
- * Verifies presence after the fact: fetches the channel's checkUrl through
- * the injected fetchImpl (global fetch only when none is injected) and
- * resolves to { status: 'listed' | 'unlisted' | 'unknown' }: 'listed' when
- * the page carries the project URL, 'unlisted' only on a definitive absence
- * (HTTP 404 or a 2xx page without it), 'unknown' on missing identity,
- * transport failures and any other HTTP status.
+/** Verifies presence after the fact by fetching the channel's checkUrl
+ * through the injected fetchImpl (falling back to global fetch) and
+ * resolving to { status: 'listed' | 'unlisted' | 'unknown' }: 'listed' when
+ * the page carries the project URL; 'unlisted' only on a definitive absence
+ * (HTTP 404 or a 2xx page without it); 'unknown' on missing identity,
+ * transport failures and any other HTTP status. A checkUrl serving a sitemap
+ * index is followed shard by shard: every <loc> shard is fetched through the
+ * same fetcher and searched alongside the index body, 'unlisted' is reported
+ * only after the whole index was read, and a shard that throws, returns null
+ * or answers any status other than 2xx or 404 resolves to 'unknown'.
  */
 export async function verify({ record, channel, fetchImpl } = {}) {
   const fetcher = typeof fetchImpl === 'function' ? fetchImpl : fetch;
@@ -84,7 +90,21 @@ export async function verify({ record, channel, fetchImpl } = {}) {
     // sitemap-style indexes list /<owner>/<repo>/<skill> entries, not the GitHub URL
     const match = GITHUB_REPO_URL.exec(ref);
     const token = match ? `/${match[1]}/${match[2]}/` : null;
-    return { status: text.includes(ref) || (token !== null && text.includes(token)) ? 'listed' : 'unlisted' };
+    const carries = (body) => body.includes(ref) || (token !== null && body.includes(token));
+    if (!text.includes('<sitemapindex')) return { status: carries(text) ? 'listed' : 'unlisted' };
+    const shards = [...text.matchAll(SITEMAP_LOC)].map((entry) => entry[1].trim());
+    if (shards.length === 0 || shards.length > MAX_SITEMAP_SHARDS) return { status: 'unknown' };
+    const bodies = [text];
+    for (const shardUrl of shards) {
+      const shard = await fetcher(shardUrl);
+      if (!shard) return { status: 'unknown' };
+      const shardStatus = typeof shard.status === 'number' ? shard.status : 0;
+      if (shardStatus !== 404 && (shardStatus < 200 || shardStatus >= 300)) return { status: 'unknown' };
+      const shardText = await shard.text();
+      if (typeof shardText !== 'string') return { status: 'unknown' };
+      bodies.push(shardText);
+    }
+    return { status: bodies.some(carries) ? 'listed' : 'unlisted' };
   } catch {
     return { status: 'unknown' };
   }

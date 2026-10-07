@@ -31,6 +31,18 @@ function stubFetch({ status = 200, body = '', textThrows = false } = {}) {
   return { fetchImpl, calls };
 }
 
+function stubPages(pages) {
+  const calls = [];
+  const fetchImpl = async (url) => {
+    calls.push(url);
+    const page = pages[url];
+    if (page === undefined) throw new Error(`unexpected fetch: ${url}`);
+    if (page === null) return null;
+    return { ok: page.status < 400, status: page.status, text: async () => page.body };
+  };
+  return { fetchImpl, calls };
+}
+
 test('describe exposes the passive mechanism contract', () => {
   assert.equal(describePassive().id, 'passive');
   assert.equal(typeof describePassive().summary, 'string');
@@ -153,4 +165,60 @@ test('verify never throws raw: transport failures, non-404 error statuses and un
 
   const badBody = stubFetch({ textThrows: true });
   assert.deepEqual(await verifyPassive({ record: RECORD, channel: CHANNEL, fetchImpl: badBody.fetchImpl }), { status: 'unknown' });
+});
+
+test('verify follows a sitemap index and reports listed when a later shard carries the token', async () => {
+  const stub = stubPages({
+    [CHANNEL.checkUrl]: { status: 200, body: '<sitemapindex><sitemap><loc>https://example.test/shard-1.xml</loc></sitemap><sitemap><loc>https://example.test/shard-2.xml</loc></sitemap></sitemapindex>' },
+    'https://example.test/shard-1.xml': { status: 200, body: '<urlset><url><loc>https://www.skills.sh/other/thing/skill</loc></url></urlset>' },
+    'https://example.test/shard-2.xml': { status: 200, body: '<urlset><url><loc>https://www.skills.sh/owner/demo/my-skill</loc></url></urlset>' },
+  });
+  assert.deepEqual(await verifyPassive({ record: RECORD, channel: CHANNEL, fetchImpl: stub.fetchImpl }), { status: 'listed' });
+  assert.deepEqual(stub.calls, [CHANNEL.checkUrl, 'https://example.test/shard-1.xml', 'https://example.test/shard-2.xml']);
+});
+
+test('verify reports unlisted only after reading every shard of a sitemap index', async () => {
+  const stub = stubPages({
+    [CHANNEL.checkUrl]: { status: 200, body: '<sitemapindex><sitemap><loc> https://example.test/shard-1.xml </loc></sitemap><sitemap><loc>https://example.test/shard-2.xml</loc></sitemap></sitemapindex>' },
+    'https://example.test/shard-1.xml': { status: 200, body: '<urlset><url><loc>https://www.skills.sh/other/thing/skill</loc></url></urlset>' },
+    'https://example.test/shard-2.xml': { status: 200, body: '<urlset><url><loc>https://www.skills.sh/another/one/skill</loc></url></urlset>' },
+  });
+  assert.deepEqual(await verifyPassive({ record: RECORD, channel: CHANNEL, fetchImpl: stub.fetchImpl }), { status: 'unlisted' });
+  assert.deepEqual(stub.calls, [CHANNEL.checkUrl, 'https://example.test/shard-1.xml', 'https://example.test/shard-2.xml']);
+});
+
+test('verify reports unknown when a shard of the sitemap index fails to fetch', async () => {
+  const index = '<sitemapindex><sitemap><loc>https://example.test/shard-1.xml</loc></sitemap><sitemap><loc>https://example.test/shard-2.xml</loc></sitemap></sitemapindex>';
+  const emptyShard = { status: 200, body: '<urlset/>' };
+
+  const throwing = stubPages({ [CHANNEL.checkUrl]: { status: 200, body: index }, 'https://example.test/shard-1.xml': emptyShard });
+  assert.deepEqual(await verifyPassive({ record: RECORD, channel: CHANNEL, fetchImpl: throwing.fetchImpl }), { status: 'unknown' });
+
+  const nullShard = stubPages({ [CHANNEL.checkUrl]: { status: 200, body: index }, 'https://example.test/shard-1.xml': emptyShard, 'https://example.test/shard-2.xml': null });
+  assert.deepEqual(await verifyPassive({ record: RECORD, channel: CHANNEL, fetchImpl: nullShard.fetchImpl }), { status: 'unknown' });
+
+  const errorShard = stubPages({ [CHANNEL.checkUrl]: { status: 200, body: index }, 'https://example.test/shard-1.xml': emptyShard, 'https://example.test/shard-2.xml': { status: 503, body: '' } });
+  assert.deepEqual(await verifyPassive({ record: RECORD, channel: CHANNEL, fetchImpl: errorShard.fetchImpl }), { status: 'unknown' });
+});
+
+test('verify reports unknown when the sitemap index lists more shards than the cap', async () => {
+  const locs = Array.from({ length: 51 }, (_, i) => `<sitemap><loc>https://example.test/shard-${i}.xml</loc></sitemap>`).join('');
+  const stub = stubPages({ [CHANNEL.checkUrl]: { status: 200, body: `<sitemapindex>${locs}</sitemapindex>` } });
+  assert.deepEqual(await verifyPassive({ record: RECORD, channel: CHANNEL, fetchImpl: stub.fetchImpl }), { status: 'unknown' });
+  assert.deepEqual(stub.calls, [CHANNEL.checkUrl]);
+});
+
+test('verify reports unknown for a sitemap index without loc entries', async () => {
+  const stub = stubPages({ [CHANNEL.checkUrl]: { status: 200, body: '<sitemapindex></sitemapindex>' } });
+  assert.deepEqual(await verifyPassive({ record: RECORD, channel: CHANNEL, fetchImpl: stub.fetchImpl }), { status: 'unknown' });
+});
+
+test('verify tolerates a shard answering 404 and still reads the rest of the index', async () => {
+  const stub = stubPages({
+    [CHANNEL.checkUrl]: { status: 200, body: '<sitemapindex><sitemap><loc>https://example.test/shard-1.xml</loc></sitemap><sitemap><loc>https://example.test/shard-2.xml</loc></sitemap></sitemapindex>' },
+    'https://example.test/shard-1.xml': { status: 404, body: 'not found' },
+    'https://example.test/shard-2.xml': { status: 200, body: '<urlset><url><loc>https://www.skills.sh/owner/demo/my-skill</loc></url></urlset>' },
+  });
+  assert.deepEqual(await verifyPassive({ record: RECORD, channel: CHANNEL, fetchImpl: stub.fetchImpl }), { status: 'listed' });
+  assert.deepEqual(stub.calls, [CHANNEL.checkUrl, 'https://example.test/shard-1.xml', 'https://example.test/shard-2.xml']);
 });

@@ -64,7 +64,7 @@ test('the registry carries the four new channels with their mechanism config', (
   assert.equal(skills.when, 'has_skill');
   assert.equal(skills.automatable, false);
   assert.equal(skills.probe, 'crawl');
-  assert.equal(skills.checkUrl, 'https://www.skills.sh/sitemap-skills-1.xml');
+  assert.equal(skills.checkUrl, 'https://www.skills.sh/sitemap.xml');
 
   const npm = channelById('npm-registry');
   assert.equal(npm.mechanism, 'cli-publish');

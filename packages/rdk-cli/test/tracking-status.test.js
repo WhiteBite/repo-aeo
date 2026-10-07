@@ -204,7 +204,7 @@ test('buildDistributionStatus verifies crawl presence through the injected fetch
 
     const status = await buildDistributionStatus({ cwd, gh: boom, fetchImpl, live: true, now: () => NOW });
 
-    assert.deepEqual(fetchCalls, ['https://www.skills.sh/sitemap-skills-1.xml']);
+    assert.deepEqual(fetchCalls, ['https://www.skills.sh/sitemap.xml']);
     const item = status.items[0];
     assert.equal(item.state, null);
     assert.equal(item.is_draft, null);
@@ -212,7 +212,7 @@ test('buildDistributionStatus verifies crawl presence through the injected fetch
     assert.equal(item.merge_state, null);
     assert.deepEqual(item.checks, { pass: 0, fail: 0, pending: 0 });
     assert.equal(item.presence, 'listed');
-    assert.equal(item.url, 'https://www.skills.sh/sitemap-skills-1.xml');
+    assert.equal(item.url, 'https://www.skills.sh/sitemap.xml');
     assert.equal(item.checked_at, NOW);
     assert.equal(item.attention, 'listed');
     assert.equal(item.why, 'listed on the channel');
@@ -223,7 +223,7 @@ test('buildDistributionStatus verifies crawl presence through the injected fetch
     const cache = readTrackingCache(cwd);
     assert.deepEqual(cache.snapshots[snapshotKey(rows[0])], {
       presence: 'listed',
-      url: 'https://www.skills.sh/sitemap-skills-1.xml',
+      url: 'https://www.skills.sh/sitemap.xml',
       checked_at: NOW,
       fetched_at: NOW,
     });
@@ -377,7 +377,7 @@ test('renderDistributionStatus prints the url on the target line for presence it
 
     const text = renderDistributionStatus(status);
 
-    assert.ok(text.includes('- skills.sh [listed] https://www.skills.sh/sitemap-skills-1.xml'));
+    assert.ok(text.includes('- skills.sh [listed] https://www.skills.sh/sitemap.xml'));
   } finally {
     removeRepo(cwd);
   }
@@ -412,7 +412,7 @@ test('buildDistributionStatus batches ten or more gh-pr rows into one graphql ca
 
     assert.equal(calls.length, 1, 'ten gh-pr rows hydrate through exactly one graphql call');
     assert.deepEqual(calls[0].args, ['api', 'graphql', '--input', '-']);
-    assert.deepEqual(fetchCalls, ['https://www.skills.sh/sitemap-skills-1.xml']);
+    assert.deepEqual(fetchCalls, ['https://www.skills.sh/sitemap.xml']);
     assert.equal(status.items.length, 11);
     for (const item of status.items.slice(0, 10)) {
       assert.equal(item.state, 'OPEN');
