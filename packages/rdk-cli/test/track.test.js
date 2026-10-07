@@ -123,6 +123,13 @@ test('track --adopt previews a digest, refuses an unguarded --apply and appends 
     assert.match(preview.output, /Dry run/);
     assert.equal(JSON.parse(readFileSync(ledgerPath(cwd), 'utf8')).length, 1);
 
+    const jsonPreview = await trackCommand({ cwd, options: { adopt: true, json: true }, config: {}, ghRunner: gh, now: () => NOW });
+    assert.equal(jsonPreview.ok, true);
+    const parsedJson = JSON.parse(jsonPreview.output);
+    assert.equal(parsedJson.plan_digest, preview.plan_digest);
+    assert.equal(parsedJson.rows.length, 1);
+    assert.equal(parsedJson.rows[0].pr_url, ADOPT_PR);
+
     const noAck = await trackCommand({ cwd, options: { adopt: true, apply: true }, config: {}, ghRunner: gh, now: () => NOW });
     assert.equal(noAck.ok, false);
     assert.equal(noAck.exitCode, 1);
@@ -286,6 +293,130 @@ test('track --sync forwards the injected fetch and previews prepared -> listed f
   }
 });
 
+test('track --mark previews a digest, refuses an unguarded --apply and rewrites only the matching row', async () => {
+  const other = { channel: 'awesome-list', target: 'other/list', pr_url: PR2, status: 'open', dedupe_key: 'awesome-list:other/list' };
+  const rows = [
+    { channel: 'awesome-list', target: 'owner/list', pr_url: PR1, status: 'submitted', dedupe_key: 'awesome-list:owner/list' },
+    other,
+  ];
+  const cwd = ledgerRepo(rows);
+  try {
+    const boom = () => {
+      throw new Error('gh must not be called for --mark');
+    };
+
+    const preview = await trackCommand({ cwd, options: { mark: 'owner/list', status: 'listed' }, config: {}, ghRunner: boom, now: () => NOW });
+    assert.equal(preview.ok, true);
+    assert.equal(preview.exitCode, 0);
+    assert.match(preview.output, /- owner\/list: submitted -> listed/);
+    assert.doesNotMatch(preview.output, /other\/list/);
+    assert.match(preview.output, /Plan digest: [0-9a-f]{64}/);
+    assert.match(preview.output, /Dry run/);
+    assert.equal(readFileSync(ledgerPath(cwd), 'utf8'), `${JSON.stringify(rows, null, 2)}\n`);
+
+    const jsonPreview = await trackCommand({ cwd, options: { mark: 'owner/list', status: 'listed', json: true }, config: {}, ghRunner: boom, now: () => NOW });
+    assert.equal(jsonPreview.ok, true);
+    const parsed = JSON.parse(jsonPreview.output);
+    assert.deepEqual(parsed.changes, [{ key: 'awesome-list:owner/list', from: 'submitted', to: 'listed' }]);
+    assert.equal(parsed.plan_digest, preview.plan_digest);
+
+    const noAck = await trackCommand({ cwd, options: { mark: 'owner/list', status: 'listed', apply: true }, config: {}, ghRunner: boom, now: () => NOW });
+    assert.equal(noAck.ok, false);
+    assert.equal(noAck.exitCode, 1);
+    assert.match(noAck.error, /--ack/);
+
+    const noReason = await trackCommand({ cwd, options: { mark: 'owner/list', status: 'listed', apply: true, ack: ACK }, config: {}, ghRunner: boom, now: () => NOW });
+    assert.equal(noReason.ok, false);
+    assert.match(noReason.output, /--reason/);
+
+    const noDigest = await trackCommand({ cwd, options: { mark: 'owner/list', status: 'listed', apply: true, ack: ACK, reason: 'unit test mark' }, config: {}, ghRunner: boom, now: () => NOW });
+    assert.equal(noDigest.ok, false);
+    assert.equal(noDigest.code, 'plan_digest_required');
+    assert.equal(JSON.parse(readFileSync(ledgerPath(cwd), 'utf8')).length, 2);
+
+    const applied = await trackCommand({
+      cwd,
+      options: { mark: 'owner/list', status: 'listed', apply: true, ack: ACK, reason: 'unit test mark', plan_digest: preview.plan_digest },
+      config: {},
+      ghRunner: boom,
+      now: () => NOW,
+    });
+    assert.equal(applied.ok, true, applied.output);
+    assert.match(applied.output, /Reason logged: unit test mark/);
+    assert.match(applied.output, /Marked 1 submission in \.discoverability\/submissions\.json\./);
+    const ledger = JSON.parse(readFileSync(ledgerPath(cwd), 'utf8'));
+    assert.deepEqual(ledger[0], {
+      channel: 'awesome-list',
+      target: 'owner/list',
+      pr_url: PR1,
+      status: 'listed',
+      dedupe_key: 'awesome-list:owner/list',
+      synced_at: NOW,
+    });
+    assert.deepEqual(ledger[1], other);
+  } finally {
+    removeRepo(cwd);
+  }
+});
+
+test('track --mark fails on unknown target, invalid status, missing --status and mode conflicts', async () => {
+  const rows = [{ channel: 'awesome-list', target: 'owner/list', pr_url: PR1, status: 'submitted', dedupe_key: 'awesome-list:owner/list' }];
+  const cwd = ledgerRepo(rows);
+  try {
+    const boom = () => {
+      throw new Error('gh must not be called when --mark fails');
+    };
+
+    const unknownTarget = await trackCommand({ cwd, options: { mark: 'nope/list', status: 'listed' }, config: {}, ghRunner: boom, now: () => NOW });
+    assert.equal(unknownTarget.ok, false);
+    assert.equal(unknownTarget.exitCode, 1);
+    assert.match(unknownTarget.error, /no ledger row for target "nope\/list"/);
+
+    const badStatus = await trackCommand({ cwd, options: { mark: 'owner/list', status: 'shipped' }, config: {}, ghRunner: boom, now: () => NOW });
+    assert.equal(badStatus.ok, false);
+    assert.equal(badStatus.exitCode, 1);
+    assert.match(badStatus.error, /unknown status "shipped"/);
+
+    const noStatus = await trackCommand({ cwd, options: { mark: 'owner/list' }, config: {}, ghRunner: boom, now: () => NOW });
+    assert.equal(noStatus.ok, false);
+    assert.equal(noStatus.exitCode, 1);
+    assert.match(noStatus.error, /--status is required with --mark/);
+
+    const withAdopt = await trackCommand({ cwd, options: { mark: 'owner/list', status: 'listed', adopt: true }, config: {}, ghRunner: boom, now: () => NOW });
+    assert.equal(withAdopt.ok, false);
+    assert.match(withAdopt.error, /pass only one of --adopt, --sync, --mark/);
+
+    const withSync = await trackCommand({ cwd, options: { mark: 'owner/list', status: 'listed', sync: true }, config: {}, ghRunner: boom, now: () => NOW });
+    assert.equal(withSync.ok, false);
+    assert.match(withSync.error, /pass only one of --adopt, --sync, --mark/);
+
+    assert.equal(readFileSync(ledgerPath(cwd), 'utf8'), `${JSON.stringify(rows, null, 2)}\n`);
+  } finally {
+    removeRepo(cwd);
+  }
+});
+
+test('track --sync --json emits parseable JSON with the plan digest', async () => {
+  const rows = [{ channel: 'awesome-list', target: 'owner/list', pr_url: PR1, status: 'submitted', dedupe_key: 'awesome-list:owner/list' }];
+  const cwd = ledgerRepo(rows);
+  try {
+    const gh = ghStub({
+      view: { [PR1]: () => okJson(raw({ state: 'MERGED', mergedAt: '2026-10-01T00:00:00Z', url: PR1 })) },
+    });
+
+    const preview = await trackCommand({ cwd, options: { sync: true, json: true }, config: {}, ghRunner: gh, now: () => NOW });
+    assert.equal(preview.ok, true);
+    assert.equal(preview.exitCode, 0);
+    const parsed = JSON.parse(preview.output);
+    assert.deepEqual(parsed.changes, [{ key: 'awesome-list:owner/list', from: 'submitted', to: 'listed' }]);
+    assert.equal(parsed.plan_digest, preview.plan_digest);
+    assert.match(parsed.plan_digest, /^[0-9a-f]{64}$/);
+    assert.equal(readFileSync(ledgerPath(cwd), 'utf8'), `${JSON.stringify(rows, null, 2)}\n`);
+  } finally {
+    removeRepo(cwd);
+  }
+});
+
 test('track refuses --adopt together with --sync instead of preferring one', async () => {
   const rows = [{ channel: 'awesome-list', target: 'owner/list', pr_url: PR1, status: 'submitted', dedupe_key: 'awesome-list:owner/list' }];
   const cwd = ledgerRepo(rows);
@@ -297,8 +428,8 @@ test('track refuses --adopt together with --sync instead of preferring one', asy
     const result = await trackCommand({ cwd, options: { adopt: true, sync: true }, config: {}, ghRunner: boom, now: () => NOW });
     assert.equal(result.ok, false);
     assert.equal(result.exitCode, 1);
-    assert.match(result.error, /pass either --adopt or --sync, not both/);
-    assert.match(result.output, /Pass either --adopt or --sync, not both\./);
+    assert.match(result.error, /pass only one of --adopt, --sync, --mark/);
+    assert.match(result.output, /Pass only one of --adopt, --sync, --mark\./);
     assert.equal(JSON.parse(readFileSync(ledgerPath(cwd), 'utf8')).length, 1);
   } finally {
     removeRepo(cwd);

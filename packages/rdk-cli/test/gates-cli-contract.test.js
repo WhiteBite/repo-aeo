@@ -366,6 +366,36 @@ const BEHAVIOUR = {
     }
   },
 
+  '--mark': async () => {
+    await withRepo({
+      'package.json': JSON.stringify(PKG),
+      '.discoverability/submissions.json': JSON.stringify([
+        { channel: 'awesome-list', target: 'owner/list', pr_url: 'https://github.com/owner/list/pull/7', status: 'prepared', dedupe_key: 'awesome-list:owner/list' },
+      ]),
+    }, async (dir) => {
+      const result = rdk(['track', '--mark', 'owner/list', '--status', 'submitted'], dir);
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      assert.match(result.stdout, /- owner\/list: prepared -> submitted/);
+      assert.match(result.stdout, /Plan digest: [0-9a-f]{64}/);
+    });
+  },
+
+  '--status': async () => {
+    await withRepo({
+      'package.json': JSON.stringify(PKG),
+      '.discoverability/submissions.json': JSON.stringify([
+        { channel: 'awesome-list', target: 'owner/list', pr_url: 'https://github.com/owner/list/pull/7', status: 'prepared', dedupe_key: 'awesome-list:owner/list' },
+      ]),
+    }, async (dir) => {
+      const result = rdk(['track', '--mark', 'owner/list', '--status', 'submitted'], dir);
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      assert.match(result.stdout, /prepared -> submitted/);
+      const invalid = rdk(['track', '--mark', 'owner/list', '--status', 'shipped'], dir);
+      assert.equal(invalid.status, 1, invalid.stdout + invalid.stderr);
+      assert.match(invalid.stdout, /Unknown status/);
+    });
+  },
+
   '--project': async () => {
     await withRepo({ 'package.json': JSON.stringify(PKG) }, async (dir) => {
       const project = rdk(['skill', 'status', '--project'], dir);

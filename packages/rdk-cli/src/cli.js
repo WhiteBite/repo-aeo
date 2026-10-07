@@ -22,7 +22,7 @@ Usage:
   rdk npm-surface          Audit the publishable package.json surface
   rdk github-sync          Push description/homepage/topics to GitHub (needs --apply --ack)
   rdk submit [--channel <id>]  Propose the project to curated lists (needs --apply --ack)
-  rdk track [--json] [--adopt] [--sync]  Campaign dashboard: live status, adopt existing PRs, sync the ledger
+  rdk track [--json] [--adopt] [--sync] [--mark <target> --status <status>]  Campaign dashboard: live status, adopt existing PRs, sync the ledger, mark a row's status
   rdk channels             Show every distribution channel, applicability and next action
   rdk skill <install|uninstall|status>  Link the agent skill into harness skill dirs (--project: repo-local)
 
