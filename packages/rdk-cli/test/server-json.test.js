@@ -48,3 +48,27 @@ test('mcpOwnershipMarker returns the name as a string', () => {
   assert.equal(mcpOwnershipMarker('repo-aeo'), 'repo-aeo');
   assert.equal(typeof mcpOwnershipMarker(42), 'string');
 });
+
+test('mcpOwnershipMarker builds the reverse-DNS marker when the owner is known', () => {
+  assert.equal(mcpOwnershipMarker('repo-aeo', 'WhiteBite'), 'io.github.WhiteBite/repo-aeo');
+});
+
+test('mcpOwnershipMarker returns the bare name when no owner is known', () => {
+  assert.equal(mcpOwnershipMarker('repo-aeo', null), 'repo-aeo');
+  assert.equal(mcpOwnershipMarker('repo-aeo', ''), 'repo-aeo');
+});
+
+test('renderServerJson uses pkg.mcpName when present', () => {
+  const doc = renderServerJson(config, { ...pkg, mcpName: 'io.github.WhiteBite/repo-aeo' });
+  assert.equal(doc.name, 'io.github.WhiteBite/repo-aeo');
+});
+
+test('renderServerJson derives the marker from a github.com link when mcpName is absent', () => {
+  const cfg = { project: { name: 'demo' }, links: { homepage: 'https://github.com/acme/demo#readme' } };
+  assert.equal(renderServerJson(cfg, { name: 'demo', version: '1.0.0' }).name, 'io.github.acme/demo');
+});
+
+test('renderServerJson falls back to copyright_holder when no github link yields an owner', () => {
+  const cfg = { project: { name: 'demo', copyright_holder: 'acme' }, links: { homepage: 'https://example.com' } };
+  assert.equal(renderServerJson(cfg, { name: 'demo', version: '1.0.0' }).name, 'io.github.acme/demo');
+});

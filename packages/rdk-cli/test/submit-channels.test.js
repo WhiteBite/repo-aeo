@@ -14,7 +14,7 @@ const PROJECT_YML = [
   '  category: mcp-server',
 ].join('\n');
 
-const PKG = { name: 'demo-project', version: '1.2.3', description: 'Demo package for channel submit tests.' };
+const PKG = { name: 'demo-project', version: '1.2.3', description: 'Demo package for channel submit tests.', mcpName: 'io.github.demo-owner/demo-project' };
 
 const GUARDS = { apply: true, ack: 'I_ACK_RDK_GITHUB_WRITE', reason: 'unit test submission' };
 
@@ -166,6 +166,55 @@ test('--channel skills-sh records the crawl preconditions and the project url', 
     assert.equal(ledger[0].channel, 'skills-sh');
     assert.equal(ledger[0].status, 'prepared');
     assert.equal(ledger[0].url, 'https://github.com/owner/demo');
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('mcp-official-registry fails before any plan or POST when package.json has no mcpName', async () => {
+  const pkg = { ...PKG };
+  delete pkg.mcpName;
+  const dir = makeRepo({ '.discoverability/project.yml': PROJECT_YML, 'package.json': JSON.stringify(pkg) });
+  const loaded = loadConfig(dir);
+  const calls = [];
+  const fetchImpl = async (url, init = {}) => {
+    calls.push({ url, init });
+    return { ok: true, status: 201, text: async () => '{}' };
+  };
+  try {
+    const preview = await submitCommand({ cwd: dir, options: { channel: 'mcp-official-registry' }, config: loaded.config, loaded, fetchImpl });
+    assert.equal(preview.ok, false);
+    assert.equal(preview.exitCode, 1);
+    assert.match(preview.error, /mcpName/);
+    assert.match(preview.error, /io\.github\./);
+
+    const result = await submitCommand({
+      cwd: dir,
+      options: { ...GUARDS, channel: 'mcp-official-registry', plan_digest: 'deadbeef' },
+      config: loaded.config,
+      loaded,
+      fetchImpl,
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.exitCode, 1);
+    assert.match(result.error, /mcpName/);
+    assert.match(result.error, /io\.github\./);
+    assert.equal(calls.length, 0);
+    assert.equal(existsSync(join(dir, '.discoverability', 'submissions.json')), false);
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('mcp-official-registry precondition passes when package.json carries mcpName', async () => {
+  const { dir, config, loaded } = repo();
+  try {
+    const preview = await submitCommand({ cwd: dir, options: { channel: 'mcp-official-registry' }, config, loaded });
+    assert.equal(preview.ok, true);
+    assert.equal(preview.exitCode, 0);
+    assert.equal(preview.plan_digest !== null && /^[0-9a-f]{64}$/.test(preview.plan_digest), true);
+    assert.equal(preview.output.includes('io.github.demo-owner/demo-project'), true);
+    assert.match(preview.output, /Dry run/);
   } finally {
     removeRepo(dir);
   }

@@ -162,6 +162,18 @@ export async function submitCommand({ cwd, options = {}, config, loaded, ghRunne
   }
   const mechanism = mechanismById(channel.mechanism);
 
+  if (channel.mechanism === 'http-json' && channel.id === 'mcp-official-registry') {
+    const pkg = (loaded && loaded.publishable && loaded.publishable.pkg) || (loaded && loaded.pkg) || null;
+    const mcpName = pkg && typeof pkg.mcpName === 'string' ? pkg.mcpName.trim() : '';
+    if (!mcpName) {
+      const repoSlug = resolveRepo(cwd, options);
+      const projectName = (config && config.project && config.project.name) || (pkg && pkg.name) || 'project';
+      const example = `io.github.${repoSlug || projectName}`;
+      lines.push(`The official MCP registry requires "mcpName" in package.json; add "mcpName": "${example}" before submitting.`);
+      return fail(`package.json is missing "mcpName" - the official MCP registry rejects the submission without it; add "mcpName": "${example}"`);
+    }
+  }
+
   if (options.search) {
     if (!gh(['--version']).ok) {
       lines.push('The GitHub CLI (gh) is required for --search. Install it from https://cli.github.com and run `gh auth login`.');
