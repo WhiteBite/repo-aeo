@@ -31,6 +31,24 @@ function raw(overrides = {}) {
 
 const okJson = (value) => ({ ok: true, stdout: JSON.stringify(value), stderr: '', code: 0 });
 
+function graphNode(overrides = {}) {
+  return {
+    state: 'OPEN',
+    isDraft: false,
+    reviewDecision: null,
+    mergeable: 'MERGEABLE',
+    mergeStateStatus: 'CLEAN',
+    mergedAt: null,
+    url: null,
+    latestReviews: { nodes: [] },
+    reviews: { nodes: [] },
+    comments: { nodes: [] },
+    statusCheckRollup: { contexts: { nodes: [{ status: 'COMPLETED', conclusion: 'SUCCESS' }] } },
+    commits: { nodes: [{ commit: { committedDate: '2026-10-05T12:00:00Z' } }] },
+    ...overrides,
+  };
+}
+
 function ghStub({ search, list = {}, view = {} } = {}) {
   return (args, opts) => {
     if (args[0] === 'search') return search ? search(args, opts) : okJson([]);
@@ -411,6 +429,43 @@ test('track --sync --json emits parseable JSON with the plan digest', async () =
     assert.deepEqual(parsed.changes, [{ key: 'awesome-list:owner/list', from: 'submitted', to: 'listed' }]);
     assert.equal(parsed.plan_digest, preview.plan_digest);
     assert.match(parsed.plan_digest, /^[0-9a-f]{64}$/);
+    assert.equal(readFileSync(ledgerPath(cwd), 'utf8'), `${JSON.stringify(rows, null, 2)}\n`);
+  } finally {
+    removeRepo(cwd);
+  }
+});
+
+test('track --sync batches ten or more gh-pr rows into one graphql call', async () => {
+  const rows = Array.from({ length: 10 }, (_, i) => ({
+    channel: 'awesome-list',
+    target: `owner/list${i}`,
+    pr_url: `https://github.com/owner/list${i}/pull/${i + 1}`,
+    status: 'submitted',
+    dedupe_key: `awesome-list:owner/list${i}`,
+  }));
+  const cwd = ledgerRepo(rows);
+  try {
+    const calls = [];
+    const gh = (args, opts) => {
+      calls.push({ args, opts });
+      if (args[0] === 'api' && args[1] === 'graphql') {
+        const data = {};
+        rows.forEach((row, i) => {
+          data[`pr${i}`] = { pullRequest: i === 0 ? graphNode({ state: 'CLOSED' }) : graphNode({ url: row.pr_url }) };
+        });
+        return okJson({ data });
+      }
+      return { ok: false, stdout: '', stderr: `unexpected gh call: ${args.join(' ')}`, code: 1 };
+    };
+
+    const preview = await trackCommand({ cwd, options: { sync: true }, config: {}, ghRunner: gh, now: () => NOW });
+
+    assert.equal(preview.ok, true, preview.output);
+    assert.equal(calls.length, 1, 'ten gh-pr rows hydrate through exactly one graphql call');
+    assert.deepEqual(calls[0].args, ['api', 'graphql', '--input', '-']);
+    assert.match(preview.output, /awesome-list:owner\/list0: submitted -> closed/);
+    assert.match(preview.output, /Plan digest: [0-9a-f]{64}/);
+    assert.match(preview.output, /Dry run/);
     assert.equal(readFileSync(ledgerPath(cwd), 'utf8'), `${JSON.stringify(rows, null, 2)}\n`);
   } finally {
     removeRepo(cwd);

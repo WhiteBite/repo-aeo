@@ -34,9 +34,9 @@ const USER_AGENT = `repo-aeo-mcp/0.1 (+${TOOL_HOME})`;
 const httpGet = (url, options = {}) => httpGetText(url, { ...options, userAgent: USER_AGENT });
 
 // the repo-aeo engine invokes gh synchronously; an async runner would silently disable every live probe
-function gh(args, { cwd } = {}) {
+function gh(args, { cwd, input } = {}) {
   try {
-    const result = spawnSync('gh', args, { cwd, timeout: 20000, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+    const result = spawnSync('gh', args, { cwd, timeout: 20000, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, input });
     if (result.error) return { ok: false, stdout: '', stderr: String(result.error.message), code: null };
     return { ok: result.status === 0, stdout: result.stdout ?? '', stderr: result.stderr ?? '', code: result.status };
   } catch (error) {

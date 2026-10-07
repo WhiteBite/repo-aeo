@@ -6,7 +6,7 @@
  */
 import { readLedger } from '../ledger.js';
 import { channelById } from '../channels.js';
-import { hydrateByProbe } from './hydrate.js';
+import { hydrateByProbe, hydrateGitPrBatch, isGhPrRow, GH_PR_BATCH_MIN } from './hydrate.js';
 import { evaluateAttention, neededFor, commandFor } from './attention.js';
 import { readTrackingCache, writeTrackingCache, snapshotKey } from './cache.js';
 
@@ -38,13 +38,13 @@ function whyFor(attention, needed) {
   return 'no live state';
 }
 
-async function projectRow(row, { cwd, gh, fetchImpl, live, generated_at, now }) {
+async function projectRow(row, { cwd, gh, fetchImpl, live, generated_at, now, batch = null }) {
   const descriptor = row.channel ? channelById(row.channel) : null;
 
   let normalized = null;
   let hasLive = false;
   if (live) {
-    const hydrated = await hydrateByProbe({ entry: row, channel: descriptor, gh, fetchImpl, cwd, now });
+    const hydrated = await hydrateByProbe({ entry: row, channel: descriptor, gh, fetchImpl, cwd, now, batch });
     hasLive = Boolean(hydrated && hydrated.ok && hydrated.normalized);
     normalized = hasLive ? hydrated.normalized : null;
   }
@@ -89,8 +89,11 @@ export async function buildDistributionStatus({ cwd, loaded, options = {}, gh, g
   let cacheDirty = false;
   const items = [];
 
+  const ghPrRows = rows.filter(isGhPrRow);
+  const batch = live && ghPrRows.length >= GH_PR_BATCH_MIN ? hydrateGitPrBatch({ entries: ghPrRows, gh, cwd }) : null;
+
   for (const row of rows) {
-    const { hasLive, normalized, item } = await projectRow(row, { cwd, gh, fetchImpl, live, generated_at, now });
+    const { hasLive, normalized, item } = await projectRow(row, { cwd, gh, fetchImpl, live, generated_at, now, batch });
     items.push(item);
     if (by_attention[item.attention] !== undefined) by_attention[item.attention] += 1;
     by_state[stateBucket(item.state)] += 1;

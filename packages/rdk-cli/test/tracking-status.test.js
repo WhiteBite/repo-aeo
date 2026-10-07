@@ -47,6 +47,33 @@ function ghStub(byUrl) {
   return { gh, calls };
 }
 
+function graphNode(overrides = {}) {
+  return {
+    state: 'OPEN',
+    isDraft: false,
+    reviewDecision: null,
+    mergeable: 'MERGEABLE',
+    mergeStateStatus: 'CLEAN',
+    mergedAt: null,
+    url: null,
+    latestReviews: { nodes: [] },
+    reviews: { nodes: [] },
+    comments: { nodes: [] },
+    statusCheckRollup: { contexts: { nodes: [{ status: 'COMPLETED', conclusion: 'SUCCESS' }] } },
+    commits: { nodes: [{ commit: { committedDate: '2026-10-05T12:00:00Z' } }] },
+    ...overrides,
+  };
+}
+
+function ghPrRows(count) {
+  return Array.from({ length: count }, (_, i) => ({
+    channel: 'awesome-list',
+    target: `owner/list${i}`,
+    pr_url: `https://github.com/owner/list${i}/pull/${i + 1}`,
+    status: 'submitted',
+  }));
+}
+
 function ledgerRepo(rows) {
   return makeRepo({
     '.discoverability/submissions.json': `${JSON.stringify(rows, null, 2)}\n`,
@@ -327,6 +354,69 @@ test('renderDistributionStatus prints the url on the target line for presence it
     const text = renderDistributionStatus(status);
 
     assert.ok(text.includes('- skills.sh [listed] https://www.skills.sh/sitemap-skills-1.xml'));
+  } finally {
+    removeRepo(cwd);
+  }
+});
+
+test('buildDistributionStatus batches ten or more gh-pr rows into one graphql call and keeps fetch rows on their verifiers', async () => {
+  const prRows = ghPrRows(10);
+  const rows = [...prRows, { channel: 'skills-sh', target: 'skills.sh', url: 'https://github.com/owner/repo', status: 'prepared', dedupe_key: 'skills-sh:skills.sh' }];
+  const cwd = ledgerRepo(rows);
+  try {
+    const calls = [];
+    const gh = (args, opts) => {
+      calls.push({ args, opts });
+      if (args[0] === 'api' && args[1] === 'graphql') {
+        const payload = JSON.parse(opts.input);
+        assert.equal(Object.keys(payload.variables).length, 30);
+        const data = {};
+        prRows.forEach((row, i) => {
+          data[`pr${i}`] = { pullRequest: graphNode({ url: row.pr_url }) };
+        });
+        return { ok: true, stdout: JSON.stringify({ data }), stderr: '', code: 0 };
+      }
+      return { ok: false, stdout: '', stderr: `unexpected gh call: ${args.join(' ')}`, code: 1 };
+    };
+    const fetchCalls = [];
+    const fetchImpl = async (url) => {
+      fetchCalls.push(url);
+      return { ok: true, status: 200, text: async () => 'crawl me: https://github.com/owner/repo' };
+    };
+
+    const status = await buildDistributionStatus({ cwd, loaded: {}, gh, fetchImpl, live: true, now: () => NOW });
+
+    assert.equal(calls.length, 1, 'ten gh-pr rows hydrate through exactly one graphql call');
+    assert.deepEqual(calls[0].args, ['api', 'graphql', '--input', '-']);
+    assert.deepEqual(fetchCalls, ['https://www.skills.sh/sitemap-skills-1.xml']);
+    assert.equal(status.items.length, 11);
+    for (const item of status.items.slice(0, 10)) {
+      assert.equal(item.state, 'OPEN');
+      assert.deepEqual(item.checks, { pass: 1, fail: 0, pending: 0 });
+      assert.equal(item.attention, 'awaiting_review');
+    }
+    assert.equal(status.items[10].presence, 'listed');
+    assert.equal(status.items[10].attention, 'listed');
+    assert.equal(status.summary.by_state.open, 10);
+  } finally {
+    removeRepo(cwd);
+  }
+});
+
+test('buildDistributionStatus keeps the per-item pr view path below the threshold', async () => {
+  const rows = ghPrRows(9);
+  const cwd = ledgerRepo(rows);
+  try {
+    const byUrl = {};
+    for (const row of rows) byUrl[row.pr_url] = raw({ url: row.pr_url });
+    const { gh, calls } = ghStub(byUrl);
+
+    const status = await buildDistributionStatus({ cwd, loaded: {}, gh, live: true, now: () => NOW });
+
+    assert.equal(calls.length, 9, 'nine gh-pr rows hydrate one gh pr view call each');
+    for (const call of calls) assert.deepEqual(call.args.slice(0, 2), ['pr', 'view']);
+    assert.equal(status.items.length, 9);
+    assert.equal(status.summary.by_state.open, 9);
   } finally {
     removeRepo(cwd);
   }

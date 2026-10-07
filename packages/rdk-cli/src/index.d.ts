@@ -397,6 +397,11 @@ export declare function hydrateGitPr(args: {
   gh: (args: string[], opts?: { cwd?: string }) => { ok: boolean; stdout?: string; stderr?: string };
   cwd: string;
 }): { ok: boolean; normalized?: NormalizedPr; raw?: unknown; error?: string };
+export declare function hydrateGitPrBatch(args: {
+  entries: Submission[];
+  gh: (args: string[], opts?: { cwd?: string; input?: string }) => { ok: boolean; stdout?: string; stderr?: string };
+  cwd: string;
+}): Map<string, { ok: boolean; kind: 'gh-pr'; normalized?: NormalizedPr; recorded?: boolean }>;
 export declare function hydrateByProbe(args: {
   entry: Submission;
   channel?: ChannelDescriptor | null;
@@ -404,6 +409,7 @@ export declare function hydrateByProbe(args: {
   fetchImpl?: (url: string, init?: Record<string, unknown>) => Promise<{ ok: boolean; status?: number; text?: () => Promise<string> }>;
   cwd?: string;
   now?: () => string;
+  batch?: Map<string, { ok: boolean; kind: 'gh-pr'; normalized?: NormalizedPr; recorded?: boolean }>;
 }): Promise<{ ok: boolean; kind?: string | null; normalized?: NormalizedPr | NormalizedPresence; raw?: unknown; error?: string; recorded?: boolean }>;
 
 export declare function evaluateAttention(

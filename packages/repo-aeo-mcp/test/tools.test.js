@@ -615,6 +615,70 @@ test('distribution_check_submissions hydrates git-pr items through an injected g
   }
 });
 
+test('distribution_check_submissions live path batches ten or more git-pr rows into one graphql call', async () => {
+  const box = sandbox();
+  try {
+    mkdirSync(join(box.dir, '.discoverability'), { recursive: true });
+    const rows = Array.from({ length: 10 }, (_, i) => ({
+      channel: 'awesome-list',
+      mechanism: 'git-pr',
+      artifact: 'readme-row',
+      dedupe_key: `owner/list${i}:WhiteBite/repo-aeo`,
+      target: `owner/list${i}`,
+      pr_url: `https://github.com/owner/list${i}/pull/${i + 1}`,
+      branch: `rdk/list${i}/add-repo-aeo`,
+      fork: 'WhiteBite/awesome-kiro',
+      submitted_at: '2026-10-03T09:00:00Z',
+      status: 'open',
+    }));
+    writeFileSync(join(box.dir, '.discoverability', 'submissions.json'), JSON.stringify(rows));
+    const pushedAt = new Date().toISOString();
+    const calls = [];
+    const gh = (args, options) => {
+      calls.push({ args, options });
+      if (args[0] === 'api' && args[1] === 'graphql') {
+        const data = {};
+        rows.forEach((row, i) => {
+          data[`pr${i}`] = {
+            pullRequest: {
+              state: 'OPEN',
+              isDraft: false,
+              reviewDecision: null,
+              mergeable: 'MERGEABLE',
+              mergeStateStatus: 'CLEAN',
+              mergedAt: null,
+              url: row.pr_url,
+              latestReviews: { nodes: [] },
+              reviews: { nodes: [] },
+              comments: { nodes: [] },
+              statusCheckRollup: { contexts: { nodes: [] } },
+              commits: { nodes: [{ commit: { committedDate: pushedAt } }] },
+            },
+          };
+        });
+        return { ok: true, stdout: JSON.stringify({ data }), stderr: '', code: 0 };
+      }
+      return { ok: false, stdout: '', stderr: `unexpected gh invocation: ${args.join(' ')}`, code: 1 };
+    };
+
+    const payload = await callTool('distribution_check_submissions', { cwd: box.dir, live: true }, { gh });
+
+    assert.equal(payload.ok, true);
+    assert.equal(calls.length, 1, 'ten git-pr rows hydrate through exactly one graphql call');
+    assert.deepEqual(calls[0].args, ['api', 'graphql', '--input', '-']);
+    assert.equal(calls[0].options.cwd, box.dir);
+    const request = JSON.parse(calls[0].options.input);
+    assert.match(request.query, /pr0: repository\(owner:\$o0, name:\$n0\)\{ pullRequest\(number:\$p0\)\{/);
+    assert.equal(Object.keys(request.variables).length, 30);
+    assert.equal(payload.items.length, 10);
+    for (const item of payload.items) assert.equal(item.state, 'OPEN');
+    assert.equal(payload.summary.by_state.open, 10);
+    assert.equal(payload.schema_version, 'rdk-distribution/1');
+  } finally {
+    box.cleanup();
+  }
+});
+
 test('distribution_check_submissions adopt and sync are read-only previews', async () => {
   const box = sandbox();
   try {

@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 
 /** Runs a command synchronously and returns { ok, stdout, stderr, code }. Never throws. */
-export function run(cmd, args = [], { cwd = process.cwd(), timeout = 20000, env = process.env, shell = false } = {}) {
+export function run(cmd, args = [], { cwd = process.cwd(), timeout = 20000, env = process.env, shell = false, input } = {}) {
   try {
     const result = spawnSync(cmd, args, {
       cwd,
@@ -10,6 +10,7 @@ export function run(cmd, args = [], { cwd = process.cwd(), timeout = 20000, env 
       env,
       shell,
       maxBuffer: 32 * 1024 * 1024,
+      input,
     });
     if (result.error) {
       return { ok: false, stdout: '', stderr: String(result.error.message), code: null, missing: result.error.code === 'ENOENT' };

@@ -11,7 +11,7 @@ import { channelById } from '../distribution/channels.js';
 import { ACK_HINT, assertWriteGuards, planDigest } from '../distribution/guard.js';
 import { buildDistributionStatus, renderDistributionStatus } from '../distribution/tracking/status.js';
 import { discoverOwnedPrs, matchAdoptable, adoptRows, applyAdopt } from '../distribution/tracking/adopt.js';
-import { hydrateByProbe } from '../distribution/tracking/hydrate.js';
+import { hydrateByProbe, hydrateGitPrBatch, isGhPrRow, GH_PR_BATCH_MIN } from '../distribution/tracking/hydrate.js';
 
 const GUARD_LINES = {
   ack_mismatch: `Refusing to write: --ack must equal ${ACK_HINT}.`,
@@ -69,8 +69,10 @@ function adoptMode({ cwd, options, config, ledger, gh, lines, fail, refuse }) {
 
 async function syncMode({ cwd, options, config, ledger, gh, fetchImpl, lines, fail, refuse, now }) {
   const hydratedByKey = {};
+  const ghPrRows = ledger.filter(isGhPrRow);
+  const batch = ghPrRows.length >= GH_PR_BATCH_MIN ? hydrateGitPrBatch({ entries: ghPrRows, gh, cwd }) : null;
   for (const row of ledger) {
-    const hydrated = await hydrateByProbe({ entry: row, channel: channelById(row.channel), gh, fetchImpl, cwd, now });
+    const hydrated = await hydrateByProbe({ entry: row, channel: channelById(row.channel), gh, fetchImpl, cwd, now, batch });
     if (hydrated && hydrated.ok && hydrated.normalized) hydratedByKey[row.dedupe_key || row.pr_url] = hydrated.normalized;
   }
 
@@ -151,7 +153,7 @@ function markMode({ cwd, options, config, ledger, lines, fail, refuse, now }) {
 }
 
 export async function trackCommand({ cwd, options = {}, config, loaded, ghRunner, gitRunner, fetchImpl, now = () => new Date().toISOString() }) {
-  const gh = ghRunner || ((args, opts = {}) => run('gh', args, { cwd: (opts && opts.cwd) || cwd, timeout: (opts && opts.timeout) || 20000 }));
+  const gh = ghRunner || ((args, opts = {}) => run('gh', args, { cwd: (opts && opts.cwd) || cwd, timeout: (opts && opts.timeout) || 20000, input: opts && opts.input }));
   const lines = ['# rdk track', ''];
   const fail = (error, extra = {}) => ({ ok: false, error, output: `${lines.join('\n')}\n`, exitCode: 1, ...extra });
   const refuse = (guard, extra = {}) => {

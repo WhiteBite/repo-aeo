@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeGhPrView, hydrateGitPr, hydrateByProbe } from '../src/distribution/tracking/hydrate.js';
+import { normalizeGhPrView, hydrateGitPr, hydrateByProbe, hydrateGitPrBatch } from '../src/distribution/tracking/hydrate.js';
 import { countChecks } from '../src/distribution/tracking/attention.js';
 
 const PR_URL = 'https://github.com/foo/bar/pull/7';
@@ -283,4 +283,115 @@ test('hydrateByProbe never throws when a gh probe fails', async () => {
   assert.equal(garbage.ok, false);
   assert.equal(garbage.kind, 'gh-pr');
   assert.ok(garbage.error.length > 0);
+});
+
+const PR_URL_A = 'https://github.com/foo/bar/pull/7';
+const PR_URL_B = 'https://github.com/foo/bar/pull/8';
+
+function graphNode(overrides = {}) {
+  return {
+    state: 'OPEN',
+    isDraft: false,
+    reviewDecision: null,
+    mergeable: 'MERGEABLE',
+    mergeStateStatus: 'CLEAN',
+    mergedAt: null,
+    url: PR_URL_A,
+    latestReviews: { nodes: [{ author: { login: 'alice' }, state: 'APPROVED', submittedAt: '2026-10-05T10:00:00Z' }] },
+    reviews: { nodes: [{ author: { login: 'dave' }, state: 'CHANGES_REQUESTED', submittedAt: '2026-10-04T10:00:00Z' }] },
+    comments: { nodes: [{ author: { login: 'bob' }, createdAt: '2026-10-05T11:00:00Z' }] },
+    statusCheckRollup: {
+      contexts: {
+        nodes: [
+          { __typename: 'CheckRun', name: 'ci', status: 'COMPLETED', conclusion: 'SUCCESS' },
+          { __typename: 'StatusContext', context: 'continuous-integration/travis', state: 'FAILURE' },
+        ],
+      },
+    },
+    commits: { nodes: [{ commit: { committedDate: '2026-10-05T12:00:00Z' } }] },
+    ...overrides,
+  };
+}
+
+test('hydrateGitPrBatch issues exactly one graphql call and maps aliases through normalizeGhPrView', () => {
+  const calls = [];
+  const gh = (args, opts) => {
+    calls.push({ args, opts });
+    return { ok: true, stdout: JSON.stringify({ data: { pr0: { pullRequest: graphNode() }, pr1: null } }), stderr: '', code: 0 };
+  };
+  const entries = [
+    { target: 'foo/bar', pr_url: PR_URL_A },
+    { target: 'foo/bar', pr_url: PR_URL_B },
+  ];
+
+  const results = hydrateGitPrBatch({ entries, gh, cwd: process.cwd() });
+
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].args, ['api', 'graphql', '--input', '-']);
+  const payload = JSON.parse(calls[0].opts.input);
+  assert.match(payload.query, /query\(\$o0: String! \$n0: String! \$p0: Int!/);
+  assert.match(payload.query, /pr0: repository\(owner:\$o0, name:\$n0\)\{ pullRequest\(number:\$p0\)\{/);
+  assert.match(payload.query, /pr1: repository\(owner:\$o1, name:\$n1\)\{ pullRequest\(number:\$p1\)\{/);
+  assert.ok(payload.query.includes('statusCheckRollup{contexts(first:100)'));
+  assert.ok(payload.query.includes('commits(last:1){nodes{commit{committedDate}}}'));
+  assert.deepEqual(payload.variables, { o0: 'foo', n0: 'bar', p0: 7, o1: 'foo', n1: 'bar', p1: 8 });
+
+  assert.equal(results.size, 2);
+  const first = results.get(PR_URL_A);
+  assert.equal(first.ok, true);
+  assert.equal(first.kind, 'gh-pr');
+  assert.equal(first.normalized.state, 'OPEN');
+  assert.equal(first.normalized.is_draft, false);
+  assert.deepEqual(first.normalized.checks, { pass: 1, fail: 1, pending: 0 });
+  assert.equal(first.normalized.reviews[0].state, 'APPROVED');
+  assert.equal(first.normalized.last_push, '2026-10-05T12:00:00Z');
+  assert.deepEqual(results.get(PR_URL_B), { ok: false, kind: 'gh-pr', recorded: true });
+});
+
+test('hydrateGitPrBatch degrades every entry to recorded when the graphql call fails', () => {
+  const entries = [
+    { target: 'foo/bar', pr_url: PR_URL_A },
+    { target: 'foo/bar', pr_url: PR_URL_B },
+  ];
+  const cwd = process.cwd();
+
+  const failed = hydrateGitPrBatch({ entries, gh: () => ({ ok: false, stdout: '', stderr: 'GraphQL: boom', code: 1 }), cwd });
+  assert.deepEqual(failed.get(PR_URL_A), { ok: false, kind: 'gh-pr', recorded: true });
+  assert.deepEqual(failed.get(PR_URL_B), { ok: false, kind: 'gh-pr', recorded: true });
+
+  const garbage = hydrateGitPrBatch({ entries, gh: () => ({ ok: true, stdout: 'not json', stderr: '', code: 0 }), cwd });
+  assert.deepEqual(garbage.get(PR_URL_A), { ok: false, kind: 'gh-pr', recorded: true });
+  assert.deepEqual(garbage.get(PR_URL_B), { ok: false, kind: 'gh-pr', recorded: true });
+
+  const thrown = hydrateGitPrBatch({ entries, gh: () => { throw new Error('gh exploded'); }, cwd });
+  assert.deepEqual(thrown.get(PR_URL_A), { ok: false, kind: 'gh-pr', recorded: true });
+  assert.deepEqual(thrown.get(PR_URL_B), { ok: false, kind: 'gh-pr', recorded: true });
+});
+
+test('hydrateGitPrBatch skips malformed pr urls and keeps them recorded', () => {
+  const calls = [];
+  const gh = (args, opts) => {
+    calls.push({ args, opts });
+    return { ok: true, stdout: JSON.stringify({ data: { pr0: { pullRequest: graphNode() } } }), stderr: '', code: 0 };
+  };
+  const entries = [
+    { target: 'foo/bar', pr_url: 'https://gitlab.com/foo/bar/pull/7' },
+    { target: 'foo/bar', pr_url: 'https://github.com/foo/bar/issues/7' },
+    { target: 'foo/bar' },
+    { target: 'foo/bar', pr_url: PR_URL_A },
+  ];
+
+  const results = hydrateGitPrBatch({ entries, gh, cwd: process.cwd() });
+
+  assert.equal(calls.length, 1);
+  const payload = JSON.parse(calls[0].opts.input);
+  assert.match(payload.query, /pr0: repository\(owner:\$o0, name:\$n0\)\{ pullRequest\(number:\$p0\)\{/);
+  assert.doesNotMatch(payload.query, /pr1/);
+  assert.deepEqual(payload.variables, { o0: 'foo', n0: 'bar', p0: 7 });
+
+  assert.deepEqual(results.get('https://gitlab.com/foo/bar/pull/7'), { ok: false, kind: 'gh-pr', recorded: true });
+  assert.deepEqual(results.get('https://github.com/foo/bar/issues/7'), { ok: false, kind: 'gh-pr', recorded: true });
+  assert.deepEqual(results.get(undefined), { ok: false, kind: 'gh-pr', recorded: true });
+  assert.equal(results.get(PR_URL_A).ok, true);
+  assert.equal(results.get(PR_URL_A).normalized.state, 'OPEN');
 });

@@ -13,7 +13,7 @@ export { assertWriteGuards } from './distribution/guard.js';
 export { CHANNELS, CHANNEL_DESCRIPTOR_FIELDS, channelById, applicableChannels } from './distribution/channels.js';
 export { readLedger, appendRecords, writeLedger, upsertRecords, syncTransition, applySync, isBlocking, projectStatus } from './distribution/ledger.js';
 export { buildDistributionStatus, renderDistributionStatus, DISTRIBUTION_SCHEMA } from './distribution/tracking/status.js';
-export { hydrateGitPr, normalizeGhPrView, hydrateByProbe } from './distribution/tracking/hydrate.js';
+export { hydrateGitPr, hydrateGitPrBatch, normalizeGhPrView, hydrateByProbe } from './distribution/tracking/hydrate.js';
 export { evaluateAttention, neededFor, commandFor, countChecks, isMaintainer } from './distribution/tracking/attention.js';
 export { readTrackingCache, writeTrackingCache, trackingCachePath, snapshotKey } from './distribution/tracking/cache.js';
 export { discoverOwnedPrs, matchAdoptable, adoptRows, applyAdopt } from './distribution/tracking/adopt.js';

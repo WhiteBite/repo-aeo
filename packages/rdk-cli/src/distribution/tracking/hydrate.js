@@ -1,10 +1,23 @@
 /** Live hydration of recorded submissions: gh-pr via the gh runner, fetch channels via their verifiers; never throws. */
 import { countChecks, isMaintainer } from './attention.js';
+import { channelById } from '../channels.js';
 import * as passive from '../mechanisms/passive.js';
 import * as httpJson from '../mechanisms/httpJson.js';
 import * as cliPublish from '../mechanisms/cliPublish.js';
 
 const GH_PR_FIELDS = 'state,isDraft,reviewDecision,latestReviews,reviews,comments,statusCheckRollup,mergeStateStatus,mergeable,labels,updatedAt,closedAt,mergedAt,url,commits';
+
+export const GH_PR_BATCH_MIN = 10;
+
+const BATCH_PR_FIELDS =
+  'state isDraft reviewDecision mergeable mergeStateStatus mergedAt url ' +
+  'latestReviews(first:100){nodes{author{login} state submittedAt}} ' +
+  'reviews(first:100){nodes{author{login} state submittedAt}} ' +
+  'comments(first:100){nodes{author{login} createdAt}} ' +
+  'statusCheckRollup{contexts(first:100){nodes{... on CheckRun{name status conclusion} ... on StatusContext{context state}}}} ' +
+  'commits(last:1){nodes{commit{committedDate}}}';
+
+const PR_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)\/?$/;
 
 function lastPush(raw) {
   let latest = null;
@@ -60,6 +73,69 @@ export function hydrateGitPr({ entry, gh, cwd }) {
   }
 }
 
+function parsePrRef(url) {
+  if (typeof url !== 'string') return null;
+  const match = PR_URL.exec(url);
+  if (!match) return null;
+  return { owner: match[1], name: match[2], number: Number(match[3]) };
+}
+
+export function isGhPrRow(row) {
+  const descriptor = row && row.channel ? channelById(row.channel) : null;
+  const kind = (descriptor && descriptor.probe) || (row && row.pr_url ? 'gh-pr' : null);
+  return kind === 'gh-pr';
+}
+
+function viewFromGraphNode(node) {
+  return {
+    ...node,
+    statusCheckRollup: node.statusCheckRollup?.contexts?.nodes ?? [],
+    latestReviews: node.latestReviews?.nodes ?? [],
+    reviews: node.reviews?.nodes ?? [],
+    comments: node.comments?.nodes ?? [],
+    commits: (node.commits?.nodes ?? []).map((entry) => entry?.commit ?? {}),
+  };
+}
+
+export function hydrateGitPrBatch({ entries, gh, cwd }) {
+  const results = new Map();
+  const parsed = [];
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    const url = entry && entry.pr_url;
+    const ref = parsePrRef(url);
+    if (ref) parsed.push({ url, ref });
+    else results.set(url, { ok: false, kind: 'gh-pr', recorded: true });
+  }
+
+  let data = null;
+  if (parsed.length > 0) {
+    try {
+      const aliases = [];
+      const declarations = [];
+      const variables = {};
+      parsed.forEach(({ ref }, index) => {
+        declarations.push(`$o${index}: String!`, `$n${index}: String!`, `$p${index}: Int!`);
+        variables[`o${index}`] = ref.owner;
+        variables[`n${index}`] = ref.name;
+        variables[`p${index}`] = ref.number;
+        aliases.push(`pr${index}: repository(owner:$o${index}, name:$n${index}){ pullRequest(number:$p${index}){ ${BATCH_PR_FIELDS} } }`);
+      });
+      const result = gh(['api', 'graphql', '--input', '-'], { cwd, input: JSON.stringify({ query: `query(${declarations.join(' ')}){ ${aliases.join(' ')} }`, variables }) });
+      if (result && result.ok) data = JSON.parse(result.stdout).data ?? null;
+    } catch {
+      data = null;
+    }
+  }
+
+  parsed.forEach(({ url }, index) => {
+    const repository = data ? data[`pr${index}`] : null;
+    const node = repository && typeof repository === 'object' ? repository.pullRequest : null;
+    if (node && typeof node === 'object') results.set(url, { ok: true, kind: 'gh-pr', normalized: normalizeGhPrView(viewFromGraphNode(node)) });
+    else results.set(url, { ok: false, kind: 'gh-pr', recorded: true });
+  });
+  return results;
+}
+
 function presenceUrl(kind, entry, channel) {
   if (kind === 'crawl') return (channel && channel.checkUrl) || null;
   if (kind === 'http-search') {
@@ -77,10 +153,12 @@ async function verifyPresence(kind, { entry, channel, fetchImpl }) {
   return cliPublish.verify({ record: entry, fetchImpl });
 }
 
-export async function hydrateByProbe({ entry, channel, gh, fetchImpl, cwd, now = () => new Date().toISOString() }) {
+export async function hydrateByProbe({ entry, channel, gh, fetchImpl, cwd, now = () => new Date().toISOString(), batch = null }) {
   const kind = (channel && channel.probe) || (entry && entry.pr_url ? 'gh-pr' : null);
   try {
     if (kind === 'gh-pr') {
+      const prehydrated = batch ? batch.get(entry && entry.pr_url) : undefined;
+      if (prehydrated) return prehydrated;
       if (!entry || !entry.pr_url) return { ok: false, kind, recorded: true };
       return { ...hydrateGitPr({ entry, gh, cwd }), kind };
     }
