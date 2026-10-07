@@ -34,7 +34,7 @@ const ITEM = {
   url: 'https://github.com/owner/demo',
 };
 
-const OPEN_PR = { url: 'https://github.com/owner/list/pull/9' };
+const OPEN_PR = { url: 'https://github.com/owner/list/pull/9', state: 'OPEN' };
 
 function ghStub(overrides = {}) {
   const calls = [];
@@ -83,6 +83,8 @@ test('gitPr.execute pushes to the existing fork branch when an open PR matches t
   });
   const result = execute({ item: ITEM, owner: 'WhiteBite', gh, git });
   assert.equal(result.ok, true, result.error);
+  const listCall = gh.calls.find((args) => args[0] === 'pr' && args[1] === 'list');
+  assert.deepEqual(listCall, ['pr', 'list', '-R', ITEM.target, '--head', `WhiteBite:${ITEM.branch}`, '--state', 'all', '--json', 'url,state']);
   const fetches = git.calls.filter((args) => args.includes('fetch'));
   assert.deepEqual(fetches.map((args) => args.slice(2)), [['fetch', 'https://github.com/WhiteBite/list.git', `${ITEM.branch}:${ITEM.branch}`]]);
   const checkouts = git.calls.filter((args) => args.includes('checkout'));
@@ -112,6 +114,31 @@ test('gitPr.execute opens a new PR when no open PR matches the branch', () => {
   assert.equal(result.ok, true, result.error);
   assert.equal(gh.calls.some((args) => args[0] === 'pr' && args[1] === 'create'), true);
   assert.equal(result.record.pr_url, 'https://github.com/owner/list/pull/42');
+  assert.equal(result.record.updated, undefined);
+});
+
+test('gitPr.execute deletes the stale fork branch and opens a new PR when the only existing PR is closed', () => {
+  const gh = ghStub({
+    'repo fork': () => ({ ok: true, stdout: '', stderr: '', code: 0 }),
+    'pr list': () => ({ ok: true, stdout: JSON.stringify([{ url: 'https://github.com/owner/list/pull/9', state: 'CLOSED' }]), stderr: '', code: 0 }),
+    'pr create': () => ({ ok: true, stdout: 'https://github.com/owner/list/pull/43\n', stderr: '', code: 0 }),
+  });
+  const git = gitStub({
+    onClone: (work) => {
+      mkdirSync(work, { recursive: true });
+      writeFileSync(join(work, 'README.md'), BASE_README);
+    },
+  });
+  const result = execute({ item: ITEM, owner: 'WhiteBite', gh, git });
+  assert.equal(result.ok, true, result.error);
+  const deleteIdx = git.calls.findIndex((args) => args.includes('--delete'));
+  assert.notEqual(deleteIdx, -1, 'expected a stale-branch delete push');
+  assert.deepEqual(git.calls[deleteIdx], ['push', 'https://github.com/WhiteBite/list.git', '--delete', ITEM.branch]);
+  const pushIdx = git.calls.findIndex((args) => args.includes(`${ITEM.branch}:${ITEM.branch}`));
+  assert.notEqual(pushIdx, -1, 'expected a fresh branch push');
+  assert.ok(deleteIdx < pushIdx, 'the stale branch must be deleted before the fresh push');
+  assert.equal(gh.calls.some((args) => args[0] === 'pr' && args[1] === 'create'), true);
+  assert.equal(result.record.pr_url, 'https://github.com/owner/list/pull/43');
   assert.equal(result.record.updated, undefined);
 });
 

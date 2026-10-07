@@ -100,9 +100,9 @@ function prBody(item) {
   return `Adds ${item.project} to "${item.category}".\n\n${item.entry}\n\nRepository: ${item.url}\n`;
 }
 
-/** Resolves the open PR for the head branch; { ok: false } means the check itself failed, url null means no open PR. */
-function openPrUrl({ item, owner, gh }) {
-  const listed = gh(['pr', 'list', '-R', item.target, '--head', `${owner}:${item.branch}`, '--state', 'open', '--json', 'url']);
+/** Resolves the PR for the head branch across all states; { ok: false } means the check itself failed, pr null means no PR at all. */
+function existingPr({ item, owner, gh }) {
+  const listed = gh(['pr', 'list', '-R', item.target, '--head', `${owner}:${item.branch}`, '--state', 'all', '--json', 'url,state']);
   if (!listed.ok) return { ok: false, error: listed.stderr.trim().slice(0, 200) };
   let parsed;
   try {
@@ -112,7 +112,7 @@ function openPrUrl({ item, owner, gh }) {
   }
   if (!Array.isArray(parsed)) return { ok: false, error: 'unparsable gh pr list output' };
   const hit = parsed.find((pr) => pr && typeof pr.url === 'string' && pr.url !== '');
-  return { ok: true, url: hit ? hit.url : null };
+  return { ok: true, pr: hit ? { url: hit.url, state: hit.state } : null };
 }
 
 function updateExistingPr({ item, git, lines, fail, fork, prUrl }) {
@@ -185,12 +185,16 @@ export function execute({ item, owner, gh, git }) {
     lines.push(`❌ fork failed: ${forked.stderr.trim().slice(0, 200)}`);
     return fail(`failed to fork ${item.target}: ${forked.stderr.trim().slice(0, 200)}`);
   }
-  const existing = openPrUrl({ item, owner, gh });
+  const existing = existingPr({ item, owner, gh });
   if (!existing.ok) {
     lines.push(`❌ gh pr list failed: ${existing.error}`);
     return fail(`could not check for an existing pull request against ${item.target}: ${existing.error}`);
   }
-  if (existing.url !== null) return updateExistingPr({ item, git, lines, fail, fork, prUrl: existing.url });
+  if (existing.pr && existing.pr.state === 'OPEN') return updateExistingPr({ item, git, lines, fail, fork, prUrl: existing.pr.url });
+  if (existing.pr) {
+    // best-effort: a closed/merged PR leaves the fork branch behind and the fresh push would be non-fast-forward
+    git(['push', `https://github.com/${fork}.git`, '--delete', item.branch], { timeout: 60000 });
+  }
   const work = mkdtempSync(join(tmpdir(), 'rdk-submit-'));
   try {
     const clone = git(['clone', '--depth=1', `https://github.com/${item.target}.git`, work], { timeout: 120000 });

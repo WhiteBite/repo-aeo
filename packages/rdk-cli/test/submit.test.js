@@ -211,7 +211,7 @@ test('submit --apply updates an existing PR and replaces the ledger row instead 
     const gh = ghStub({
       'api user': () => ({ ok: true, stdout: 'WhiteBite\n', stderr: '', code: 0 }),
       'repo fork': () => ({ ok: true, stdout: '', stderr: '', code: 0 }),
-      'pr list': () => ({ ok: true, stdout: JSON.stringify([{ url: 'https://github.com/owner/list/pull/9' }]), stderr: '', code: 0 }),
+      'pr list': () => ({ ok: true, stdout: JSON.stringify([{ url: 'https://github.com/owner/list/pull/9', state: 'OPEN' }]), stderr: '', code: 0 }),
     });
     const readme = LIST_README.replace(
       '- [Beta](https://github.com/a/beta) — Second.',
