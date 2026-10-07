@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { describe, execute, plan, probe } from '../src/distribution/mechanisms/httpJson.js';
+import { describe, execute, plan, probe, verify } from '../src/distribution/mechanisms/httpJson.js';
 
 const CHANNEL = {
   id: 'registry',
@@ -120,4 +120,59 @@ test('probe reports the listing URL as an http-search ref', () => {
   assert.deepEqual(probe({ url: 'https://reg.example/items/demo' }), { kind: 'http-search', ref: 'https://reg.example/items/demo' });
   assert.deepEqual(probe({}), { kind: 'http-search', ref: null });
   assert.deepEqual(probe(null), { kind: 'http-search', ref: null });
+});
+
+test('verify reads the MCP registry detail endpoint and reports presence', async () => {
+  const { fetchImpl, calls } = stubFetch([okJson('{}')]);
+  const result = await verify({ record: { server_name: 'io.github.owner/demo' }, fetchImpl });
+  assert.deepEqual(result, { status: 'listed' });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, 'https://registry.modelcontextprotocol.io/v0.1/servers/io.github.owner%2Fdemo/versions/latest');
+  assert.equal(calls[0].init.method, 'GET');
+});
+
+test('verify reports unlisted on 404 and on 5xx', async () => {
+  const notFound = stubFetch([errHttp(404)]);
+  assert.deepEqual(await verify({ record: { server_name: 'io.github.owner/demo' }, fetchImpl: notFound.fetchImpl }), { status: 'unlisted' });
+  const serverError = stubFetch([errHttp(500)]);
+  assert.deepEqual(await verify({ record: { server_name: 'io.github.owner/demo' }, fetchImpl: serverError.fetchImpl }), { status: 'unlisted' });
+});
+
+test('verify reports unlisted when the fetchImpl throws', async () => {
+  const fetchImpl = async () => { throw new Error('socket hang up'); };
+  assert.deepEqual(await verify({ record: { server_name: 'io.github.owner/demo' }, fetchImpl }), { status: 'unlisted' });
+});
+
+test('verify reports unlisted without server_name and never calls fetch', async () => {
+  const { fetchImpl, calls } = stubFetch([okJson('{}')]);
+  assert.deepEqual(await verify({ record: {}, fetchImpl }), { status: 'unlisted' });
+  assert.deepEqual(await verify({ record: { server_name: '' }, fetchImpl }), { status: 'unlisted' });
+  assert.deepEqual(await verify({ record: null, fetchImpl }), { status: 'unlisted' });
+  assert.equal(calls.length, 0);
+});
+
+test('execute persists server_name in every record shape', async () => {
+  const [submitItem] = plan({ targets: ['demo'], channel: CHANNEL, payload: PAYLOAD });
+  const submitStub = stubFetch([okJson('{"url":"https://reg.example/items/demo"}')]);
+  const submitted = await execute({ item: submitItem, channel: CHANNEL, cwd: '/tmp/rdk-demo', fetchImpl: submitStub.fetchImpl, env: { REGISTRY_TOKEN: 'tok' } });
+  assert.equal(submitted.record.server_name, PAYLOAD.name);
+
+  const dedupeChannel = { ...CHANNEL, dedupe: { url: 'https://reg.example/items/demo' } };
+  const [dedupeItem] = plan({ targets: ['demo'], channel: dedupeChannel, payload: PAYLOAD });
+  const dedupeStub = stubFetch([okJson('{}')]);
+  const listed = await execute({ item: dedupeItem, channel: dedupeChannel, cwd: '/tmp/rdk-demo', fetchImpl: dedupeStub.fetchImpl, env: { REGISTRY_TOKEN: 'tok' } });
+  assert.equal(listed.record.server_name, PAYLOAD.name);
+
+  const manualChannel = { ...CHANNEL, automatable: false };
+  const [manualItem] = plan({ targets: ['demo'], channel: manualChannel, payload: PAYLOAD });
+  const manualStub = stubFetch([okJson('{}')]);
+  const prepared = await execute({ item: manualItem, channel: manualChannel, cwd: '/tmp/rdk-demo', fetchImpl: manualStub.fetchImpl, env: { REGISTRY_TOKEN: 'tok' } });
+  assert.equal(prepared.record.server_name, PAYLOAD.name);
+});
+
+test('execute records server_name as null when the payload has no name', async () => {
+  const [item] = plan({ targets: ['demo'], channel: CHANNEL, payload: { url: 'https://github.com/owner/demo' } });
+  const { fetchImpl } = stubFetch([okJson('{}')]);
+  const result = await execute({ item, channel: CHANNEL, cwd: '/tmp/rdk-demo', fetchImpl, env: { REGISTRY_TOKEN: 'tok' } });
+  assert.equal(result.record.server_name, null);
 });

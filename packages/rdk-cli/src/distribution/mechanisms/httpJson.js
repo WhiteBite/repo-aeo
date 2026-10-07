@@ -22,6 +22,7 @@ export function plan({ targets, channel, payload }) {
 
 export async function execute({ item, channel, fetchImpl, env }) {
   const lines = ['', `## ${item.target}`];
+  const serverName = item.payload && typeof item.payload.name === 'string' && item.payload.name !== '' ? item.payload.name : null;
   const fail = (error) => ({ ok: false, error, lines });
   const fetcher = typeof fetchImpl === 'function' ? fetchImpl : fetch;
   const safeText = async (res) => { try { return await res.text(); } catch { return ''; } };
@@ -35,7 +36,7 @@ export async function execute({ item, channel, fetchImpl, env }) {
   if (channel && channel.automatable === false) {
     const steps = ['Submit the payload to the registry by hand.', `Record the listing URL for "${item.target}" in .discoverability/submissions.json.`];
     lines.push('manual submission required (no API write performed)');
-    return { ok: true, lines, record: { target: item.target, status: 'prepared', submitted_at: new Date().toISOString(), url: null }, checklist: { steps } };
+    return { ok: true, lines, record: { target: item.target, status: 'prepared', submitted_at: new Date().toISOString(), url: null, server_name: serverName }, checklist: { steps } };
   }
   const envName = channel && channel.auth && typeof channel.auth.env === 'string' ? channel.auth.env : '';
   const token = envName ? (env || {})[envName] : undefined;
@@ -50,7 +51,7 @@ export async function execute({ item, channel, fetchImpl, env }) {
     const res = attempt.res;
     if (res.ok) {
       lines.push(`already listed: ${dedupeUrl}`);
-      return { ok: true, lines, record: { target: item.target, status: 'listed', submitted_at: new Date().toISOString(), url: dedupeUrl } };
+      return { ok: true, lines, record: { target: item.target, status: 'listed', submitted_at: new Date().toISOString(), url: dedupeUrl, server_name: serverName } };
     }
     if (res.status !== 404) {
       const body = await safeText(res);
@@ -70,7 +71,22 @@ export async function execute({ item, channel, fetchImpl, env }) {
   let url = dedupeUrl;
   try { const parsed = JSON.parse(text); if (parsed && typeof parsed.url === 'string' && parsed.url !== '') url = parsed.url; } catch {}
   lines.push(`submitted: ${url || endpoint}`);
-  return { ok: true, lines, record: { target: item.target, status: 'submitted', submitted_at: new Date().toISOString(), url: url || null } };
+  return { ok: true, lines, record: { target: item.target, status: 'submitted', submitted_at: new Date().toISOString(), url: url || null, server_name: serverName } };
+}
+
+/** Presence check against the public MCP registry detail endpoint, driven only by the record's persisted server_name; any failure is unlisted. */
+export async function verify({ record, fetchImpl }) {
+  const serverName = record && typeof record.server_name === 'string' && record.server_name !== '' ? record.server_name : null;
+  if (!serverName) return { status: 'unlisted' };
+  const url = `https://registry.modelcontextprotocol.io/v0.1/servers/${encodeURIComponent(serverName)}/versions/latest`;
+  const fetcher = typeof fetchImpl === 'function' ? fetchImpl : fetch;
+  try {
+    const res = await fetcher(url, { method: 'GET', headers: { accept: 'application/json' } });
+    const status = res && typeof res.status === 'number' ? res.status : 0;
+    return { status: status >= 200 && status < 300 ? 'listed' : 'unlisted' };
+  } catch {
+    return { status: 'unlisted' };
+  }
 }
 
 /** How to probe a record's live state: the listing URL returned at submit time. */
