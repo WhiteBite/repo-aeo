@@ -119,11 +119,17 @@ function markMode({ cwd, options, config, ledger, lines, fail, refuse, now }) {
     lines.push(`Unknown status "${status}". Allowed: ${MARK_STATUSES.join(', ')}.`);
     return fail(`unknown status "${status}" - allowed: ${MARK_STATUSES.join(', ')}`);
   }
-  const row = ledger.find((entry) => entry && entry.target === options.mark);
-  if (!row) {
+  const matches = ledger.filter((entry) => entry && entry.target === options.mark && (!options.channel || entry.channel === options.channel));
+  if (matches.length === 0) {
     lines.push(`No ledger row for target "${options.mark}".`);
     return fail(`no ledger row for target "${options.mark}"`);
   }
+  if (matches.length > 1) {
+    const channels = matches.map((entry) => entry.channel).join(', ');
+    lines.push(`Target "${options.mark}" matches ${matches.length} ledger rows (channels: ${channels}). Pass --channel <id> to pick one.`);
+    return fail(`target "${options.mark}" matches ${matches.length} ledger rows (channels: ${channels}) - pass --channel <id> to pick one`);
+  }
+  const row = matches[0];
 
   const changes = [{ key: row.dedupe_key || row.pr_url, from: row.status, to: status }];
   const digest = planDigest(changes);
@@ -152,7 +158,7 @@ function markMode({ cwd, options, config, ledger, lines, fail, refuse, now }) {
   return { ok: true, output: `${lines.join('\n')}\n`, exitCode: 0, changes, plan_digest: digest };
 }
 
-export async function trackCommand({ cwd, options = {}, config, loaded, ghRunner, gitRunner, fetchImpl, now = () => new Date().toISOString() }) {
+export async function trackCommand({ cwd, options = {}, config, ghRunner, gitRunner, fetchImpl, now = () => new Date().toISOString() }) {
   const gh = ghRunner || ((args, opts = {}) => run('gh', args, { cwd: (opts && opts.cwd) || cwd, timeout: (opts && opts.timeout) || 20000, input: opts && opts.input }));
   const lines = ['# rdk track', ''];
   const fail = (error, extra = {}) => ({ ok: false, error, output: `${lines.join('\n')}\n`, exitCode: 1, ...extra });
@@ -165,6 +171,16 @@ export async function trackCommand({ cwd, options = {}, config, loaded, ghRunner
   if ([options.adopt, options.sync, options.mark].filter(Boolean).length > 1) {
     lines.push('Pass only one of --adopt, --sync, --mark.');
     return fail('pass only one of --adopt, --sync, --mark');
+  }
+  const markGiven = options.mark !== undefined && options.mark !== null;
+  const statusGiven = options.status !== undefined && options.status !== null;
+  if (markGiven && (typeof options.mark !== 'string' || options.mark === '')) {
+    lines.push('`--mark` requires a target (use `--mark "<target>"`).');
+    return fail('`--mark` requires a target (use `--mark "<target>"`)');
+  }
+  if (statusGiven && !markGiven) {
+    lines.push('`--status` requires `--mark`.');
+    return fail('`--status` requires `--mark`');
   }
   if (options.mark && !options.status) {
     lines.push('--status is required with --mark.');
@@ -181,7 +197,7 @@ export async function trackCommand({ cwd, options = {}, config, loaded, ghRunner
   if (options.sync) return syncMode({ cwd, options, config, ledger, gh, fetchImpl, lines, fail, refuse, now });
   if (options.mark) return markMode({ cwd, options, config, ledger, lines, fail, refuse, now });
 
-  const status = await buildDistributionStatus({ cwd, loaded, gh, git: gitRunner, fetchImpl, now });
+  const status = await buildDistributionStatus({ cwd, gh, git: gitRunner, fetchImpl, now });
   if (options.json) return { ok: true, output: `${JSON.stringify(status, null, 2)}\n`, exitCode: 0, status };
   return { ok: true, output: `${[...lines, renderDistributionStatus(status)].join('\n')}\n`, exitCode: 0, status };
 }

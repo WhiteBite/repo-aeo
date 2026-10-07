@@ -63,26 +63,29 @@ const GITHUB_REPO_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)/;
 /**
  * Verifies presence after the fact: fetches the channel's checkUrl through
  * the injected fetchImpl (global fetch only when none is injected) and
- * resolves to { status: 'listed' | 'unlisted' }; absent, unreachable or
- * malformed inputs resolve to 'unlisted' instead of throwing.
+ * resolves to { status: 'listed' | 'unlisted' | 'unknown' }: 'listed' when
+ * the page carries the project URL, 'unlisted' only on a definitive absence
+ * (HTTP 404 or a 2xx page without it), 'unknown' on missing identity,
+ * transport failures and any other HTTP status.
  */
 export async function verify({ record, channel, fetchImpl } = {}) {
   const fetcher = typeof fetchImpl === 'function' ? fetchImpl : fetch;
   try {
     const { ref } = probe(record);
     const checkUrl = channel && typeof channel.checkUrl === 'string' && channel.checkUrl !== '' ? channel.checkUrl : null;
-    if (!ref || !checkUrl) return { status: 'unlisted' };
+    if (!ref || !checkUrl) return { status: 'unknown' };
     const response = await fetcher(checkUrl);
-    if (!response || response.ok === false || (typeof response.status === 'number' && response.status >= 400)) {
-      return { status: 'unlisted' };
-    }
+    if (!response) return { status: 'unknown' };
+    const status = typeof response.status === 'number' ? response.status : 0;
+    if (status === 404) return { status: 'unlisted' };
+    if (status < 200 || status >= 300) return { status: 'unknown' };
     const text = await response.text();
-    if (typeof text !== 'string') return { status: 'unlisted' };
+    if (typeof text !== 'string') return { status: 'unknown' };
     // sitemap-style indexes list /<owner>/<repo>/<skill> entries, not the GitHub URL
     const match = GITHUB_REPO_URL.exec(ref);
     const token = match ? `/${match[1]}/${match[2]}/` : null;
     return { status: text.includes(ref) || (token !== null && text.includes(token)) ? 'listed' : 'unlisted' };
   } catch {
-    return { status: 'unlisted' };
+    return { status: 'unknown' };
   }
 }

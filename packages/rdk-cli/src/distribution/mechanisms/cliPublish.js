@@ -99,23 +99,24 @@ function verifyFetchUrl(record) {
 /**
  * Verifies registry presence: GETs the abbreviated metadata document for the
  * record's package through the injected fetchImpl (global fetch only when none
- * is injected) and resolves to { status: 'listed' | 'unlisted' }. The version
- * counts as listed when it appears in `versions` or equals `dist-tags.latest`;
- * without a recorded version any package document with a `versions` map is
- * listed. Absent identity, non-2xx, transport and parse failures resolve to
- * 'unlisted' instead of throwing.
+ * is injected) and resolves to { status: 'listed' | 'unlisted' | 'unknown' }.
+ * The version counts as listed when it appears in `versions` or equals
+ * `dist-tags.latest`; without a recorded version any package document with a
+ * `versions` map is listed. 'unlisted' marks only a definitive absence - HTTP
+ * 404 or a 2xx document without the recorded version; missing identity,
+ * transport and parse failures resolve to 'unknown' instead of throwing.
  */
 export async function verify({ record, fetchImpl } = {}) {
   const fetcher = typeof fetchImpl === 'function' ? fetchImpl : fetch;
   try {
     const pkg = record && record.package;
-    if (typeof pkg !== 'string' || pkg === '') return { status: 'unlisted' };
+    if (typeof pkg !== 'string' || pkg === '') return { status: 'unknown' };
     const version = typeof record.version === 'string' && record.version !== '' ? record.version : null;
     const response = await fetcher(verifyFetchUrl(record), { headers: { accept: ABBREVIATED_ACCEPT } });
-    if (!response || response.ok === false) return { status: 'unlisted' };
-    if (typeof response.status !== 'number' || response.status < 200 || response.status >= 300) {
-      return { status: 'unlisted' };
-    }
+    if (!response) return { status: 'unknown' };
+    const status = typeof response.status === 'number' ? response.status : 0;
+    if (status === 404) return { status: 'unlisted' };
+    if (status < 200 || status >= 300) return { status: 'unknown' };
     const body = JSON.parse(await response.text());
     const versions = body && body.versions;
     if (!versions || typeof versions !== 'object') return { status: 'unlisted' };
@@ -124,6 +125,6 @@ export async function verify({ record, fetchImpl } = {}) {
     const latest = body['dist-tags'] && body['dist-tags'].latest;
     return { status: latest === version ? 'listed' : 'unlisted' };
   } catch {
-    return { status: 'unlisted' };
+    return { status: 'unknown' };
   }
 }

@@ -108,17 +108,31 @@ test('verify returns unlisted on 404', async () => {
   assert.deepEqual(await verify({ record, fetchImpl }), { status: 'unlisted' });
 });
 
-test('verify returns unlisted when fetch throws', async () => {
+test('verify returns unknown when fetch throws', async () => {
   const record = { package: 'pkg', version: '1.0.0' };
   const { fetchImpl } = stubFetch(() => {
     throw new Error('offline');
   });
+  assert.deepEqual(await verify({ record, fetchImpl }), { status: 'unknown' });
+});
+
+test('verify returns unknown on server errors and an unparsable document', async () => {
+  const record = { package: 'pkg', version: '1.0.0' };
+  const serverError = stubFetch([errHttp(500)]);
+  assert.deepEqual(await verify({ record, fetchImpl: serverError.fetchImpl }), { status: 'unknown' });
+  const garbage = stubFetch([okJson('not json')]);
+  assert.deepEqual(await verify({ record, fetchImpl: garbage.fetchImpl }), { status: 'unknown' });
+});
+
+test('verify returns unlisted on a 2xx document without a versions map', async () => {
+  const record = { package: 'pkg', version: '1.0.0' };
+  const { fetchImpl } = stubFetch([okJson('{}')]);
   assert.deepEqual(await verify({ record, fetchImpl }), { status: 'unlisted' });
 });
 
-test('verify returns unlisted without a package and never fetches', async () => {
+test('verify returns unknown without a package and never fetches', async () => {
   const { fetchImpl, calls } = stubFetch([okJson('{}')]);
-  assert.deepEqual(await verify({ record: { version: '1.0.0' }, fetchImpl }), { status: 'unlisted' });
+  assert.deepEqual(await verify({ record: { version: '1.0.0' }, fetchImpl }), { status: 'unknown' });
   assert.equal(calls.length, 0);
 });
 

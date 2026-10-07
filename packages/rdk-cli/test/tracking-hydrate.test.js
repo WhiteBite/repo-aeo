@@ -219,6 +219,47 @@ test('hydrateByProbe wraps an unlisted verifier result as ok with presence unlis
   assert.equal(crawl.normalized.checked_at, NOW);
 });
 
+test('hydrateByProbe degrades a non-definitive verifier outcome to the recorded state', async () => {
+  const unusedGh = () => {
+    throw new Error('gh must not be called for fetch probe kinds');
+  };
+  const rejectingFetch = async () => {
+    throw new Error('network unreachable');
+  };
+
+  const legacyHttpSearch = await hydrateByProbe({
+    entry: { channel: 'mcp-official-registry', target: 'mcp.so', status: 'submitted' },
+    channel: { id: 'mcp-official-registry', probe: 'http-search' },
+    gh: unusedGh,
+    fetchImpl: rejectingFetch,
+  });
+  assert.deepEqual(legacyHttpSearch, { ok: false, kind: 'http-search', recorded: true });
+
+  const legacyCrawl = await hydrateByProbe({
+    entry: { channel: 'skills-sh', target: 'skills-sh', status: 'prepared' },
+    channel: { id: 'skills-sh', probe: 'crawl', checkUrl: 'https://x/sitemap.xml' },
+    gh: unusedGh,
+    fetchImpl: rejectingFetch,
+  });
+  assert.deepEqual(legacyCrawl, { ok: false, kind: 'crawl', recorded: true });
+
+  const legacyRegistry = await hydrateByProbe({
+    entry: { channel: 'npm-registry', target: 'npm-registry', status: 'prepared' },
+    channel: { id: 'npm-registry', probe: 'registry-read' },
+    gh: unusedGh,
+    fetchImpl: rejectingFetch,
+  });
+  assert.deepEqual(legacyRegistry, { ok: false, kind: 'registry-read', recorded: true });
+
+  const serverError = await hydrateByProbe({
+    entry: { channel: 'skills-sh', target: 'skills-sh', url: 'https://github.com/foo/bar', status: 'prepared' },
+    channel: { id: 'skills-sh', probe: 'crawl', checkUrl: 'https://x/sitemap.xml' },
+    gh: unusedGh,
+    fetchImpl: async () => ({ ok: false, status: 503, text: async () => '' }),
+  });
+  assert.deepEqual(serverError, { ok: false, kind: 'crawl', recorded: true });
+});
+
 test('hydrateByProbe keeps none and unknown probe kinds on their recorded state', async () => {
   const unusedGh = () => {
     throw new Error('gh must not be called for recorded probe kinds');
@@ -296,10 +337,11 @@ function graphNode(overrides = {}) {
     mergeable: 'MERGEABLE',
     mergeStateStatus: 'CLEAN',
     mergedAt: null,
+    updatedAt: '2026-10-06T00:00:00Z',
     url: PR_URL_A,
-    latestReviews: { nodes: [{ author: { login: 'alice' }, state: 'APPROVED', submittedAt: '2026-10-05T10:00:00Z' }] },
-    reviews: { nodes: [{ author: { login: 'dave' }, state: 'CHANGES_REQUESTED', submittedAt: '2026-10-04T10:00:00Z' }] },
-    comments: { nodes: [{ author: { login: 'bob' }, createdAt: '2026-10-05T11:00:00Z' }] },
+    latestReviews: { nodes: [{ author: { login: 'alice' }, authorAssociation: 'MEMBER', state: 'APPROVED', submittedAt: '2026-10-05T10:00:00Z' }] },
+    reviews: { nodes: [{ author: { login: 'dave' }, authorAssociation: 'FIRST_TIME_CONTRIBUTOR', state: 'CHANGES_REQUESTED', submittedAt: '2026-10-04T10:00:00Z' }] },
+    comments: { nodes: [{ author: { login: 'bob' }, authorAssociation: 'MEMBER', body: 'please address the review comments', createdAt: '2026-10-05T11:00:00Z' }] },
     statusCheckRollup: {
       contexts: {
         nodes: [
@@ -346,6 +388,38 @@ test('hydrateGitPrBatch issues exactly one graphql call and maps aliases through
   assert.equal(first.normalized.reviews[0].state, 'APPROVED');
   assert.equal(first.normalized.last_push, '2026-10-05T12:00:00Z');
   assert.deepEqual(results.get(PR_URL_B), { ok: false, kind: 'gh-pr', recorded: true });
+});
+
+test('hydrateGitPrBatch requests the per-item field set and maps it identically', () => {
+  const calls = [];
+  const gh = (args, opts) => {
+    calls.push({ args, opts });
+    return { ok: true, stdout: JSON.stringify({ data: { pr0: { pullRequest: graphNode() } } }), stderr: '', code: 0 };
+  };
+
+  const results = hydrateGitPrBatch({ entries: [{ target: 'foo/bar', pr_url: PR_URL_A }], gh, cwd: process.cwd() });
+
+  const query = JSON.parse(calls[0].opts.input).query;
+  assert.ok(query.includes('authorAssociation'), 'the batch query must request review and comment author associations');
+  assert.ok(query.includes('body'), 'the batch query must request comment bodies');
+  assert.ok(query.includes('updatedAt'), 'the batch query must request the PR updatedAt timestamp');
+
+  const node = graphNode();
+  const perItemRaw = {
+    state: node.state,
+    isDraft: node.isDraft,
+    reviewDecision: node.reviewDecision,
+    mergeStateStatus: node.mergeStateStatus,
+    mergedAt: node.mergedAt,
+    updatedAt: node.updatedAt,
+    url: node.url,
+    latestReviews: node.latestReviews.nodes,
+    reviews: node.reviews.nodes,
+    comments: node.comments.nodes,
+    statusCheckRollup: node.statusCheckRollup.contexts.nodes,
+    commits: node.commits.nodes.map((entry) => entry.commit),
+  };
+  assert.deepEqual(results.get(PR_URL_A).normalized, normalizeGhPrView(perItemRaw));
 });
 
 test('hydrateGitPrBatch degrades every entry to recorded when the graphql call fails', () => {

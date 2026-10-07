@@ -131,23 +131,23 @@ test('verify reads the MCP registry detail endpoint and reports presence', async
   assert.equal(calls[0].init.method, 'GET');
 });
 
-test('verify reports unlisted on 404 and on 5xx', async () => {
+test('verify reports unlisted on 404 and unknown on 5xx', async () => {
   const notFound = stubFetch([errHttp(404)]);
   assert.deepEqual(await verify({ record: { server_name: 'io.github.owner/demo' }, fetchImpl: notFound.fetchImpl }), { status: 'unlisted' });
   const serverError = stubFetch([errHttp(500)]);
-  assert.deepEqual(await verify({ record: { server_name: 'io.github.owner/demo' }, fetchImpl: serverError.fetchImpl }), { status: 'unlisted' });
+  assert.deepEqual(await verify({ record: { server_name: 'io.github.owner/demo' }, fetchImpl: serverError.fetchImpl }), { status: 'unknown' });
 });
 
-test('verify reports unlisted when the fetchImpl throws', async () => {
+test('verify reports unknown when the fetchImpl throws', async () => {
   const fetchImpl = async () => { throw new Error('socket hang up'); };
-  assert.deepEqual(await verify({ record: { server_name: 'io.github.owner/demo' }, fetchImpl }), { status: 'unlisted' });
+  assert.deepEqual(await verify({ record: { server_name: 'io.github.owner/demo' }, fetchImpl }), { status: 'unknown' });
 });
 
-test('verify reports unlisted without server_name and never calls fetch', async () => {
+test('verify reports unknown without server_name and never calls fetch', async () => {
   const { fetchImpl, calls } = stubFetch([okJson('{}')]);
-  assert.deepEqual(await verify({ record: {}, fetchImpl }), { status: 'unlisted' });
-  assert.deepEqual(await verify({ record: { server_name: '' }, fetchImpl }), { status: 'unlisted' });
-  assert.deepEqual(await verify({ record: null, fetchImpl }), { status: 'unlisted' });
+  assert.deepEqual(await verify({ record: {}, fetchImpl }), { status: 'unknown' });
+  assert.deepEqual(await verify({ record: { server_name: '' }, fetchImpl }), { status: 'unknown' });
+  assert.deepEqual(await verify({ record: null, fetchImpl }), { status: 'unknown' });
   assert.equal(calls.length, 0);
 });
 

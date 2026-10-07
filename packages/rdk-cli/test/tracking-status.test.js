@@ -85,7 +85,7 @@ test('buildDistributionStatus emits the schema, injected generated_at, a zero-fi
   try {
     const { gh } = ghStub({ [PR1]: raw({ url: PR1 }) });
 
-    const status = await buildDistributionStatus({ cwd, loaded: {}, gh, live: true, now: () => NOW });
+    const status = await buildDistributionStatus({ cwd, gh, live: true, now: () => NOW });
 
     assert.equal(status.schema_version, DISTRIBUTION_SCHEMA);
     assert.equal(status.generated_at, NOW);
@@ -119,7 +119,7 @@ test('buildDistributionStatus marks an open changes-requested row action_require
       [PR1]: raw({ reviewDecision: 'CHANGES_REQUESTED', latestReviews: [{ state: 'CHANGES_REQUESTED', authorAssociation: 'MEMBER' }], url: PR1 }),
     });
 
-    const status = await buildDistributionStatus({ cwd, loaded: {}, gh, live: true, now: () => NOW });
+    const status = await buildDistributionStatus({ cwd, gh, live: true, now: () => NOW });
     const item = status.items[0];
 
     assert.equal(item.attention, 'action_required');
@@ -145,7 +145,7 @@ test('buildDistributionStatus maps recorded ledger status when live is off', asy
     { channel: 'mcp-directory-form', target: 'mcp.so', status: 'prepared' },
   ]);
   try {
-    const status = await buildDistributionStatus({ cwd, loaded: {}, live: false, now: () => NOW });
+    const status = await buildDistributionStatus({ cwd, live: false, now: () => NOW });
 
     assert.deepEqual(status.items.map((item) => item.attention), ['listed', 'terminal', 'none', 'none']);
     assert.equal(status.items[0].why, 'listed (merged)');
@@ -159,7 +159,7 @@ test('buildDistributionStatus maps recorded ledger status when live is off', asy
   }
 });
 
-test('buildDistributionStatus verifies non-gh-pr channels live without ever calling gh', async () => {
+test('buildDistributionStatus degrades an unverifiable presence row to its recorded state without calling gh', async () => {
   const cwd = ledgerRepo([
     { channel: 'mcp-official-registry', target: 'mcp.so', status: 'submitted' },
     { channel: 'awesome-list', target: 'owner/list', pr_url: PR1, status: 'submitted' },
@@ -172,16 +172,18 @@ test('buildDistributionStatus verifies non-gh-pr channels live without ever call
       throw new Error('fetch must not be called for a record without server_name');
     };
 
-    const status = await buildDistributionStatus({ cwd, loaded: {}, gh, fetchImpl: unusedFetch, live: true, now: () => NOW });
+    const status = await buildDistributionStatus({ cwd, gh, fetchImpl: unusedFetch, live: true, now: () => NOW });
 
     assert.equal(calls.length, 1);
     assert.deepEqual(calls[0].args, ['pr', 'view', PR1, '-R', 'owner/list', '--json', 'state,isDraft,reviewDecision,latestReviews,reviews,comments,statusCheckRollup,mergeStateStatus,mergeable,labels,updatedAt,closedAt,mergedAt,url,commits']);
-    assert.equal(status.items[0].attention, 'terminal');
-    assert.equal(status.items[0].presence, 'unlisted');
+    assert.equal(status.items[0].attention, 'none');
+    assert.equal(status.items[0].presence, null);
     assert.equal(status.items[0].state, null);
+    assert.equal(status.items[0].why, 'no live state');
     assert.equal(status.items[1].attention, 'listed');
     assert.equal(status.items[1].state, 'MERGED');
     assert.equal(status.items[1].presence, null);
+    assert.equal(status.items[1].why, 'listed (merged)');
   } finally {
     removeRepo(cwd);
   }
@@ -200,7 +202,7 @@ test('buildDistributionStatus verifies crawl presence through the injected fetch
       return { ok: true, status: 200, text: async () => 'crawl me: https://github.com/owner/repo' };
     };
 
-    const status = await buildDistributionStatus({ cwd, loaded: {}, gh: boom, fetchImpl, live: true, now: () => NOW });
+    const status = await buildDistributionStatus({ cwd, gh: boom, fetchImpl, live: true, now: () => NOW });
 
     assert.deepEqual(fetchCalls, ['https://www.skills.sh/sitemap-skills-1.xml']);
     const item = status.items[0];
@@ -213,6 +215,7 @@ test('buildDistributionStatus verifies crawl presence through the injected fetch
     assert.equal(item.url, 'https://www.skills.sh/sitemap-skills-1.xml');
     assert.equal(item.checked_at, NOW);
     assert.equal(item.attention, 'listed');
+    assert.equal(item.why, 'listed on the channel');
     assert.deepEqual(item.needed, []);
     assert.equal(status.summary.by_attention.listed, 1);
     assert.equal(status.summary.by_state.unknown, 1);
@@ -229,6 +232,27 @@ test('buildDistributionStatus verifies crawl presence through the injected fetch
   }
 });
 
+test('buildDistributionStatus marks a definitive absence terminal with a presence-aware why', async () => {
+  const rows = [{ channel: 'skills-sh', target: 'skills.sh', url: 'https://github.com/owner/repo', status: 'prepared', dedupe_key: 'skills-sh:skills-sh' }];
+  const cwd = ledgerRepo(rows);
+  try {
+    const boom = () => {
+      throw new Error('gh must not be called for a crawl row');
+    };
+    const fetchImpl = async () => ({ ok: false, status: 404, text: async () => 'not found' });
+
+    const status = await buildDistributionStatus({ cwd, gh: boom, fetchImpl, live: true, now: () => NOW });
+
+    const item = status.items[0];
+    assert.equal(item.presence, 'unlisted');
+    assert.equal(item.attention, 'terminal');
+    assert.equal(item.why, 'not present on the channel');
+    assert.equal(status.summary.by_attention.terminal, 1);
+  } finally {
+    removeRepo(cwd);
+  }
+});
+
 test('buildDistributionStatus is read-only to the committed ledger and upserts live snapshots into the cache', async () => {
   const rows = [{ channel: 'awesome-list', target: 'owner/list', pr_url: PR1, status: 'submitted' }];
   const cwd = ledgerRepo(rows);
@@ -239,7 +263,7 @@ test('buildDistributionStatus is read-only to the committed ledger and upserts l
       [PR1]: raw({ reviewDecision: 'APPROVED', mergeStateStatus: 'CLEAN', url: PR1 }),
     });
 
-    await buildDistributionStatus({ cwd, loaded: {}, gh, live: true, now: () => NOW });
+    await buildDistributionStatus({ cwd, gh, live: true, now: () => NOW });
 
     assert.equal(readFileSync(ledgerPath, 'utf8'), before);
     assert.ok(!existsSync(join(cwd, '.discoverability', 'cache', 'tracking.json.corrupt-0')));
@@ -284,7 +308,7 @@ test('buildDistributionStatus summary counts match the items', async () => {
       throw new Error('fetch must not be called for a record without package identity');
     };
 
-    const status = await buildDistributionStatus({ cwd, loaded: {}, gh, fetchImpl: unusedFetch, live: true, now: () => NOW });
+    const status = await buildDistributionStatus({ cwd, gh, fetchImpl: unusedFetch, live: true, now: () => NOW });
 
     assert.deepEqual(status.items.map((item) => item.attention), [
       'action_required',
@@ -293,16 +317,16 @@ test('buildDistributionStatus summary counts match the items', async () => {
       'stale',
       'listed',
       'terminal',
-      'terminal',
+      'none',
     ]);
     assert.deepEqual(status.summary.by_attention, {
       action_required: 1,
       awaiting_review: 1,
       approved: 1,
       stale: 1,
-      none: 0,
+      none: 1,
       listed: 1,
-      terminal: 2,
+      terminal: 1,
     });
     assert.deepEqual(status.summary.by_state, { open: 4, merged: 1, closed: 1, unknown: 1 });
 
@@ -328,7 +352,7 @@ test('renderDistributionStatus prints a header, a target line and the pr_url and
   const cwd = ledgerRepo([{ channel: 'awesome-list', target: 'owner/list', pr_url: PR1, status: 'submitted' }]);
   try {
     const { gh } = ghStub({ [PR1]: raw({ reviewDecision: 'CHANGES_REQUESTED', url: PR1 }) });
-    const status = await buildDistributionStatus({ cwd, loaded: {}, gh, live: true, now: () => NOW });
+    const status = await buildDistributionStatus({ cwd, gh, live: true, now: () => NOW });
 
     const text = renderDistributionStatus(status);
 
@@ -349,7 +373,7 @@ test('renderDistributionStatus prints the url on the target line for presence it
       throw new Error('gh must not be called for a crawl row');
     };
     const fetchImpl = async () => ({ ok: true, status: 200, text: async () => 'https://github.com/owner/repo' });
-    const status = await buildDistributionStatus({ cwd, loaded: {}, gh: boom, fetchImpl, live: true, now: () => NOW });
+    const status = await buildDistributionStatus({ cwd, gh: boom, fetchImpl, live: true, now: () => NOW });
 
     const text = renderDistributionStatus(status);
 
@@ -384,7 +408,7 @@ test('buildDistributionStatus batches ten or more gh-pr rows into one graphql ca
       return { ok: true, status: 200, text: async () => 'crawl me: https://github.com/owner/repo' };
     };
 
-    const status = await buildDistributionStatus({ cwd, loaded: {}, gh, fetchImpl, live: true, now: () => NOW });
+    const status = await buildDistributionStatus({ cwd, gh, fetchImpl, live: true, now: () => NOW });
 
     assert.equal(calls.length, 1, 'ten gh-pr rows hydrate through exactly one graphql call');
     assert.deepEqual(calls[0].args, ['api', 'graphql', '--input', '-']);
@@ -411,7 +435,7 @@ test('buildDistributionStatus keeps the per-item pr view path below the threshol
     for (const row of rows) byUrl[row.pr_url] = raw({ url: row.pr_url });
     const { gh, calls } = ghStub(byUrl);
 
-    const status = await buildDistributionStatus({ cwd, loaded: {}, gh, live: true, now: () => NOW });
+    const status = await buildDistributionStatus({ cwd, gh, live: true, now: () => NOW });
 
     assert.equal(calls.length, 9, 'nine gh-pr rows hydrate one gh pr view call each');
     for (const call of calls) assert.deepEqual(call.args.slice(0, 2), ['pr', 'view']);

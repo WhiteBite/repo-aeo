@@ -28,12 +28,13 @@ function stateBucket(state) {
   return 'unknown';
 }
 
-function whyFor(attention, needed) {
+function whyFor(attention, needed, item) {
+  const presence = item && item.presence ? item.presence : null;
   if (attention === 'action_required') return `needs: ${needed.join(', ')}`;
   if (attention === 'awaiting_review') return 'waiting on review';
   if (attention === 'approved') return 'approved, ready to merge';
-  if (attention === 'listed') return 'listed (merged)';
-  if (attention === 'terminal') return 'closed without merging';
+  if (attention === 'listed') return presence ? 'listed on the channel' : 'listed (merged)';
+  if (attention === 'terminal') return presence === 'unlisted' ? 'not present on the channel' : 'closed without merging';
   if (attention === 'stale') return 'no activity for 7 days';
   return 'no live state';
 }
@@ -73,7 +74,7 @@ async function projectRow(row, { cwd, gh, fetchImpl, live, generated_at, now, ba
       checked_at: presence ? presence.checked_at : null,
       attention,
       needed,
-      why: whyFor(attention, needed),
+      why: whyFor(attention, needed, { presence: presence ? presence.presence : null, state: pr ? pr.state : null }),
       action,
       command,
     },

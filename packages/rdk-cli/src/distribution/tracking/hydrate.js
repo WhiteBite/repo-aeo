@@ -10,10 +10,10 @@ const GH_PR_FIELDS = 'state,isDraft,reviewDecision,latestReviews,reviews,comment
 export const GH_PR_BATCH_MIN = 10;
 
 const BATCH_PR_FIELDS =
-  'state isDraft reviewDecision mergeable mergeStateStatus mergedAt url ' +
-  'latestReviews(first:100){nodes{author{login} state submittedAt}} ' +
-  'reviews(first:100){nodes{author{login} state submittedAt}} ' +
-  'comments(first:100){nodes{author{login} createdAt}} ' +
+  'state isDraft reviewDecision mergeable mergeStateStatus mergedAt updatedAt url ' +
+  'latestReviews(first:100){nodes{author{login} authorAssociation state submittedAt}} ' +
+  'reviews(first:100){nodes{author{login} authorAssociation state submittedAt}} ' +
+  'comments(first:100){nodes{author{login} authorAssociation body createdAt}} ' +
   'statusCheckRollup{contexts(first:100){nodes{... on CheckRun{name status conclusion} ... on StatusContext{context state}}}} ' +
   'commits(last:1){nodes{commit{committedDate}}}';
 
@@ -164,8 +164,8 @@ export async function hydrateByProbe({ entry, channel, gh, fetchImpl, cwd, now =
     }
     if (kind === 'crawl' || kind === 'http-search' || kind === 'registry-read') {
       const verified = await verifyPresence(kind, { entry, channel, fetchImpl });
-      if (!verified || typeof verified.status !== 'string') {
-        return { ok: false, kind, error: `${kind} verifier returned no status` };
+      if (!verified || (verified.status !== 'listed' && verified.status !== 'unlisted')) {
+        return { ok: false, kind, recorded: true };
       }
       return { ok: true, kind, normalized: { presence: verified.status, checked_at: now(), url: presenceUrl(kind, entry, channel) } };
     }

@@ -81,15 +81,12 @@ test('verify reports listed when the channel page contains the project URL', asy
   assert.deepEqual(stub.calls, [CHANNEL.checkUrl]);
 });
 
-test('verify reports unlisted when the page lacks the project or answers with an error', async () => {
+test('verify reports unlisted when the page lacks the project or answers with 404', async () => {
   const missing = stubFetch({ body: '# index\n- [other](https://github.com/other/thing)\n' });
   assert.deepEqual(await verifyPassive({ record: RECORD, channel: CHANNEL, fetchImpl: missing.fetchImpl }), { status: 'unlisted' });
 
   const notFound = stubFetch({ status: 404, body: 'not found' });
   assert.deepEqual(await verifyPassive({ record: RECORD, channel: CHANNEL, fetchImpl: notFound.fetchImpl }), { status: 'unlisted' });
-
-  const unreachable = stubFetch({ status: null });
-  assert.deepEqual(await verifyPassive({ record: RECORD, channel: CHANNEL, fetchImpl: unreachable.fetchImpl }), { status: 'unlisted' });
 });
 
 test('verify matches the repo path token on a sitemap and the full url when present', async () => {
@@ -130,20 +127,30 @@ test('execute emits a record carrying the project url for the public-repo precon
   }
 });
 
-test('verify reports unlisted without fetching when the record or the checkUrl is absent', async () => {
+test('verify reports unknown without fetching when the record or the checkUrl is absent', async () => {
   const stub = stubFetch({ body: `# index\n- ${RECORD.url}\n` });
-  assert.deepEqual(await verifyPassive({ record: {}, channel: CHANNEL, fetchImpl: stub.fetchImpl }), { status: 'unlisted' });
-  assert.deepEqual(await verifyPassive({ record: null, channel: CHANNEL, fetchImpl: stub.fetchImpl }), { status: 'unlisted' });
-  assert.deepEqual(await verifyPassive({ record: RECORD, channel: {}, fetchImpl: stub.fetchImpl }), { status: 'unlisted' });
-  assert.deepEqual(await verifyPassive({ record: RECORD, channel: null, fetchImpl: stub.fetchImpl }), { status: 'unlisted' });
+  assert.deepEqual(await verifyPassive({ record: {}, channel: CHANNEL, fetchImpl: stub.fetchImpl }), { status: 'unknown' });
+  assert.deepEqual(await verifyPassive({ record: null, channel: CHANNEL, fetchImpl: stub.fetchImpl }), { status: 'unknown' });
+  assert.deepEqual(await verifyPassive({ record: RECORD, channel: {}, fetchImpl: stub.fetchImpl }), { status: 'unknown' });
+  assert.deepEqual(await verifyPassive({ record: RECORD, channel: null, fetchImpl: stub.fetchImpl }), { status: 'unknown' });
   assert.deepEqual(stub.calls, []);
 });
 
-test('verify never throws raw: a rejecting fetch or an unreadable body resolves to unlisted', async () => {
+test('verify never throws raw: transport failures, non-404 error statuses and unreadable bodies resolve to unknown', async () => {
   const rejecting = async () => {
     throw new Error('boom');
   };
-  assert.deepEqual(await verifyPassive({ record: RECORD, channel: CHANNEL, fetchImpl: rejecting }), { status: 'unlisted' });
+  assert.deepEqual(await verifyPassive({ record: RECORD, channel: CHANNEL, fetchImpl: rejecting }), { status: 'unknown' });
+
+  const unreachable = stubFetch({ status: null });
+  assert.deepEqual(await verifyPassive({ record: RECORD, channel: CHANNEL, fetchImpl: unreachable.fetchImpl }), { status: 'unknown' });
+
+  const serverError = stubFetch({ status: 503, body: '' });
+  assert.deepEqual(await verifyPassive({ record: RECORD, channel: CHANNEL, fetchImpl: serverError.fetchImpl }), { status: 'unknown' });
+
+  const forbidden = stubFetch({ status: 403, body: '' });
+  assert.deepEqual(await verifyPassive({ record: RECORD, channel: CHANNEL, fetchImpl: forbidden.fetchImpl }), { status: 'unknown' });
+
   const badBody = stubFetch({ textThrows: true });
-  assert.deepEqual(await verifyPassive({ record: RECORD, channel: CHANNEL, fetchImpl: badBody.fetchImpl }), { status: 'unlisted' });
+  assert.deepEqual(await verifyPassive({ record: RECORD, channel: CHANNEL, fetchImpl: badBody.fetchImpl }), { status: 'unknown' });
 });

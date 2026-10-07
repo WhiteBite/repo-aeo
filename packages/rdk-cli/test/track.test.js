@@ -77,7 +77,7 @@ test('track default is read-only: header, live items and a byte-identical ledger
     const before = readFileSync(ledgerPath(cwd), 'utf8');
     const gh = ghStub({ view: { [PR1]: () => okJson(raw({ url: PR1 })) } });
 
-    const result = await trackCommand({ cwd, options: {}, config: {}, loaded: {}, ghRunner: gh, now: () => NOW });
+    const result = await trackCommand({ cwd, options: {}, config: {}, ghRunner: gh, now: () => NOW });
 
     assert.equal(result.ok, true);
     assert.equal(result.exitCode, 0);
@@ -409,6 +409,77 @@ test('track --mark fails on unknown target, invalid status, missing --status and
     assert.match(withSync.error, /pass only one of --adopt, --sync, --mark/);
 
     assert.equal(readFileSync(ledgerPath(cwd), 'utf8'), `${JSON.stringify(rows, null, 2)}\n`);
+  } finally {
+    removeRepo(cwd);
+  }
+});
+
+test('track --mark rejects a valueless or empty --mark and a --status without --mark', async () => {
+  const rows = [{ channel: 'awesome-list', target: 'owner/list', pr_url: PR1, status: 'submitted', dedupe_key: 'awesome-list:owner/list' }];
+  const cwd = ledgerRepo(rows);
+  try {
+    const boom = () => {
+      throw new Error('gh must not be called when --mark is invalid');
+    };
+
+    const valueless = await trackCommand({ cwd, options: { mark: true, status: 'listed' }, config: {}, ghRunner: boom, now: () => NOW });
+    assert.equal(valueless.ok, false);
+    assert.equal(valueless.exitCode, 1);
+    assert.match(valueless.error, /--mark.+requires a target/);
+    assert.match(valueless.output, /--mark.+requires a target/);
+
+    const empty = await trackCommand({ cwd, options: { mark: '', status: 'listed' }, config: {}, ghRunner: boom, now: () => NOW });
+    assert.equal(empty.ok, false);
+    assert.match(empty.error, /--mark.+requires a target/);
+
+    const loneStatus = await trackCommand({ cwd, options: { status: 'listed' }, config: {}, ghRunner: boom, now: () => NOW });
+    assert.equal(loneStatus.ok, false);
+    assert.equal(loneStatus.exitCode, 1);
+    assert.match(loneStatus.error, /--status.+requires.+--mark/);
+
+    assert.equal(readFileSync(ledgerPath(cwd), 'utf8'), `${JSON.stringify(rows, null, 2)}\n`);
+  } finally {
+    removeRepo(cwd);
+  }
+});
+
+test('track --mark refuses an ambiguous target and --channel picks the row', async () => {
+  const rows = [
+    { channel: 'mcp-official-registry', target: 'demo-project', url: 'https://github.com/owner/repo', status: 'submitted', dedupe_key: 'mcp-official-registry:demo-project' },
+    { channel: 'npm-registry', target: 'demo-project', url: 'https://github.com/owner/repo', status: 'prepared', dedupe_key: 'npm-registry:demo-project' },
+  ];
+  const cwd = ledgerRepo(rows);
+  try {
+    const boom = () => {
+      throw new Error('gh must not be called for --mark');
+    };
+
+    const ambiguous = await trackCommand({ cwd, options: { mark: 'demo-project', status: 'listed' }, config: {}, ghRunner: boom, now: () => NOW });
+    assert.equal(ambiguous.ok, false);
+    assert.equal(ambiguous.exitCode, 1);
+    assert.match(ambiguous.error, /--channel/);
+    assert.match(ambiguous.output, /mcp-official-registry/);
+    assert.match(ambiguous.output, /npm-registry/);
+    assert.equal(readFileSync(ledgerPath(cwd), 'utf8'), `${JSON.stringify(rows, null, 2)}\n`);
+
+    const preview = await trackCommand({ cwd, options: { mark: 'demo-project', channel: 'npm-registry', status: 'listed' }, config: {}, ghRunner: boom, now: () => NOW });
+    assert.equal(preview.ok, true);
+    assert.match(preview.output, /- demo-project: prepared -> listed/);
+    assert.doesNotMatch(preview.output, /submitted/);
+    assert.match(preview.output, /Plan digest: [0-9a-f]{64}/);
+
+    const applied = await trackCommand({
+      cwd,
+      options: { mark: 'demo-project', channel: 'npm-registry', status: 'listed', apply: true, ack: ACK, reason: 'unit test channel disambiguation', plan_digest: preview.plan_digest },
+      config: {},
+      ghRunner: boom,
+      now: () => NOW,
+    });
+    assert.equal(applied.ok, true, applied.output);
+    assert.match(applied.output, /Marked 1 submission/);
+    const ledger = JSON.parse(readFileSync(ledgerPath(cwd), 'utf8'));
+    assert.deepEqual(ledger[0], rows[0]);
+    assert.deepEqual(ledger[1], { ...rows[1], status: 'listed', synced_at: NOW });
   } finally {
     removeRepo(cwd);
   }

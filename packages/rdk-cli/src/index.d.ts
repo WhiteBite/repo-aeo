@@ -464,7 +464,6 @@ export declare function trackCommand(args: {
   cwd: string;
   options?: Record<string, unknown>;
   config?: RdkConfig;
-  loaded?: ReturnType<typeof loadConfig> | null;
   ghRunner?: (args: string[], opts?: { cwd?: string; timeout?: number }) => { ok: boolean; stdout?: string; stderr?: string };
   gitRunner?: (args: string[], options?: { timeout?: number }) => { ok: boolean; stdout?: string; stderr?: string };
   fetchImpl?: (url: string, init?: Record<string, unknown>) => Promise<{ ok: boolean; status?: number; text?: () => Promise<string> }>;

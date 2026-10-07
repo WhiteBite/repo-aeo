@@ -579,7 +579,6 @@ export const TOOLS = [
       }
       const status = await buildDistributionStatus({
         cwd,
-        loaded: loadConfig(cwd),
         live: args.live === true,
         gh: ghFor(context),
         fetchImpl: fetchFor(context),

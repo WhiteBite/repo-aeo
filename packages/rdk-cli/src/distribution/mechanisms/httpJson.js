@@ -74,18 +74,26 @@ export async function execute({ item, channel, fetchImpl, env }) {
   return { ok: true, lines, record: { target: item.target, status: 'submitted', submitted_at: new Date().toISOString(), url: url || null, server_name: serverName } };
 }
 
-/** Presence check against the public MCP registry detail endpoint, driven only by the record's persisted server_name; any failure is unlisted. */
+/**
+ * Presence check against the public MCP registry detail endpoint, driven only
+ * by the record's persisted server_name. Resolves to
+ * { status: 'listed' | 'unlisted' | 'unknown' }: 'listed' on a 2xx response,
+ * 'unlisted' only on 404, 'unknown' on a missing server_name, transport
+ * failures and any other status.
+ */
 export async function verify({ record, fetchImpl }) {
   const serverName = record && typeof record.server_name === 'string' && record.server_name !== '' ? record.server_name : null;
-  if (!serverName) return { status: 'unlisted' };
+  if (!serverName) return { status: 'unknown' };
   const url = `https://registry.modelcontextprotocol.io/v0.1/servers/${encodeURIComponent(serverName)}/versions/latest`;
   const fetcher = typeof fetchImpl === 'function' ? fetchImpl : fetch;
   try {
     const res = await fetcher(url, { method: 'GET', headers: { accept: 'application/json' } });
     const status = res && typeof res.status === 'number' ? res.status : 0;
-    return { status: status >= 200 && status < 300 ? 'listed' : 'unlisted' };
+    if (status === 404) return { status: 'unlisted' };
+    if (status < 200 || status >= 300) return { status: 'unknown' };
+    return { status: 'listed' };
   } catch {
-    return { status: 'unlisted' };
+    return { status: 'unknown' };
   }
 }
 

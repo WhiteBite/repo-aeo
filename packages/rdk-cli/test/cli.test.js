@@ -211,6 +211,51 @@ test('rdk track is registered: help mentions it, a ledger-less repo prints the d
   }
 });
 
+test('rdk track --mark validates its flags: a valueless --mark and a lone --status exit 1', () => {
+  const dir = makeRepo({ 'package.json': JSON.stringify({ name: 'mark-flags', description: 'mark flag validation demo' }) });
+  try {
+    const valueless = rdk(['track', '--mark', '--status', 'listed'], dir);
+    assert.equal(valueless.status, 1);
+    assert.match(valueless.stdout, /--mark.+requires a target/);
+
+    const loneStatus = rdk(['track', '--status', 'listed'], dir);
+    assert.equal(loneStatus.status, 1);
+    assert.match(loneStatus.stdout, /--status.+requires.+--mark/);
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('rdk track --mark on a shared target fails without --channel and picks the row with it', () => {
+  const rows = [
+    { channel: 'mcp-official-registry', target: 'demo-project', url: 'https://github.com/owner/repo', status: 'submitted', dedupe_key: 'mcp-official-registry:demo-project' },
+    { channel: 'npm-registry', target: 'demo-project', url: 'https://github.com/owner/repo', status: 'prepared', dedupe_key: 'npm-registry:demo-project' },
+  ];
+  const dir = makeRepo({
+    'package.json': JSON.stringify({ name: 'mark-channel', description: 'mark channel disambiguation demo' }),
+    '.discoverability/submissions.json': `${JSON.stringify(rows, null, 2)}\n`,
+  });
+  try {
+    const ambiguous = rdk(['track', '--mark', 'demo-project', '--status', 'listed'], dir);
+    assert.equal(ambiguous.status, 1);
+    assert.match(ambiguous.stdout, /--channel/);
+    assert.match(ambiguous.stdout, /mcp-official-registry/);
+
+    const picked = rdk(['track', '--mark', 'demo-project', '--channel', 'npm-registry', '--status', 'listed'], dir);
+    assert.equal(picked.status, 0, picked.stdout + picked.stderr);
+    assert.match(picked.stdout, /- demo-project: prepared -> listed/);
+    assert.equal(readFileSync(join(dir, '.discoverability', 'submissions.json'), 'utf8'), `${JSON.stringify(rows, null, 2)}\n`);
+  } finally {
+    removeRepo(dir);
+  }
+});
+
+test('CHANGELOG.md ends with exactly one trailing newline', () => {
+  const changelog = readFileSync(join(fileURLToPath(import.meta.url), '..', '..', '..', '..', 'CHANGELOG.md'), 'utf8');
+  assert.ok(changelog.endsWith('\n'));
+  assert.doesNotMatch(changelog, /\n\n$/);
+});
+
 test('valid invocations are unaffected by the stray-argument guard', () => {
   const dir = makeRepo({
     'package.json': JSON.stringify({ name: 'valid-calls', description: 'valid invocation demo' }),
