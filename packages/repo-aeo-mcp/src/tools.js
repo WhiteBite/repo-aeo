@@ -44,6 +44,8 @@ function gh(args, { cwd } = {}) {
   }
 }
 
+const ghFor = (context) => (context && typeof context.gh === 'function' ? context.gh : gh);
+
 function resolveCwd(args, context = {}) {
   if (typeof args.cwd === 'string' && args.cwd !== '') return args.cwd;
   if (typeof context.cwd === 'string' && context.cwd !== '') return context.cwd;
@@ -234,7 +236,7 @@ export const TOOLS = [
       const repo = args.repo || (git.host === 'github.com' && git.owner && git.repo ? `${git.owner}/${git.repo}` : null);
       if (!repo) return { ok: false, error: 'no repository resolved (pass repo=owner/name)' };
 
-      const result = gh(
+      const result = ghFor(context)(
         [
           'repo',
           'view',
@@ -576,19 +578,19 @@ export const TOOLS = [
         cwd,
         loaded: loadConfig(cwd),
         live: args.live === true,
-        gh,
+        gh: ghFor(context),
         now: () => new Date().toISOString(),
       });
       if (args.adopt === true) {
         const targets = [...new Set(ledger.map((row) => row && row.target).filter((target) => typeof target === 'string' && target !== ''))];
-        const rows = adoptRows(ledger, matchAdoptable(discoverOwnedPrs({ gh, cwd, targets })));
+        const rows = adoptRows(ledger, matchAdoptable(discoverOwnedPrs({ gh: ghFor(context), cwd, targets })));
         return { ok: true, status, preview: rows, plan_digest: planDigest(rows) };
       }
       if (args.sync === true) {
         const hydratedByKey = {};
         for (const row of ledger) {
           const probeKind = channelById(row.channel)?.probe || (row.pr_url ? 'gh-pr' : null);
-          const hydrated = hydrateByProbe({ probe: { kind: probeKind, ref: row.pr_url || null }, entry: row, gh, cwd });
+          const hydrated = hydrateByProbe({ probe: { kind: probeKind, ref: row.pr_url || null }, entry: row, gh: ghFor(context), cwd });
           if (hydrated && hydrated.ok && hydrated.normalized) hydratedByKey[row.dedupe_key || row.pr_url] = hydrated.normalized;
         }
         const { changes } = applySync(ledger, hydratedByKey, { at: new Date().toISOString() });

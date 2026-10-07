@@ -196,6 +196,82 @@ test('read-only mode hides the write tool from descriptors and calls', async () 
   }
 });
 
+test('github_audit_visibility_signals parses a stubbed gh repo view into concrete signals', async () => {
+  const box = sandbox();
+  try {
+    const pushedAt = new Date(Date.now() - 2 * 86400000).toISOString();
+    const releasedAt = new Date(Date.now() - 10 * 86400000).toISOString();
+    const repoView = {
+      nameWithOwner: 'WhiteBite/repo-aeo',
+      description: 'Repo Discoverability Kit',
+      homepageUrl: 'https://github.com/WhiteBite/repo-aeo',
+      stargazerCount: 42,
+      forkCount: 7,
+      watchers: { totalCount: 12 },
+      issues: { totalCount: 3 },
+      pullRequests: { totalCount: 2 },
+      repositoryTopics: ['discoverability', 'npm', 'github', 'seo', 'aeo', 'llms-txt', 'cli', 'mcp'].map((name) => ({ name })),
+      pushedAt,
+      updatedAt: pushedAt,
+      createdAt: '2025-01-01T00:00:00Z',
+      hasWikiEnabled: true,
+      hasDiscussionsEnabled: true,
+      isArchived: false,
+      isFork: false,
+      licenseInfo: { spdxId: 'MIT' },
+      defaultBranchRef: { name: 'master' },
+      latestRelease: { publishedAt: releasedAt },
+      securityPolicyUrl: 'https://github.com/WhiteBite/repo-aeo/security/policy',
+    };
+    const calls = [];
+    const gh = (args, options) => {
+      calls.push({ args, options });
+      return { ok: true, stdout: JSON.stringify(repoView), stderr: '', code: 0 };
+    };
+
+    const payload = await callTool('github_audit_visibility_signals', { repo: 'WhiteBite/repo-aeo', cwd: box.dir }, { gh });
+
+    assert.equal(calls.length, 1, 'the tool must run gh exactly once through the injected runner');
+    assert.deepEqual(calls[0].args.slice(0, 3), ['repo', 'view', 'WhiteBite/repo-aeo']);
+    assert.equal(calls[0].options.cwd, box.dir);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.repo, 'WhiteBite/repo-aeo');
+    assert.equal(payload.description, 'Repo Discoverability Kit');
+    assert.equal(payload.homepage, 'https://github.com/WhiteBite/repo-aeo');
+    assert.equal(payload.stars, 42);
+    assert.equal(payload.forks, 7);
+    assert.equal(payload.watchers, 12);
+    assert.equal(payload.open_issues, 3);
+    assert.deepEqual(payload.topics, ['discoverability', 'npm', 'github', 'seo', 'aeo', 'llms-txt', 'cli', 'mcp']);
+    assert.equal(payload.topic_count, 8);
+    assert.equal(payload.license, 'MIT');
+    assert.equal(payload.default_branch, 'master');
+    assert.equal(payload.days_since_last_push, 2);
+    assert.equal(payload.days_since_last_release, 10);
+    assert.deepEqual(payload.findings, [], 'a healthy repo view must yield no findings');
+    assert.equal(payload.history_points, 1);
+  } finally {
+    box.cleanup();
+  }
+});
+
+test('github_audit_visibility_signals degrades gracefully when gh fails', async () => {
+  const box = sandbox();
+  try {
+    const payload = await callTool(
+      'github_audit_visibility_signals',
+      { repo: 'WhiteBite/repo-aeo', cwd: box.dir },
+      { gh: () => ({ ok: false, stdout: '', stderr: 'boom', code: 1 }) },
+    );
+    assert.equal(payload.ok, false);
+    assert.equal(payload.repo, 'WhiteBite/repo-aeo');
+    assert.equal(payload.error, 'the gh CLI is unavailable or not authenticated');
+    assert.equal(payload.detail, 'boom');
+  } finally {
+    box.cleanup();
+  }
+});
+
 test('first heading extraction survives a served BOM', () => {
   const bom = String.fromCharCode(0xfeff);
   assert.equal(firstHeadingOf(`${bom}# Project docs\n\n- [Docs](https://example.com)\n`), 'Project docs');
@@ -448,6 +524,73 @@ test('distribution_check_submissions carries per-channel items and recommends ch
     const both = await callTool('distribution_check_submissions', { cwd: box.dir, live: true, include_recommendations: true });
     assert.equal(both.ok, true, 'live + recommendations stays read-only and offline-safe');
     assert.ok(Array.isArray(both.recommendations.channels));
+  } finally {
+    box.cleanup();
+  }
+});
+
+test('distribution_check_submissions hydrates git-pr items through an injected gh runner', async () => {
+  const box = sandbox();
+  try {
+    mkdirSync(join(box.dir, '.discoverability'), { recursive: true });
+    writeFileSync(
+      join(box.dir, '.discoverability', 'submissions.json'),
+      JSON.stringify([
+        {
+          channel: 'awesome-list',
+          mechanism: 'git-pr',
+          artifact: 'readme-row',
+          dedupe_key: 'kirodotdev-labs/awesome-kiro:WhiteBite/repo-aeo',
+          target: 'kirodotdev-labs/awesome-kiro',
+          pr_url: 'https://github.com/kirodotdev-labs/awesome-kiro/pull/1',
+          branch: 'rdk/awesome-kiro/add-repo-aeo',
+          fork: 'WhiteBite/awesome-kiro',
+          submitted_at: '2026-10-03T09:00:00Z',
+          status: 'open',
+        },
+      ]),
+    );
+    const updatedAt = new Date().toISOString();
+    const prView = {
+      state: 'OPEN',
+      isDraft: false,
+      reviewDecision: 'CHANGES_REQUESTED',
+      latestReviews: [],
+      reviews: [],
+      comments: [],
+      statusCheckRollup: [],
+      mergeStateStatus: 'CLEAN',
+      mergeable: true,
+      labels: [],
+      updatedAt,
+      closedAt: null,
+      mergedAt: null,
+      url: 'https://github.com/kirodotdev-labs/awesome-kiro/pull/1',
+      commits: [{ committedDate: updatedAt }],
+    };
+    const calls = [];
+    const gh = (args, options) => {
+      calls.push({ args, options });
+      if (args[0] === 'pr' && args[1] === 'view') return { ok: true, stdout: JSON.stringify(prView), stderr: '', code: 0 };
+      return { ok: false, stdout: '', stderr: `unexpected gh invocation: ${args.join(' ')}`, code: 1 };
+    };
+
+    const payload = await callTool('distribution_check_submissions', { cwd: box.dir, live: true }, { gh });
+
+    assert.equal(payload.ok, true);
+    assert.equal(calls.length, 1, 'only the git-pr row is probed, and only through the injected runner');
+    assert.deepEqual(calls[0].args.slice(0, 4), ['pr', 'view', 'https://github.com/kirodotdev-labs/awesome-kiro/pull/1', '-R']);
+    assert.equal(calls[0].options.cwd, box.dir);
+    const [item] = payload.items;
+    assert.equal(item.state, 'OPEN');
+    assert.equal(item.review_decision, 'CHANGES_REQUESTED');
+    assert.equal(item.is_draft, false);
+    assert.equal(item.merge_state, 'CLEAN');
+    assert.deepEqual(item.checks, { pass: 0, fail: 0, pending: 0 });
+    assert.equal(item.attention, 'action_required');
+    assert.deepEqual(item.needed, ['address_review']);
+    assert.equal(payload.summary.by_attention.action_required, 1);
+    assert.equal(payload.summary.by_state.open, 1);
   } finally {
     box.cleanup();
   }
