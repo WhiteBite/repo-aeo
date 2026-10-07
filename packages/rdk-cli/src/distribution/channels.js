@@ -75,7 +75,7 @@ export const CHANNELS = [
     when: 'has_skill',
     automatable: false,
     probe: 'crawl',
-    checkUrl: 'https://skills.sh',
+    checkUrl: 'https://www.skills.sh/sitemap-skills-1.xml',
   },
   {
     id: 'npm-registry',

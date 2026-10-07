@@ -92,6 +92,44 @@ test('verify reports unlisted when the page lacks the project or answers with an
   assert.deepEqual(await verifyPassive({ record: RECORD, channel: CHANNEL, fetchImpl: unreachable.fetchImpl }), { status: 'unlisted' });
 });
 
+test('verify matches the repo path token on a sitemap and the full url when present', async () => {
+  const sitemap = stubFetch({ body: '<url><loc>https://www.skills.sh/owner/demo/my-skill</loc></url>\n' });
+  assert.deepEqual(await verifyPassive({ record: RECORD, channel: CHANNEL, fetchImpl: sitemap.fetchImpl }), { status: 'listed' });
+
+  const fullUrl = stubFetch({ body: `see ${RECORD.url} for details` });
+  assert.deepEqual(await verifyPassive({ record: RECORD, channel: CHANNEL, fetchImpl: fullUrl.fetchImpl }), { status: 'listed' });
+
+  const absent = stubFetch({ body: '<url><loc>https://www.skills.sh/other/thing/my-skill</loc></url>\n' });
+  assert.deepEqual(await verifyPassive({ record: RECORD, channel: CHANNEL, fetchImpl: absent.fetchImpl }), { status: 'unlisted' });
+
+  const nonGithub = { channel: 'skills-sh', url: 'https://example.com/owner/demo', status: 'submitted' };
+  const tokenOnly = stubFetch({ body: '<url><loc>https://www.skills.sh/owner/demo/my-skill</loc></url>\n' });
+  assert.deepEqual(await verifyPassive({ record: nonGithub, channel: CHANNEL, fetchImpl: tokenOnly.fetchImpl }), { status: 'unlisted' });
+});
+
+test('execute emits a record carrying the project url for the public-repo precondition', () => {
+  const dir = makeRepo({ 'README.md': '# demo\n' });
+  try {
+    const items = planPassive({ channel: CHANNEL });
+    const result = executePassive({ item: items[0], channel: CHANNEL, cwd: dir, config: {}, url: 'https://github.com/owner/demo' });
+    assert.equal(result.ok, true);
+    assert.equal(result.record.channel, 'skills-sh');
+    assert.equal(result.record.url, 'https://github.com/owner/demo');
+    assert.equal(result.record.target, 'skills-sh');
+    assert.equal(result.record.status, 'prepared');
+    assert.match(result.record.submitted_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    assert.deepEqual(result.checklist.steps, items.map((item) => item.requirement));
+
+    const withoutUrl = executePassive({ item: items[0], channel: CHANNEL, cwd: dir, config: {} });
+    assert.equal(withoutUrl.record.url, null);
+
+    const other = executePassive({ item: items[1], channel: CHANNEL, cwd: dir, config: {}, url: 'https://github.com/owner/demo' });
+    assert.equal(other.record, undefined);
+  } finally {
+    removeRepo(dir);
+  }
+});
+
 test('verify reports unlisted without fetching when the record or the checkUrl is absent', async () => {
   const stub = stubFetch({ body: `# index\n- ${RECORD.url}\n` });
   assert.deepEqual(await verifyPassive({ record: {}, channel: CHANNEL, fetchImpl: stub.fetchImpl }), { status: 'unlisted' });

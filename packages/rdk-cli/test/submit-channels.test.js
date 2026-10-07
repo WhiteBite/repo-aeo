@@ -143,7 +143,7 @@ test('--channel npm-registry records prepared and never runs a publish', async (
   }
 });
 
-test('--channel skills-sh appends no record', async () => {
+test('--channel skills-sh records the crawl preconditions', async () => {
   const { dir, config, loaded } = repo();
   try {
     const preview = await submitCommand({ cwd: dir, options: { channel: 'skills-sh' }, config, loaded });
@@ -158,9 +158,12 @@ test('--channel skills-sh appends no record', async () => {
       loaded,
     });
     assert.equal(result.ok, true, result.output);
-    assert.equal(result.applied.length, 0);
+    assert.equal(result.applied.length, 1);
     assert.match(result.output, /nothing to submit - this channel crawls on its own/);
-    assert.equal(existsSync(join(dir, '.discoverability', 'submissions.json')), false);
+    const ledger = JSON.parse(readFileSync(join(dir, '.discoverability', 'submissions.json'), 'utf8'));
+    assert.equal(ledger.length, 1);
+    assert.equal(ledger[0].channel, 'skills-sh');
+    assert.equal(ledger[0].status, 'prepared');
   } finally {
     removeRepo(dir);
   }

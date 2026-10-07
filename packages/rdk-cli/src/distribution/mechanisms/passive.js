@@ -29,7 +29,7 @@ export function plan({ channel } = {}) {
   }));
 }
 
-export function execute({ item, channel } = {}) {
+export function execute({ item, channel, url } = {}) {
   const id = channel && typeof channel.id === 'string' && channel.id !== '' ? channel.id : 'passive';
   const checkUrl = channel && typeof channel.checkUrl === 'string' && channel.checkUrl !== '' ? channel.checkUrl : null;
   const requirement = item && typeof item.requirement === 'string' && item.requirement !== '' ? item.requirement : null;
@@ -39,7 +39,17 @@ export function execute({ item, channel } = {}) {
     'nothing to submit - this channel crawls on its own',
     checkUrl ? `presence is verified later at ${checkUrl}` : 'no check URL configured - presence cannot be verified after the fact',
   ];
-  return { ok: true, lines, checklist: { steps: PRECONDITIONS.map((precondition) => precondition.requirement) } };
+  const result = { ok: true, lines, checklist: { steps: PRECONDITIONS.map((precondition) => precondition.requirement) } };
+  if (item && item.precondition === 'public-repo') {
+    result.record = {
+      channel: id,
+      url: url || null,
+      target: id,
+      status: 'prepared',
+      submitted_at: new Date().toISOString(),
+    };
+  }
+  return result;
 }
 
 /** How to probe a record's live state: the project URL to look for on the channel's index page. */
@@ -47,6 +57,8 @@ export function probe(record) {
   const ref = record && typeof record.url === 'string' && record.url !== '' ? record.url : null;
   return { kind: 'crawl', ref };
 }
+
+const GITHUB_REPO_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)/;
 
 /**
  * Verifies presence after the fact: fetches the channel's checkUrl through
@@ -65,7 +77,11 @@ export async function verify({ record, channel, fetchImpl } = {}) {
       return { status: 'unlisted' };
     }
     const text = await response.text();
-    return { status: typeof text === 'string' && text.includes(ref) ? 'listed' : 'unlisted' };
+    if (typeof text !== 'string') return { status: 'unlisted' };
+    // sitemap-style indexes list /<owner>/<repo>/<skill> entries, not the GitHub URL
+    const match = GITHUB_REPO_URL.exec(ref);
+    const token = match ? `/${match[1]}/${match[2]}/` : null;
+    return { status: text.includes(ref) || (token !== null && text.includes(token)) ? 'listed' : 'unlisted' };
   } catch {
     return { status: 'unlisted' };
   }
