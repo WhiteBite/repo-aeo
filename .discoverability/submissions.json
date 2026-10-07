@@ -6,5 +6,26 @@
     "fork": "WhiteBite/awesome-answer-engine-optimization",
     "submitted_at": "2026-10-03T20:31:18.647Z",
     "status": "open"
+  },
+  {
+    "channel": "skills-sh",
+    "url": "https://github.com/WhiteBite/repo-aeo",
+    "target": "skills-sh",
+    "status": "prepared",
+    "submitted_at": "2026-10-07T11:47:36.346Z",
+    "mechanism": "passive",
+    "artifact": "none",
+    "dedupe_key": "skills-sh:skills-sh"
+  },
+  {
+    "channel": "npm-registry",
+    "package": "repo-aeo",
+    "version": "1.0.0",
+    "artifact": "npm-tarball",
+    "registry_url": "https://registry.npmjs.org/repo-aeo",
+    "status": "prepared",
+    "target": "npm-registry",
+    "mechanism": "cli-publish",
+    "dedupe_key": "npm-registry:npm-registry"
   }
 ]
