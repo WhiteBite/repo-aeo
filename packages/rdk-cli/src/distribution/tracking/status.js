@@ -80,7 +80,7 @@ async function projectRow(row, { cwd, gh, fetchImpl, live, generated_at, now, ba
   };
 }
 
-export async function buildDistributionStatus({ cwd, loaded, options = {}, gh, git, fetchImpl, now = () => new Date().toISOString(), live = true }) {
+export async function buildDistributionStatus({ cwd, options = {}, gh, git, fetchImpl, now = () => new Date().toISOString(), live = true }) {
   const generated_at = now();
   const rows = readLedger(cwd) || [];
   const by_attention = emptyCounts(ATTENTION_KEYS);

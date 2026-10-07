@@ -360,7 +360,6 @@ export interface DistributionStatus {
 export declare const DISTRIBUTION_SCHEMA: string;
 export declare function buildDistributionStatus(args: {
   cwd: string;
-  loaded?: ReturnType<typeof loadConfig> | null;
   options?: Record<string, unknown>;
   gh?: (args: string[], opts?: { cwd?: string }) => { ok: boolean; stdout?: string; stderr?: string };
   git?: (args: string[], options?: { timeout?: number }) => { ok: boolean; stdout?: string; stderr?: string };
