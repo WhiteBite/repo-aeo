@@ -45,6 +45,26 @@ every change.
 | `fixtures/demo-repo/` | the before/after demo repo used by tests and REPORT.md |
 | `.discoverability/project.yml` | source of truth for this repository's metadata |
 
+## Distribution tracking
+
+```bash
+node packages/rdk-cli/bin/rdk.js channels          # where to publish (read-only)
+node packages/rdk-cli/bin/rdk.js track             # campaign dashboard over .discoverability/submissions.json
+node packages/rdk-cli/bin/rdk.js track --json      # canonical status object (schema rdk-distribution/1)
+node packages/rdk-cli/bin/rdk.js track --adopt     # pull pre-ledger rdk/* PRs into the ledger
+node packages/rdk-cli/bin/rdk.js track --sync      # rewrite recorded statuses from live probes
+node packages/rdk-cli/bin/rdk.js track --mark <target> --status <status>   # manual override of one row
+```
+
+The ledger `.discoverability/submissions.json` is committed state; live probe
+snapshots live in the git-ignored cache. Every ledger write (`--adopt`,
+`--sync`, `--mark`) requires the guard chain
+`--apply --ack <ACK> --reason "<why>" --plan-digest <DIGEST>`, where the digest
+comes from the dry-run preview. Non-PR channels report live presence via the
+`crawl`, `http-search` and `registry-read` probes; PR channels hydrate through
+`gh`. The weekly `rdk-track` workflow runs `rdk track --json` and upserts the
+tracking issue — it never writes the ledger.
+
 ## Do / Don't
 
 - **Do** run `npm test` before committing; the suite covers the YAML parser, the

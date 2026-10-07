@@ -83,6 +83,17 @@ named sources. Feeds the README "Why choose this" section.
 | `require_ack_for_publish` | `true` | publish/tag/release always require an explicit human ACK |
 | `ack` | `null` | server-configured acknowledgement override for `github-sync`; a non-empty string replaces the default ACK constant, `null`/absent keeps it |
 
+## Distribution state is not config
+
+The distribution campaign (`rdk channels`, `submit`, `track`) adds no keys to
+`project.yml`. The config decides *what* the artifact is; where it was
+submitted and how it is doing lives in the committed ledger
+`.discoverability/submissions.json` (schema `rdk-distribution/1`), and live
+probe snapshots live in the git-ignored `.discoverability/cache/`. Ledger
+writes go through the same guard chain as `github-sync`:
+`--apply --ack <ACK> --reason "<why>" --plan-digest <DIGEST>`. See
+[`architecture.md`](./architecture.md) for the tracking model.
+
 ## Safety model
 
 | Operation | Requirement |

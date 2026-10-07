@@ -23,11 +23,15 @@ Three layers, because no single artifact makes discoverability "just happen".
                                         │
                                         ▼
                           ┌────────────────────────┐
-                          │ (4) MCP server         │
-                          │ packages/repo-aeo-mcp  │
-                          │ 9 tools, stdio, Docker │
-                          └────────────────────────┘
+                           │ (4) MCP server         │
+                           │ packages/repo-aeo-mcp  │
+                           │ 9 tools, stdio, Docker │
+                           └────────────────────────┘
 ```
+
+The distribution campaign (`rdk channels`/`submit`/`track`, section (5) below)
+runs on the same engine and reads the same config; its state lives in a
+committed ledger beside the config.
 
 ## (1) Repo Kit
 
@@ -88,6 +92,39 @@ one write tool (`github_sync_metadata`) which reuses the CLI's guarded
 implementation, requires an ack string plus a reason, and **previews by
 default** (`apply: true` is opt-in, mirroring `rdk fix`). See
 [`mcp-plan.md`](./mcp-plan.md) for the tool table and safety model.
+
+## (5) Distribution tracking
+
+The campaign state lives beside the engine, not inside it:
+
+- **Ledger** — `.discoverability/submissions.json` is committed state: one row
+  per submission with `channel`, `mechanism`, `artifact`, `target`, `pr_url`,
+  `status` and a `dedupe_key`. Status machine
+  `prepared -> submitted -> listed`, terminal negatives
+  `rejected|closed|unlisted|failed` allow one retry. The ledger is never
+  auto-repaired: an unparsable file fails every command that reads it.
+- **Cache** — live probe snapshots go to `.discoverability/cache/tracking.json`
+  (schema `rdk-tracking/1`, git-ignored, safe to lose). Recorded status changes
+  only through the guarded writes below.
+- **Probes** — each channel descriptor names one hydration source: `gh-pr` for
+  git-pr channels (PR state via `gh`), and presence checks for the rest —
+  `crawl` (sitemap fetch), `http-search` (registry search) and `registry-read`
+  (npm package document). A probe failure degrades to the recorded state,
+  never to a guess.
+- **Canonical status** — `buildDistributionStatus` projects the ledger through
+  the probes into one deterministic object (schema `rdk-distribution/1`): per
+  item the attention state (`action_required|awaiting_review|approved|stale|
+  none|listed|terminal`) and, when something is due, the exact guarded command
+  to run next. CLI `rdk track [--json]` and the MCP tool
+  `distribution_check_submissions` render the same object.
+- **Writes** — `rdk track --adopt` (pull pre-ledger `rdk/*` PRs in), `--sync`
+  (rewrite recorded statuses from live probes) and `--mark <target> --status
+  <status>` (manual override of one row) all preview by default and write only
+  under `--apply --ack <ACK> --reason "<why>" --plan-digest <DIGEST>`, the same
+  guard chain as `submit` and `github-sync`.
+- **Automation** — `.github/workflows/rdk-track.yml` runs weekly: `rdk track
+  --json` plus an upsert of the tracking issue carrying the attention summary
+  and the action queue. It reads the ledger and never writes it.
 
 ## Data flow invariants
 

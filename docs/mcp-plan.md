@@ -22,7 +22,7 @@ The skill stays offline-first; the server is the always-on monitor.
   `resources/list` and `prompts/list` answers so probing clients do not see
   `method not found`.
 
-## Tools (8, the cap)
+## Tools (9: 8 read-only + 1 writer)
 
 | Tool | Purpose |
 | --- | --- |
@@ -33,9 +33,10 @@ The skill stays offline-first; the server is the always-on monitor.
 | `repo_get_discoverability_score` | run the same audit engine as the CLI and return the JSON report |
 | `repo_list_findings` | findings with severity, fix and effort |
 | `competitor_scan_list_articles` | (optional) live-search scan for "Top N X tools" articles in the niche |
+| `distribution_check_submissions` | canonical campaign status (schema `rdk-distribution/1`) from `.discoverability/submissions.json`: per-item attention, next command, live PR state via `gh`, live presence for non-PR channels; `adopt`/`sync` are read-only previews with a `plan_digest` |
 | `github_sync_metadata` | the only write tool; requires an ack string and a reason |
 
-Every tool carries MCP annotations: seven are `readOnlyHint: true`,
+Every tool carries MCP annotations: eight are `readOnlyHint: true`,
 `github_sync_metadata` is `readOnlyHint: false, destructiveHint: true`.
 
 ## Safety model
@@ -61,6 +62,7 @@ Every tool carries MCP annotations: seven are `readOnlyHint: true`,
 | One-shot audit in CI | yes | yes (`repo_get_discoverability_score`) |
 | Trend across runs | no | yes (local metric history) |
 | Live GitHub / site / npms probes | `audit --online`, `github-sync` | dedicated tools, no flags to remember |
+| Campaign status and ledger previews | `rdk track [--json]`, `--adopt`/`--sync` dry runs | `distribution_check_submissions` (read-only; writes stay in the CLI) |
 | Guarded write | `--apply --ack … --reason …` | ack + reason + preview-first |
 | Run it from an agent | no | yes, over MCP stdio |
 

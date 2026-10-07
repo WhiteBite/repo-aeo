@@ -370,6 +370,14 @@ export function renderAgentsMd(config, pkg) {
   lines.push('| `packages/` | publishable packages |');
   lines.push('| `docs/` | documentation sources |');
   lines.push('');
+  lines.push('## Distribution');
+  lines.push('');
+  lines.push('- `rdk channels` lists where to publish: mechanism, applicability, next action (read-only).');
+  lines.push('- `rdk track` is the campaign dashboard over `.discoverability/submissions.json`; `--json` prints the canonical status object (schema `rdk-distribution/1`).');
+  lines.push('- `rdk track --adopt` pulls pre-ledger rdk/* PRs into the ledger; `--sync` rewrites recorded statuses from live probes; `--mark <target> --status <status>` overrides one row.');
+  lines.push("- **Don't** write the ledger without the guard chain `--apply --ack <ACK> --reason \"<why>\" --plan-digest <DIGEST>`; the digest binds the write to the approved dry-run preview.");
+  lines.push("- **Don't** hand-edit `.discoverability/submissions.json` to match a probe; run `rdk track --sync` under the guard.");
+  lines.push('');
   lines.push("## Do / Don't");
   lines.push('');
   lines.push('- **Do** run the test suite before committing.');
@@ -428,6 +436,13 @@ export function renderLlmsTxt(config, pkg, readmeText) {
     lines.push(...facts);
     lines.push('');
   }
+  lines.push('## Distribution tracking');
+  lines.push('');
+  lines.push('- Ledger: `.discoverability/submissions.json`, committed campaign state with schema `rdk-distribution/1`.');
+  lines.push('- `rdk track` prints the live status (`--json` for the canonical object); `--adopt` pulls pre-ledger rdk/* PRs in, `--sync` rewrites recorded statuses from live probes, `--mark <target> --status <status>` overrides one row.');
+  lines.push('- Every ledger write requires the guard chain `--apply --ack <ACK> --reason "<why>" --plan-digest <DIGEST>` (the digest of the dry-run preview).');
+  lines.push('- Non-PR channels report live presence by probe: `crawl`, `http-search` and `registry-read`; PR channels report state via `gh`.');
+  lines.push('');
   lines.push('## Optional');
   lines.push('');
   lines.push('- [llms-full.txt](./llms-full.txt): the full documentation in a single file');

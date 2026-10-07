@@ -22,6 +22,13 @@ This file follows the llms.txt convention: a short, LLM-friendly index of the pr
 - Test: `npm test`
 - Use cases: Score a repository's discoverability and get a prioritised fix list; Generate and maintain AGENTS.md, llms.txt and llms-full.txt for a repo; Prepare package.json metadata, exports and tarball contents before an npm release; Fill GitHub description, homepage and 8-20 topics from one config file; Keep discoverability from regressing with a weekly GitHub Action audit; Watch the discoverability score, the npm search score and GitHub visibility signals from an MCP client or a cron job
 
+## Distribution tracking
+
+- Ledger: `.discoverability/submissions.json`, committed campaign state with schema `rdk-distribution/1`.
+- `rdk track` prints the live status (`--json` for the canonical object); `--adopt` pulls pre-ledger rdk/* PRs in, `--sync` rewrites recorded statuses from live probes, `--mark <target> --status <status>` overrides one row.
+- Every ledger write requires the guard chain `--apply --ack <ACK> --reason "<why>" --plan-digest <DIGEST>` (the digest of the dry-run preview).
+- Non-PR channels report live presence by probe: `crawl`, `http-search` and `registry-read`; PR channels report state via `gh`.
+
 ## Optional
 
 - [llms-full.txt](./llms-full.txt): the full documentation in a single file

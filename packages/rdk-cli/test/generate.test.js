@@ -241,6 +241,21 @@ test('renderLlmsTxt omits Key facts when quickstart values and use_cases are pre
   assert.match(llms, /## Optional/);
 });
 
+test('renderLlmsTxt documents the distribution tracking contract', () => {
+  const llms = renderLlmsTxt({ project: { name: 'dist', one_liner: 'Dist' } }, null, '# dist\n');
+  assert.match(llms, /## Distribution tracking/);
+  assert.ok(llms.includes('rdk-distribution/1'), 'the canonical schema id must appear');
+  assert.ok(llms.includes('rdk track'), 'the tracking command must appear');
+  assert.ok(llms.includes('--plan-digest'), 'the guard chain must appear');
+});
+
+test('renderAgentsMd documents the rdk track commands and the write guard', () => {
+  const agents = renderAgentsMd({ project: { name: 'dist', one_liner: 'Dist' } }, null);
+  assert.match(agents, /## Distribution/);
+  assert.ok(agents.includes('rdk track'), 'a generated AGENTS.md must teach "rdk track"');
+  assert.ok(agents.includes('--plan-digest'), 'a generated AGENTS.md must teach the guard chain');
+});
+
 test('generated CODEOWNERS names the audited repository owner, not ours', () => {
   // Regression: renderCodeowners() used to hard-code `* @WhiteBite`, which
   // silently assigned a stranger's repository to us.
