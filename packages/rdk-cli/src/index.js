@@ -53,7 +53,6 @@ export {
   POLICY,
 } from './distribution/mechanisms/cliPublish.js';
 export { renderServerJson, mcpOwnershipMarker } from './distribution/artifacts/serverJson.js';
-export { renderClaudeMarketplace, renderCodexMarketplace } from './distribution/artifacts/marketplaceJson.js';
 export { channelsCommand } from './commands/channels.js';
 export { auditCommand } from './commands/audit.js';
 export { fixCommand } from './commands/fix.js';

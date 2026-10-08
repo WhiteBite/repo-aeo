@@ -43,6 +43,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   write is an upsert keyed on the channel dedupe key, so a retried submission
   replaces its own row instead of appending a duplicate.
 
+### Removed
+
+- Removed the unused `renderClaudeMarketplace`/`renderCodexMarketplace` exports:
+  they were never wired to a generator and did not match the current Claude Code
+  or Codex plugin marketplace formats.
+
 ### Security
 
 - Listings-only, unchanged: RDK never publishes packages, images or releases and

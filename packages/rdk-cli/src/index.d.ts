@@ -629,8 +629,6 @@ export declare function probeCliPublish(record: Submission): { kind: string; ref
 export declare function renderServerJson(config: RdkConfig, pkg: Record<string, unknown> | null): Record<string, unknown>;
 /** The value the published package must carry as mcpName: io.github.<owner>/<name> when the owner is known, else the bare name. */
 export declare function mcpOwnershipMarker(name: string, owner?: string | null): string;
-export declare function renderClaudeMarketplace(config: RdkConfig, pkg: Record<string, unknown> | null): Record<string, unknown>;
-export declare function renderCodexMarketplace(config: RdkConfig, pkg: Record<string, unknown> | null): Record<string, unknown>;
 
 export declare function channelsCommand(args: { cwd: string; loaded: ReturnType<typeof loadConfig> }): CommandResult;
 
