@@ -11,21 +11,23 @@
     "channel": "skills-sh",
     "url": "https://github.com/WhiteBite/repo-aeo",
     "target": "skills-sh",
-    "status": "prepared",
+    "status": "unlisted",
     "submitted_at": "2026-10-07T11:47:36.346Z",
     "mechanism": "passive",
     "artifact": "none",
-    "dedupe_key": "skills-sh:skills-sh"
+    "dedupe_key": "skills-sh:skills-sh",
+    "synced_at": "2026-10-09T17:52:57.711Z"
   },
   {
     "channel": "npm-registry",
     "package": "repo-aeo",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "artifact": "npm-tarball",
     "registry_url": "https://registry.npmjs.org/repo-aeo",
-    "status": "prepared",
+    "status": "listed",
     "target": "npm-registry",
     "mechanism": "cli-publish",
-    "dedupe_key": "npm-registry:npm-registry"
+    "dedupe_key": "npm-registry:npm-registry",
+    "synced_at": "2026-10-09T17:52:57.711Z"
   }
 ]
