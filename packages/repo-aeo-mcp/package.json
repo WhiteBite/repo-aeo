@@ -1,6 +1,6 @@
 {
   "name": "repo-aeo-mcp",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "MCP server for continuous repository discoverability monitoring: npm search score, GitHub visibility signals, llms.txt freshness and site checks. Read-only by default.",
   "type": "module",
   "license": "MIT",
@@ -32,7 +32,7 @@
     "test": "node ../../scripts/run-tests.mjs test"
   },
   "dependencies": {
-    "repo-aeo": "^1.0.0"
+    "repo-aeo": "^1.1.0"
   },
   "keywords": [
     "mcp",
