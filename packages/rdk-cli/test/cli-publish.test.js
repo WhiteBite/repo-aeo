@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { POLICY, describe, plan, buildChecklist, execute, probe, verify } from '../src/distribution/mechanisms/cliPublish.js';
 import { makeRepo, removeRepo } from './helpers.js';
 
-const MODULE_PATH = join(import.meta.dirname, '..', 'src', 'distribution', 'mechanisms', 'cliPublish.js');
+const MODULE_PATH = fileURLToPath(new URL('../src/distribution/mechanisms/cliPublish.js', import.meta.url));
 
 function stubFetch(responses) {
   const calls = [];
