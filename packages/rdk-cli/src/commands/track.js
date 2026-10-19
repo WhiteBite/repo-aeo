@@ -8,7 +8,7 @@
 import { run } from '../util/proc.js';
 import { readLedger, applySync, writeLedger } from '../distribution/ledger.js';
 import { channelById } from '../distribution/channels.js';
-import { ACK_HINT, assertWriteGuards, planDigest } from '../distribution/guard.js';
+import { ACK_HINT, assertWriteGuards, effectiveAck, planDigest } from '../distribution/guard.js';
 import { buildDistributionStatus, renderDistributionStatus } from '../distribution/tracking/status.js';
 import { discoverOwnedPrs, matchAdoptable, adoptRows, applyAdopt } from '../distribution/tracking/adopt.js';
 import { hydrateByProbe, hydrateGitPrBatch, isGhPrRow, GH_PR_BATCH_MIN } from '../distribution/tracking/hydrate.js';
@@ -38,6 +38,7 @@ function adoptMode({ cwd, options, config, ledger, gh, lines, fail, refuse }) {
   }
 
   const digest = planDigest(rows);
+  const ack = effectiveAck(config);
   const bound = assertWriteGuards({ options, config, plan: rows });
   if (!bound.ok) return refuse(bound, bound.code === 'plan_digest_mismatch' ? { plan_digest: digest } : {});
 
@@ -54,7 +55,7 @@ function adoptMode({ cwd, options, config, ledger, gh, lines, fail, refuse }) {
       return { ok: true, output: `${JSON.stringify({ rows, plan_digest: digest })}\n`, exitCode: 0, plan: rows, plan_digest: digest, adopted: [] };
     }
     lines.push(`Plan digest: ${digest}`);
-    lines.push('Dry run. Re-run with `--apply --ack <ACK_STRING> --reason "<why>" --plan-digest <PLAN_DIGEST>` to adopt them into the ledger.');
+    lines.push(`Dry run. Re-run with \`--apply --ack ${ack} --reason "<why>" --plan-digest ${digest}\` to adopt them into the ledger.`);
     return { ok: true, output: `${lines.join('\n')}\n`, exitCode: 0, plan: rows, plan_digest: digest, adopted: [] };
   }
 
@@ -87,6 +88,7 @@ async function syncMode({ cwd, options, config, ledger, gh, fetchImpl, lines, fa
   }
 
   const digest = planDigest(changes);
+  const ack = effectiveAck(config);
   const bound = assertWriteGuards({ options, config, plan: changes });
   if (!bound.ok) return refuse(bound, bound.code === 'plan_digest_mismatch' ? { plan_digest: digest } : {});
 
@@ -100,7 +102,7 @@ async function syncMode({ cwd, options, config, ledger, gh, fetchImpl, lines, fa
       return { ok: true, output: `${JSON.stringify({ changes, plan_digest: digest })}\n`, exitCode: 0, changes, plan_digest: digest };
     }
     lines.push(`Plan digest: ${digest}`);
-    lines.push('Dry run. Re-run with `--apply --ack <ACK_STRING> --reason "<why>" --plan-digest <PLAN_DIGEST>` to sync the ledger.');
+    lines.push(`Dry run. Re-run with \`--apply --ack ${ack} --reason "<why>" --plan-digest ${digest}\` to sync the ledger.`);
     return { ok: true, output: `${lines.join('\n')}\n`, exitCode: 0, changes, plan_digest: digest };
   }
 
@@ -133,6 +135,7 @@ function markMode({ cwd, options, config, ledger, lines, fail, refuse, now }) {
 
   const changes = [{ key: row.dedupe_key || row.pr_url, from: row.status, to: status }];
   const digest = planDigest(changes);
+  const ack = effectiveAck(config);
   const bound = assertWriteGuards({ options, config, plan: changes });
   if (!bound.ok) return refuse(bound, bound.code === 'plan_digest_mismatch' ? { plan_digest: digest } : {});
 
@@ -144,7 +147,7 @@ function markMode({ cwd, options, config, ledger, lines, fail, refuse, now }) {
       return { ok: true, output: `${JSON.stringify({ changes, plan_digest: digest })}\n`, exitCode: 0, changes, plan_digest: digest };
     }
     lines.push(`Plan digest: ${digest}`);
-    lines.push('Dry run. Re-run with `--apply --ack <ACK_STRING> --reason "<why>" --plan-digest <PLAN_DIGEST>` to mark the submission.');
+    lines.push(`Dry run. Re-run with \`--apply --ack ${ack} --reason "<why>" --plan-digest ${digest}\` to mark the submission.`);
     return { ok: true, output: `${lines.join('\n')}\n`, exitCode: 0, changes, plan_digest: digest };
   }
 

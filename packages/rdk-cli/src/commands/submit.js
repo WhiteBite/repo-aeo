@@ -5,7 +5,7 @@
  */
 import { run } from '../util/proc.js';
 import { resolveRepo } from './githubSync.js';
-import { ACK_HINT, assertWriteGuards, planDigest } from '../distribution/guard.js';
+import { ACK_HINT, assertWriteGuards, effectiveAck, planDigest } from '../distribution/guard.js';
 import { isBlocking, readLedger, submissionsPath, upsertRecords } from '../distribution/ledger.js';
 import { applicableChannels, channelById } from '../distribution/channels.js';
 import { mechanismById } from '../distribution/mechanisms/registry.js';
@@ -51,11 +51,15 @@ function planFor({ cwd, options, config, loaded, channel, mechanism }) {
     return mechanism.plan({ channels: [channel], config, url: repoSlug ? `https://github.com/${repoSlug}` : null });
   }
   if (channel.mechanism === 'cli-publish') return mechanism.plan({ channel, config, pkg });
+  if (channel.mechanism === 'social-api') {
+    return mechanism.plan({ targets: options.targets ? parseTargets(options.targets) : [channel.id], channel, config, pkg });
+  }
   return mechanism.plan({ channel });
 }
 
 function executeFor({ mechanism, channel, item, cwd, config, fetchImpl, url }) {
   if (channel.mechanism === 'http-json') return mechanism.execute({ item, channel, fetchImpl, env: process.env });
+  if (channel.mechanism === 'social-api') return mechanism.execute({ item, channel, fetchImpl, env: process.env });
   if (channel.mechanism === 'web-form' || channel.mechanism === 'cli-publish') return mechanism.execute({ item, channel, cwd, config });
   return mechanism.execute({ item, channel, url });
 }
@@ -96,6 +100,7 @@ async function submitViaChannel({ cwd, options, config, loaded, channel, mechani
   }
 
   const digest = planDigest(active);
+  const ack = effectiveAck(config);
   const bound = assertWriteGuards({ options, config, plan: active });
   if (!bound.ok) return refuse(bound, bound.code === 'plan_digest_mismatch' ? { plan_digest: digest } : {});
 
@@ -110,7 +115,7 @@ async function submitViaChannel({ cwd, options, config, loaded, channel, mechani
 
   if (!options.apply) {
     lines.push(`Plan digest: ${digest}`);
-    lines.push('Dry run. Re-run with `--apply --ack <ACK_STRING> --reason "<why>" --plan-digest <PLAN_DIGEST>` to run this channel.');
+    lines.push(`Dry run. Re-run with \`--apply --ack ${ack} --reason "<why>" --plan-digest ${digest}\` to run this channel.`);
     return { ok: true, output: `${lines.join('\n')}\n`, exitCode: 0, plan: active, plan_digest: digest, applied: [] };
   }
 
@@ -252,6 +257,7 @@ export async function submitCommand({ cwd, options = {}, config, loaded, ghRunne
   const entry = buildEntry({ name, url, oneLiner: config.project.one_liner || config.project.description, entry: options.entry });
   const plan = mechanism.plan({ targets: active, category, position, entry, name, url });
   const digest = planDigest(plan);
+  const ack = effectiveAck(config);
 
   const bound = assertWriteGuards({ options, config, plan });
   if (!bound.ok) return refuse(bound, bound.code === 'plan_digest_mismatch' ? { plan_digest: digest } : {});
@@ -269,7 +275,7 @@ export async function submitCommand({ cwd, options = {}, config, loaded, ghRunne
 
   if (!options.apply) {
     lines.push(`Plan digest: ${digest}`);
-    lines.push('Dry run. Re-run with `--apply --ack <ACK_STRING> --reason "<why>" --plan-digest <PLAN_DIGEST>` to open the pull requests.');
+    lines.push(`Dry run. Re-run with \`--apply --ack ${ack} --reason "<why>" --plan-digest ${digest}\` to open the pull requests.`);
     return { ok: true, output: `${lines.join('\n')}\n`, exitCode: 0, plan, plan_digest: digest, applied: [] };
   }
 

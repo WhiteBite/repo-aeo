@@ -89,6 +89,7 @@ export async function githubSyncCommand({ cwd, options = {}, config, ghRunner })
 
   const plan = fields ? fullPlan.filter((change) => fields.includes(change.field)) : fullPlan;
   const digest = planDigest(plan);
+  const ack = effectiveAck(config);
 
   if (options.apply && String(options.plan_digest) !== digest) {
     lines.push('Refusing to write: the plan changed since the approved preview (plan_digest mismatch).');
@@ -119,7 +120,7 @@ export async function githubSyncCommand({ cwd, options = {}, config, ghRunner })
 
   if (!options.apply) {
     lines.push(`Plan digest: ${digest}`);
-    lines.push('Dry run. Re-run with `--apply --ack <ACK_STRING> --reason "<why>" --plan-digest <PLAN_DIGEST>` to write these values.');
+    lines.push(`Dry run. Re-run with \`--apply --ack ${ack} --reason "<why>" --plan-digest ${digest}\` to write these values.`);
     return { ok: true, output: `${lines.join('\n')}\n`, exitCode: 0, applied: [], plan, plan_digest: digest };
   }
 
