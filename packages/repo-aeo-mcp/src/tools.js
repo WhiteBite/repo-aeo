@@ -313,7 +313,7 @@ export const TOOLS = [
         findings: [],
       };
       if (!data.description) signals.findings.push({ id: 'github.description', severity: 'error', fix: 'set a 1-2 sentence repository description' });
-      if (topics.length < 8) signals.findings.push({ id: 'github.topics_count', severity: topics.length === 0 ? 'error' : 'warn', fix: `add ${Math.max(0, 8 - topics.length)} more topics (target 8-20)` });
+      if (topics.length < 3) signals.findings.push({ id: 'github.topics_count', severity: topics.length === 0 ? 'error' : 'warn', fix: `add ${Math.max(0, 3 - topics.length)} more topic(s) (target at least 3, up to 20)` });
       if (topics.length > 20) signals.findings.push({ id: 'github.topics_count', severity: 'warn', fix: 'drop the weakest topics' });
       if (!data.homepageUrl) signals.findings.push({ id: 'github.homepage', severity: 'warn', fix: 'set a homepage URL' });
       if (daysSincePush !== null && daysSincePush > 90) signals.findings.push({ id: 'github.freshness', severity: 'warn', fix: `no pushes for ${daysSincePush} days — stale projects lose recommendations` });

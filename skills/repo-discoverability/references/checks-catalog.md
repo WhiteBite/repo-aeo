@@ -9,7 +9,7 @@ exists, docs only when a homepage/docs site is configured).
 | Check | Weight | Fix |
 | --- | --- | --- |
 | `github.description` | 10 | 1–2 sentence `project.one_liner` in the config |
-| `github.topics_count` | 12 | 8–20 topics in `keywords.github_topics` |
+| `github.topics_count` | 12 | at least 3 topics in `keywords.github_topics` |
 | `github.topics_format` | 6 | lowercase, hyphens, no duplicates (`rdk fix`) |
 | `github.homepage` | 6 | set `links.homepage` and sync |
 
@@ -67,8 +67,8 @@ exists, docs only when a homepage/docs site is configured).
 | Check | Weight | Fix |
 | --- | --- | --- |
 | `hygiene.license` | 15 | LICENSE file |
-| `hygiene.security_policy` | 12 | SECURITY.md |
-| `hygiene.contributing` | 10 | CONTRIBUTING.md |
+| `hygiene.security_policy` | 4 | SECURITY.md |
+| `hygiene.contributing` | 6 | CONTRIBUTING.md |
 | `hygiene.code_of_conduct` | 4 | CODE_OF_CONDUCT.md |
 | `hygiene.dependabot` | 4 | `.github/dependabot.yml` with weekly updates |
 | `hygiene.secrets_heuristic` | 12 | rotate + purge anything found |
@@ -77,3 +77,4 @@ exists, docs only when a homepage/docs site is configured).
 | `hygiene.citation` | 6 | CITATION.cff |
 | `hygiene.issue_templates` | 5 | issue/PR templates |
 | `hygiene.gitattributes` | 4 | line-ending normalisation |
+| `hygiene.ci` | 8 | a workflow under `.github/workflows/` |

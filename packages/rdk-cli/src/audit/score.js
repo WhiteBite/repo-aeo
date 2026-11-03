@@ -23,12 +23,12 @@ export const AXIS_LABELS = {
 };
 
 export const AXIS_HINTS = {
-  github: 'Repository description, homepage and 8–20 topics.',
+  github: 'Repository description, homepage and specific search topics.',
   readme: 'First success path, examples, audience sections, sourced claims.',
   agents: 'AGENTS.md with working test/lint/build commands and do/don\'t rules.',
   npm: 'description, keywords, repository, exports, types, tarball hygiene.',
   docs: 'llms.txt / llms-full.txt, JSON-LD, healthy links (when a site exists).',
-  hygiene: 'LICENSE, SECURITY.md, CONTRIBUTING.md, CODEOWNERS, no leaked secrets.',
+  hygiene: 'LICENSE, SECURITY.md, CONTRIBUTING.md, CODEOWNERS, CI workflow, no leaked secrets.',
 };
 
 export function grade(total) {

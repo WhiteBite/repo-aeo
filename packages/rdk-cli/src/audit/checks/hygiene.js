@@ -6,6 +6,7 @@
 import { check, finding, skip } from './_shared.js';
 import { exists, readTextIfExists } from '../../util/fs.js';
 import { citationVersionDrift, citationRepositoryDrift, dependabotEcosystems } from '../../generate/index.js';
+import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { recentCommits } from '../../util/git.js';
 
@@ -43,7 +44,7 @@ export const hygieneChecks = [
   check({
     id: 'hygiene.security_policy',
     axis: 'hygiene',
-    weight: 12,
+    weight: 4,
     title: 'SECURITY.md present',
     why: 'A security policy tells researchers (and agents auditing dependencies) how to report issues privately — a visible maturity signal.',
     fix: 'Run `rdk fix` to add a SECURITY.md stub with a private reporting channel, then review the supported-versions table.',
@@ -53,7 +54,7 @@ export const hygieneChecks = [
     run(ctx) {
       const candidates = [join(ctx.cwd, 'SECURITY.md'), join(ctx.cwd, '.github', 'SECURITY.md'), join(ctx.cwd, 'docs', 'SECURITY.md')];
       if (!candidates.some((path) => exists(path))) {
-        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No SECURITY.md', why: this.why, fix: this.fix, effort: 'S' });
+        return finding({ id: this.id, axis: this.axis, severity: 'info', title: 'No SECURITY.md', why: this.why, fix: this.fix, effort: 'S' });
       }
       return null;
     },
@@ -62,7 +63,7 @@ export const hygieneChecks = [
   check({
     id: 'hygiene.contributing',
     axis: 'hygiene',
-    weight: 10,
+    weight: 6,
     title: 'CONTRIBUTING.md present',
     why: 'Contribution guidelines convert readers into contributors, and contributor activity is one of the strongest long-term recommendation signals.',
     fix: 'Run `rdk fix` to add a CONTRIBUTING.md stub covering setup, tests and the PR process.',
@@ -251,6 +252,28 @@ export const hygieneChecks = [
         return finding({ id: this.id, axis: this.axis, severity: 'error', title: `${hits.length} potential secret(s) in the last ${commits.length} commits`, why: this.why, fix: `First hit: ${hits[0].pattern} in ${hits[0].commit} ("${hits[0].subject}")`, effort: 'L' });
       }
       return null;
+    },
+  }),
+
+  check({
+    id: 'hygiene.ci',
+    axis: 'hygiene',
+    weight: 8,
+    title: 'A CI workflow runs on the repository',
+    why: 'A CI workflow is the single strongest predictor of maintenance quality (Octoverse: repos with an agent config log 8x commits; npm research: CI-tests correlate with fewer vulnerabilities); a repo with no workflow cannot be verified by contributors or agents.',
+    fix: 'Add a workflow under .github/workflows/ that runs the test command.',
+    effort: 'S',
+    autoFixable: false,
+    patchId: null,
+    run(ctx) {
+      let entries;
+      try {
+        entries = readdirSync(join(ctx.cwd, '.github', 'workflows'), { withFileTypes: true });
+      } catch {
+        entries = [];
+      }
+      if (entries.some((entry) => entry.isFile() && /\.ya?ml$/.test(entry.name))) return null;
+      return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No CI workflow found', why: this.why, fix: this.fix, effort: 'S' });
     },
   }),
 ];

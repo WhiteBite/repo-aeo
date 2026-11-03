@@ -182,7 +182,7 @@ test('topics_count fix text stays coherent with topics_format when both fire', (
   assert.equal(result.severity, 'warn');
   // canonical forms count toward the total, so the count advice stays plain
   assert.doesNotMatch(result.fix, /non-canonical/);
-  assert.match(result.fix, /Add 6 more topics/);
+  assert.match(result.fix, /Add 1 more topic/);
   const clean = check.run({
     config: { keywords: { github_topics: ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'] } },
     github: { available: false, reason: 'offline', description: null, topics: [], homepageUrl: null },

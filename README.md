@@ -12,7 +12,7 @@ RDK scores how discoverable your repository is, fixes the parts that can be fixe
 automatically, and keeps it from regressing in CI. It is the tool you point at a
 repo that is *good but invisible*.
 
-The audit runs **44 checks in under 300 ms offline** on this repository
+The audit runs **45 checks in under 300 ms offline** on this repository
 (measured with `rdk audit --format json`, `duration_ms` field) and carries **0
 runtime dependencies**, so `npx` stays fast and the supply chain stays small.
 
@@ -117,7 +117,7 @@ offline; `--online` adds link checks and live GitHub metadata.
 
 ```bash
 $ npx repo-aeo audit            # measured on fixtures/demo-repo, offline
-score: 52/100 (grade F) · checks: 20/43 passed · findings: 10 error, 13 warn, 10 info (19 autofixable) · mode: offline (use --online for link + GitHub checks)
+score: 56/100 (grade D) · checks: 23/44 passed · findings: 9 error, 12 warn, 13 info (19 autofixable) · mode: offline (use --online for link + GitHub checks)
 ```
 
 ### 2. Fix what is safe to fix
@@ -157,7 +157,7 @@ bot branch and opens a PR for review.
 ```bash
 $ npx repo-aeo-mcp score
 Discoverability score: 100/100 (grade A)
-checks passed: 44/44 - errors 0 - warnings 0 - autofixable 0
+checks passed: 45/45 - errors 0 - warnings 0 - autofixable 0
 trend: no history yet
 ```
 
@@ -178,7 +178,7 @@ skills/repo-discoverability/SKILL.md → description triggers on
 - Score a repository's discoverability and get a prioritised fix list.
 - Generate and maintain `AGENTS.md`, `llms.txt` and `llms-full.txt` for a repo.
 - Prepare `package.json` metadata, exports and tarball contents before an npm release.
-- Fill GitHub description, homepage and 8–20 topics from one config file.
+- Fill GitHub description, homepage and specific search topics from one config file.
 - Keep discoverability from regressing with a weekly GitHub Action audit.
 - Run a distribution campaign: prepare entries for the relevant curated lists, submit reviewable PRs, track them in `.discoverability/submissions.json`.
 - Watch score, npm search score and GitHub signals from an MCP client or a cron job.
@@ -189,7 +189,7 @@ Six weighted axes, renormalised over the axes that apply to your project:
 
 | Axis | Weight | Covers |
 | --- | --- | --- |
-| GitHub metadata | 20 | description, homepage, 8–20 topics |
+| GitHub metadata | 20 | description, homepage, specific search topics |
 | README primitives | 25 | first success path, 2–5 examples, audience sections, sourced claims |
 | Agent readiness | 15 | `AGENTS.md` with working commands, do/don't rules |
 | npm readiness | 20 | description, keywords, exports, types, tarball hygiene |

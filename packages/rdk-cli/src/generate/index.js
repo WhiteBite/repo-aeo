@@ -210,7 +210,7 @@ ${yamlBlock('audiences', config.audiences)}
 ${yamlBlock('use_cases', config.use_cases)}   # 3-7 concrete jobs this project does
 
 keywords:
-${yamlBlock('github_topics', keywords.github_topics, '  ')}   # 8-20 terms, lowercase with hyphens
+${yamlBlock('github_topics', keywords.github_topics, '  ')}   # at least 3 and up to 20 terms, lowercase with hyphens
 ${yamlBlock('npm_keywords', keywords.npm_keywords, '  ')}   # 5-15 terms for package.json keywords
 
 links:

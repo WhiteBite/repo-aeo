@@ -124,7 +124,6 @@ test('INV3: config-provided github values keep config-based validation offline',
       '  github_topics:',
       '    - cli',
       '    - tools',
-      '    - demo',
       'links:',
       '  homepage: https://example.com/cfg-gh',
       '',
@@ -134,9 +133,9 @@ test('INV3: config-provided github values keep config-based validation offline',
     const report = await audit(dir, { online: false });
     assert.equal(report.findings.find((f) => f.id === 'github.description'), undefined, 'a valid configured one_liner passes offline');
     const topics = report.findings.find((f) => f.id === 'github.topics_count');
-    assert.ok(topics, '3 configured topics must still be validated');
+    assert.ok(topics, '2 configured topics must still be validated');
     assert.equal(topics.severity, 'warn');
-    assert.match(topics.title, /Only 3 GitHub topics/);
+    assert.match(topics.title, /Only 2 GitHub topics/);
   } finally {
     removeRepo(dir);
   }

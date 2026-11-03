@@ -77,7 +77,7 @@ a number, a constraint, a capability. Adjectives are not verifiable.
 | --- | --- | --- |
 | `- [X](url) - One of the best discoverability tools.` | rejected | unverifiable superlative, marketing tone |
 | `- [X](url) - Tool for repo discoverability.` | forgettable | says nothing a hundred other entries don't |
-| `- [X](url) - Zero-dependency CLI that audits and fixes repo discoverability: 44 checks offline, llms.txt and AGENTS.md generation, CI gate.` | strong | function + checkable facts + traits the neighbours lack |
+| `- [X](url) - Zero-dependency CLI that audits and fixes repo discoverability: 45 checks offline, llms.txt and AGENTS.md generation, CI gate.` | strong | function + checkable facts + traits the neighbours lack |
 
 A battle-tested example (accepted by the elmohq AEO list):
 

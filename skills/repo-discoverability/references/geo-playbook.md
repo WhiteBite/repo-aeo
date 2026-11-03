@@ -19,7 +19,7 @@ linked, citable repository is what gets scraped, quoted and re-published).
 | README first success path | an agent summarising the repo quotes the top of the README | S |
 | 2–5 concrete examples | examples are what get copied into answers | M |
 | Numbers with named sources | verifiable statistics survive summarisation and are quoted more often | M |
-| GitHub topics (8–20) | GitHub search key + "similar repositories" surface | S |
+| GitHub topics (at least 3) | GitHub search key + "similar repositories" surface | S |
 | npm description + keywords | registry search ranking signal | S |
 | `exports` + `types` | broken installs remove the package from consideration | M |
 | `AGENTS.md` with real commands | agents that can run tests produce correct patches | S |

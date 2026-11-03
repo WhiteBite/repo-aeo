@@ -33,7 +33,7 @@ audience-matching part of agent retrieval.
 
 | Field | Meaning |
 | --- | --- |
-| `github_topics` | 8–20 terms, lowercase with hyphens; pushed by `rdk github-sync` |
+| `github_topics` | at least 3 and up to 20 terms, lowercase with hyphens; pushed by `rdk github-sync` |
 | `npm_keywords` | 5–15 terms merged into `package.json` `keywords` by `rdk fix` |
 
 ## `links`

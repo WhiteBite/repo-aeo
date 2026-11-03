@@ -164,7 +164,7 @@ procedure and pacing. `references/channels.md` is the channel matrix.
 - **README**: install/run in the first 60 lines, 2–5 short examples, sections
   "Who is it for", "Use cases", "Why choose this", "Status/roadmap", claims with
   numbers and named sources.
-- **GitHub**: 1–2 sentence description, 8–20 lowercase hyphenated topics,
+- **GitHub**: 1–2 sentence description, at least 3 lowercase hyphenated topics,
   homepage URL.
 - **npm**: `description`, `keywords` (5–15), `repository`, `homepage`, `bugs`,
   `exports` with `import` + `require`, `types`, `sideEffects` only when certain,

@@ -75,9 +75,9 @@ export const githubChecks = [
     id: 'github.topics_count',
     axis: 'github',
     weight: 12,
-    title: 'Repository has 8–20 topics',
-    why: 'Topics are a first-class search key on GitHub and a discovery surface for crawlers. Repositories with no topics are effectively invisible in topic browse and in "similar repositories" recommendations.',
-    fix: 'Fill keywords.github_topics in .discoverability/project.yml with 8–20 lowercase, hyphenated terms, then run `rdk github-sync --apply`.',
+    title: 'Repository has useful search topics',
+    why: 'Topics are an exact-match search key on GitHub and a "similar repositories" surface. A repository with zero topics is invisible there; popular repositories often run only a few, so the floor is low.',
+    fix: 'Fill keywords.github_topics in .discoverability/project.yml with at least 3 and up to 20 lowercase, hyphenated terms, then run `rdk github-sync --apply`.',
     effort: 'M',
     autoFixable: false,
     patchId: null,
@@ -109,14 +109,14 @@ export const githubChecks = [
           effort: 'M',
         });
       }
-      if (count < 8) {
+      if (count < 3) {
         return finding({
           id: 'github.topics_count',
           axis: 'github',
           severity: 'warn',
-          title: `Only ${count} GitHub topics (target 8–20)`,
+          title: `Only ${count} GitHub topics (target at least 3)`,
           why: this.why,
-          fix: `Add ${8 - count} more topics. Mix category terms (e.g. "cli", "developer-tools") with capability terms ("llms-txt", "agents-md").`,
+          fix: `Add ${3 - count} more topic(s): mix a language term, a category term and a problem term.`,
           effort: 'M',
         });
       }
@@ -125,9 +125,9 @@ export const githubChecks = [
           id: 'github.topics_count',
           axis: 'github',
           severity: 'warn',
-          title: `${count} GitHub topics is above the useful range (8–20)`,
-          why: 'Beyond ~20 topics the signal dilutes and GitHub only surfaces a subset.',
-          fix: 'Drop the weakest topics and keep the 8–20 most specific ones.',
+          title: `${count} GitHub topics exceeds the 20 GitHub applies`,
+          why: this.why,
+          fix: 'Keep the 20 most specific; GitHub caps topics at 20.',
           effort: 'S',
         });
       }

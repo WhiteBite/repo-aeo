@@ -12,7 +12,7 @@ RDK измеряет discoverability вашего репозитория, чин
 автоматически, и не даёт показателю деградировать в CI. Это инструмент, который
 направляют на репо, которое *хорошее, но невидимое*.
 
-Аудит выполняет **44 проверки менее чем за 300 мс офлайн** на этом репозитории
+Аудит выполняет **45 проверок менее чем за 300 мс офлайн** на этом репозитории
 (замер через `rdk audit --format json`, поле `duration_ms`) и не имеет **ни одной
 рантайм-зависимости**, поэтому `npx` остаётся быстрым, а цепочка поставок — маленькой.
 
@@ -115,7 +115,7 @@ docker run -i repo-aeo-mcp serve
 
 ```bash
 $ npx repo-aeo audit            # measured on fixtures/demo-repo, offline
-score: 52/100 (grade F) · checks: 20/43 passed · findings: 10 error, 13 warn, 10 info (19 autofixable) · mode: offline (use --online for link + GitHub checks)
+score: 56/100 (grade D) · checks: 23/44 passed · findings: 9 error, 12 warn, 13 info (19 autofixable) · mode: offline (use --online for link + GitHub checks)
 ```
 
 ### 2. Починить то, что безопасно чинится
@@ -156,7 +156,7 @@ GitHub сам скачивает экшен, экшен сам тянет дви
 ```bash
 $ npx repo-aeo-mcp score
 Discoverability score: 100/100 (grade A)
-checks passed: 44/44 - errors 0 - warnings 0 - autofixable 0
+checks passed: 45/45 - errors 0 - warnings 0 - autofixable 0
 trend: no history yet
 ```
 
@@ -177,7 +177,7 @@ skills/repo-discoverability/SKILL.md → description triggers on
 - Оценить discoverability репозитория и получить приоритизированный список исправлений.
 - Генерировать и поддерживать `AGENTS.md`, `llms.txt` и `llms-full.txt` для репо.
 - Подготовить метаданные `package.json`, exports и содержимое тарболла перед релизом на npm.
-- Заполнить описание, homepage и 8–20 topics GitHub из одного конфиг-файла.
+- Заполнить описание, homepage и конкретные поисковые topics GitHub из одного конфиг-файла.
 - Не дать discoverability деградировать с помощью еженедельного аудита GitHub Action.
 - Запустить кампанию по распространению: подготовить записи для релевантных curated-списков, отправить ревьюибельные PR и вести их учёт в `.discoverability/submissions.json`.
 - Следить за оценкой, npm search score и сигналами GitHub из MCP-клиента или cron-задачи.
@@ -188,7 +188,7 @@ skills/repo-discoverability/SKILL.md → description triggers on
 
 | Ось | Вес | Покрывает |
 | --- | --- | --- |
-| GitHub metadata | 20 | description, homepage, 8–20 topics |
+| GitHub metadata | 20 | description, homepage, конкретные поисковые topics |
 | README primitives | 25 | первый успешный путь, 2–5 примеров, секции для аудитории, утверждения с источниками |
 | Agent readiness | 15 | `AGENTS.md` с рабочими командами, правила do/don't |
 | npm readiness | 20 | description, keywords, exports, types, гигиена тарболла |

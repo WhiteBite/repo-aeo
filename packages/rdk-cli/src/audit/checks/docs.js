@@ -13,23 +13,23 @@ export const docsChecks = [
     axis: 'docs',
     weight: 20,
     title: 'llms.txt exists at the repository root',
-    why: 'llms.txt is the AI-friendly table of contents: when an agent asks about the project, a single small file delivers 2–10k tokens of clean context instead of parsing hundreds of kilobytes of HTML.',
+    why: 'llms.txt is consumed on demand by some agent tools, but no major crawler is measured to fetch it (Google Search explicitly ignores it), so it is advisory, not a ranking lever.',
     fix: 'Run `rdk fix` to generate llms.txt from .discoverability/project.yml + README, then edit the summary by hand.',
     effort: 'S',
     autoFixable: true,
     patchId: 'llms.generate',
     run(ctx) {
       if (!exists(join(ctx.cwd, 'llms.txt'))) {
-        return finding({ id: this.id, axis: this.axis, severity: 'error', title: 'llms.txt is missing', why: this.why, fix: this.fix, effort: 'S' });
+        return finding({ id: this.id, axis: this.axis, severity: 'info', title: 'llms.txt is missing', why: this.why, fix: this.fix, effort: 'S' });
       }
       const text = readTextIfExists(join(ctx.cwd, 'llms.txt'));
       if (text.trim().length < 80) {
         // rdk fix only rewrites marker-managed files; a hand-edited thin llms.txt must not promise an autofix
         const managed = text.includes(GENERATED_START);
-        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'llms.txt is too thin to be useful', why: this.why, fix: this.fix, effort: 'S', autoFixable: managed, patchId: managed ? 'llms.generate' : null });
+        return finding({ id: this.id, axis: this.axis, severity: 'info', title: 'llms.txt is too thin to be useful', why: this.why, fix: this.fix, effort: 'S', autoFixable: managed, patchId: managed ? 'llms.generate' : null });
       }
       if (!/^#\s+/m.test(text)) {
-        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'llms.txt does not start with an H1 project title', why: 'The llms.txt convention expects an H1 title followed by a blockquote summary and then link lists.', fix: 'Follow the format at https://llmtxt.info/llms-txt-format/', effort: 'S' });
+        return finding({ id: this.id, axis: this.axis, severity: 'info', title: 'llms.txt does not start with an H1 project title', why: 'The llms.txt convention expects an H1 title followed by a blockquote summary and then link lists.', fix: 'Follow the format at https://llmtxt.info/llms-txt-format/', effort: 'S' });
       }
       return null;
     },
@@ -40,14 +40,14 @@ export const docsChecks = [
     axis: 'docs',
     weight: 8,
     title: 'llms-full.txt exists (full documentation in one file)',
-    why: 'llms-full.txt gives an agent the complete documentation in one fetch, which is what "grounding" looks like when the model has no prior knowledge of the project.',
+    why: 'llms-full.txt gives an agent the complete documentation in one fetch, but no major crawler is measured to fetch it (Google Search explicitly ignores it), so it is advisory, not a ranking lever.',
     fix: 'Run `rdk fix` to generate llms-full.txt from the README and docs sources.',
     effort: 'S',
     autoFixable: true,
     patchId: 'llms.generate',
     run(ctx) {
       if (!exists(join(ctx.cwd, 'llms-full.txt'))) {
-        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'llms-full.txt is missing', why: this.why, fix: this.fix, effort: 'S' });
+        return finding({ id: this.id, axis: this.axis, severity: 'info', title: 'llms-full.txt is missing', why: this.why, fix: this.fix, effort: 'S' });
       }
       return null;
     },
