@@ -16,10 +16,14 @@ export function resolveHooksDir(root, { exec } = {}) {
   const run = exec ?? runGit;
   try {
     const configured = run(['config', 'core.hooksPath'], root).trim();
-    return configured === '' ? fallback : resolve(root, configured);
-  } catch {
-    return fallback;
-  }
+    if (configured !== '') return resolve(root, configured);
+  } catch {}
+  // a linked worktree has a .git FILE: only rev-parse knows the real (common-dir) hooks location
+  try {
+    const gitPath = run(['rev-parse', '--git-path', 'hooks'], root).trim();
+    if (gitPath !== '') return resolve(root, gitPath);
+  } catch {}
+  return fallback;
 }
 
 function finding(id, status, detail) {
@@ -51,12 +55,17 @@ function checkMarkerSurface(surface, path, pathExists) {
     return finding(surface.id, 'broken', null);
   }
   if (content === null) return finding(surface.id, 'missing', null);
-  const block = readMarkerBlock(content, { variant: surface.variant, id: surface.markerId });
+  let block;
+  try {
+    block = readMarkerBlock(content, { variant: surface.variant, id: surface.markerId });
+  } catch {
+    return finding(surface.id, 'broken', null);
+  }
   if (!block.present) return finding(surface.id, 'missing', null);
   const extract = surface.extract ?? extractCliPath;
   const cliPath = extract(block.text);
   if (typeof cliPath !== 'string' || cliPath === '') return finding(surface.id, 'stale', null);
-  if (pathExists(cliPath) === false) return finding(surface.id, 'stale', cliPath);
+  if (!pathExists(cliPath)) return finding(surface.id, 'stale', cliPath);
   return finding(surface.id, 'ok', null);
 }
 

@@ -31,7 +31,7 @@ test('vendored harness-kit files match the manifest sha256 (LF-normalized)', () 
 
 test('vendored harness-kit tree has no files outside the manifest', () => {
   const manifest = JSON.parse(readFileSync(join(vendorRoot, 'manifest.json'), 'utf8'));
-  const expected = new Set([...Object.keys(manifest.files), 'manifest.json']);
+  const expected = new Set([...Object.keys(manifest.files), 'manifest.json', 'harness-kit.lock']);
   const actual = walk(vendorRoot).map((path) => relative(vendorRoot, path).split('\\').join('/'));
   assert.deepEqual([...actual].sort(), [...expected].sort(), 'vendor/harness-kit must contain exactly the manifest files');
 });
