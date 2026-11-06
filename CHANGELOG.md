@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `rdk share --channel <id>` renders a ready-to-post community message (Reddit,
+  Hacker News, X/Twitter, dev.to, Telegram) from `.discoverability/project.yml`
+  and `package.json`; `--list` prints the channel ids and `--json` emits the raw
+  `{ title, body, postUrl }`. Read-only: no network, no writes.
+- A `social-api` submission mechanism with two channels (`telegram-dev`,
+  `dev.to`): `rdk submit --channel <id>` posts the rendered message through the
+  channel API with a bearer token, under the existing write guard.
+
 ## [1.1.0] - 2026-10-09
 
 ### Added

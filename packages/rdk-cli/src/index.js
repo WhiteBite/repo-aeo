@@ -8,6 +8,7 @@ export { AXIS_WEIGHTS, AXIS_LABELS, computeScore, grade } from './audit/score.js
 export { parse as parseYaml } from './yaml.js';
 export { githubSyncCommand, DEFAULT_ACK, resolveRepo, effectiveAck, planDigest } from './commands/githubSync.js';
 export { submitCommand, insertEntryIntoReadme, buildEntry, readSubmissions, submissionsPath } from './commands/submit.js';
+export { shareCommand } from './commands/share.js';
 export { trackCommand } from './commands/track.js';
 export { assertWriteGuards } from './distribution/guard.js';
 export { CHANNELS, CHANNEL_DESCRIPTOR_FIELDS, channelById, applicableChannels } from './distribution/channels.js';

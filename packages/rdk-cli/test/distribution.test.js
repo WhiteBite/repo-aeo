@@ -174,7 +174,7 @@ test('projectStatus keeps the recorded status offline and maps PR states onto th
 });
 
 test('every channel descriptor stays within the allowed schema', () => {
-  assert.equal(CHANNELS.length, 5);
+  assert.equal(CHANNELS.length, 7);
   const allowed = new Set(CHANNEL_DESCRIPTOR_FIELDS);
   for (const channel of CHANNELS) {
     for (const field of Object.keys(channel)) {
@@ -195,7 +195,7 @@ test('channelById and applicableChannels resolve and filter by the named predica
   assert.equal(channelById('awesome-list').mechanism, 'git-pr');
   assert.equal(channelById('does-not-exist'), null);
   const withRepo = { git_host: 'github.com', git_owner: 'owner', git_repo: 'demo' };
-  assert.deepEqual(applicableChannels(withRepo).map((channel) => channel.id), ['awesome-list']);
+  assert.deepEqual(applicableChannels(withRepo).map((channel) => channel.id), ['awesome-list', 'telegram-dev', 'devto']);
   assert.deepEqual(applicableChannels({ git_host: null, git_owner: null, git_repo: null }), []);
   assert.deepEqual(applicableChannels({ git_host: 'github.com', git_owner: null, git_repo: 'demo' }), []);
 });
@@ -234,7 +234,7 @@ test('recommend marks awesome-list applicable only with a GitHub remote', () => 
     git(withRemote, ['remote', 'add', 'origin', 'git@github.com:owner/demo-project.git']);
 
     const yes = recommend(withRemote, loadConfig(withRemote));
-    assert.equal(yes.channels.length, 5);
+    assert.equal(yes.channels.length, 7);
     assert.equal(yes.channels[0].id, 'awesome-list');
     assert.equal(yes.channels[0].applicable, true);
     assert.equal(yes.channels[0].status, 'untried');

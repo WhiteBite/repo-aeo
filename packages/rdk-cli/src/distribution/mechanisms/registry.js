@@ -8,6 +8,7 @@ import * as httpJson from './httpJson.js';
 import * as webForm from './webForm.js';
 import * as passive from './passive.js';
 import * as cliPublish from './cliPublish.js';
+import * as socialApi from './socialApi.js';
 
 export const MECHANISMS = {
   'git-pr': gitPr,
@@ -15,6 +16,7 @@ export const MECHANISMS = {
   'web-form': webForm,
   passive,
   'cli-publish': cliPublish,
+  'social-api': socialApi,
 };
 
 export function mechanismById(id) {

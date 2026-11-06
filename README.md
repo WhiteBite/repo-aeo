@@ -100,6 +100,7 @@ npx repo-aeo npm-surface   # package.json publish surface + npm pack --dry-run
 npx repo-aeo github-sync   # push description/homepage/topics (needs --apply --ack --reason --plan-digest)
 npx repo-aeo channels      # list every distribution channel, applicability and next action (read-only)
 npx repo-aeo submit        # submit to a distribution channel: --channel <id> (needs --apply --ack --reason --plan-digest)
+npx repo-aeo share         # print a ready-to-post message for a community channel (--channel <id> | --list)
 npx repo-aeo track         # campaign dashboard: live status, adopt existing PRs, sync the ledger
 npx repo-aeo skill install # link the agent skill into OpenCode/Claude/Codex skill dirs
 

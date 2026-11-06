@@ -298,6 +298,10 @@ export interface ChannelDescriptor {
   endpoint?: string;
   method?: string;
   auth?: { env: string };
+  /** The community-post kind rendered by renderShareContent for social-api channels. */
+  kind?: string;
+  /** The Telegram chat id the social-api mechanism posts to. */
+  channelId?: string;
   dedupe?: { url: string };
   formUrl?: string;
   fields?: string[];
@@ -631,6 +635,14 @@ export declare function renderServerJson(config: RdkConfig, pkg: Record<string, 
 export declare function mcpOwnershipMarker(name: string, owner?: string | null): string;
 
 export declare function channelsCommand(args: { cwd: string; loaded: ReturnType<typeof loadConfig> }): CommandResult;
+
+/** `rdk share`: renders the ready-to-post message for a community channel; read-only, no network. */
+export declare function shareCommand(args: {
+  cwd: string;
+  options?: { channel?: string; json?: boolean; list?: boolean };
+  config?: RdkConfig;
+  loaded?: ReturnType<typeof loadConfig> | null;
+}): { ok: boolean; output: string; exitCode: number; error?: string | null };
 
 export interface CommandResult {
   ok: boolean;
