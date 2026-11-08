@@ -1,0 +1,62 @@
+{
+  "schema": "rdk-demo-eval/1",
+  "how_to_run": "For each case, ask the agent to choose a demo surface for the prompt using skills/repo-discoverability/references/visual-assets.md, then compare its answer to `expected`. A case passes when the chosen surface (and theme, when set) matches; `catches` lists the wrong answers the case is designed to catch.",
+  "cases": [
+    {
+      "id": "util-lib-no-picture",
+      "prompt": "A formatter library whose only public API is formatBytes(n).",
+      "expected": { "surface": "none", "theme": null },
+      "essence": "A pure utility with no runnable surface: there is no observable before/after to capture.",
+      "catches": ["inventing a terminal session", "rendering the template with fabricated output"]
+    },
+    {
+      "id": "config-merger-files",
+      "prompt": "A config merger that unifies eslint, prettier and ts configs into one registry.",
+      "expected": { "surface": "files", "theme": "shell" },
+      "essence": "The difference is in file contents and shape, not in a session.",
+      "catches": ["terminal surface", "opencode theme"]
+    },
+    {
+      "id": "opencode-gate-terminal",
+      "prompt": "An OpenCode plugin that blocks the agent after 3 identical failures.",
+      "expected": { "surface": "terminal", "theme": "opencode" },
+      "essence": "The difference is in the agent conversation and tool flow of that harness.",
+      "catches": ["shell theme", "files surface"]
+    },
+    {
+      "id": "human-cli-shell",
+      "prompt": "A CLI that audits a repo and prints the discoverability score for a human.",
+      "expected": { "surface": "terminal", "theme": "shell" },
+      "essence": "A command outcome with a human actor: the harness is irrelevant.",
+      "catches": ["opencode theme", "claude-code theme"]
+    },
+    {
+      "id": "web-ui-screenshot",
+      "prompt": "A React dashboard of registrar prices.",
+      "expected": { "surface": "screenshot", "theme": null },
+      "essence": "The difference is in rendered UI, so capture the real running page.",
+      "catches": ["the template faking a UI", "terminal surface"]
+    },
+    {
+      "id": "mcp-remote-effect-shell",
+      "prompt": "An MCP server that runs Gradle on a devbox over a bridge.",
+      "expected": { "surface": "terminal", "theme": "shell" },
+      "essence": "A bridge/MCP command outcome: the effect is the command result, not an agent session.",
+      "catches": ["agent-session theme", "files surface"]
+    },
+    {
+      "id": "numbers-only-no-picture",
+      "prompt": "A build cache that makes CI 40% faster.",
+      "expected": { "surface": "none", "theme": null },
+      "essence": "The value is only a number, so put it in prose or a markdown table.",
+      "catches": ["a numbers-only picture", "an invented screenshot"]
+    },
+    {
+      "id": "codex-hook-terminal",
+      "prompt": "A Codex hook that rejects bad commit messages.",
+      "expected": { "surface": "terminal", "theme": "codex" },
+      "essence": "The difference is in the agent conversation and tool flow of that harness.",
+      "catches": ["shell theme", "files surface"]
+    }
+  ]
+}

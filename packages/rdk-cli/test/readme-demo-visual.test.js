@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { audit } from '../src/audit/index.js';
 import { makeRepo, removeRepo } from './helpers.js';
 
-const PKG = { name: 'demo-visual', version: '1.0.0', description: 'demo visual gate package' };
+const PKG = { name: 'demo-visual', version: '1.0.0', description: 'demo visual gate package', bin: { 'demo-visual': 'cli.js' } };
 
 const BASE_README = [
   '# Demo visual',

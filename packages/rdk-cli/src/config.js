@@ -12,6 +12,7 @@ export const CONFIG_RELATIVE_PATH = '.discoverability/project.yml';
 
 export const DEFAULT_CONFIG = {
   schema_version: 1,
+  demo_visual: 'auto',
   project: {
     name: null,
     one_liner: null,
@@ -76,6 +77,8 @@ const CATEGORIES = new Set([
   'other',
 ]);
 
+const DEMO_VISUAL_MODES = new Set(['required', 'not_applicable', 'auto']);
+
 /** Deep-merges defaults, then the user config, then package.json-derived facts. */
 export function loadConfig(cwd = process.cwd()) {
   const configPath = join(cwd, CONFIG_RELATIVE_PATH);
@@ -109,6 +112,14 @@ export function loadConfig(cwd = process.cwd()) {
       code: 'config.schema_version',
       message: `${CONFIG_RELATIVE_PATH}: unsupported schema_version ${JSON.stringify(userConfig.schema_version)} (expected 1); continuing with best-effort defaults.`,
     });
+  }
+
+  if (!DEMO_VISUAL_MODES.has(config.demo_visual)) {
+    warnings.push({
+      code: 'config.demo_visual',
+      message: `${CONFIG_RELATIVE_PATH}: demo_visual must be required|not_applicable|auto, got ${JSON.stringify(config.demo_visual)}; falling back to auto.`,
+    });
+    config.demo_visual = 'auto';
   }
 
   if (pkg) {

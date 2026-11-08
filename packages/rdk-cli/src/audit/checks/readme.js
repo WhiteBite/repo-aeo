@@ -3,8 +3,9 @@
  * heading structure, verifiable claims, local link health.
  */
 import { check, finding, skip, parseMarkdown, hasFirstSuccessPath, countQuantifiedClaims, normalizeHeading } from './_shared.js';
-import { exists, readTextIfExists } from '../../util/fs.js';
-import { join } from 'node:path';
+import { exists, readTextIfExists, readJsonIfExists, listFiles } from '../../util/fs.js';
+import { validateSlot } from '../../util/slot-validate.js';
+import { basename, join } from 'node:path';
 
 const README_PATH_KEY = 'README.md';
 
@@ -66,6 +67,31 @@ function hasDemoVisual(text, doc) {
     if (demoBodies.some((body) => body.includes(url))) return true;
     return DEMO_ALT_RE.test(imageAlt(text, url));
   });
+}
+
+const UI_DEPS = ['react', 'vue', 'svelte', 'solid-js', 'preact', 'next', 'nuxt', 'astro'];
+
+function hasUiDependency(pkg) {
+  const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}), ...(pkg.peerDependencies || {}) };
+  return Object.keys(deps).some((name) => UI_DEPS.some((ui) => name === ui || name.startsWith(`${ui}/`) || name.startsWith(`@${ui}/`) || name.startsWith(`${ui}-`)));
+}
+
+function hasMcpServerFile(cwd) {
+  if (exists(join(cwd, 'mcp.json'))) return true;
+  const pkg = readJsonIfExists(join(cwd, 'package.json'));
+  if (pkg && pkg.mcpName) return true;
+  return listFiles(cwd, { recursive: true, maxDepth: 3 }).some((file) => /mcp/i.test(file) && /\.(?:mjs|cjs|js|ts)$/i.test(file));
+}
+
+function hasObservableSurface(ctx) {
+  const pkg = ctx.pkg || {};
+  if (pkg.bin) return true;
+  const links = (ctx.config && ctx.config.links) || {};
+  if (links.homepage || links.docs) return true;
+  if (hasUiDependency(pkg)) return true;
+  if (exists(join(ctx.cwd, 'skills'))) return true;
+  if (exists(join(ctx.cwd, 'plugin.json'))) return true;
+  return hasMcpServerFile(ctx.cwd);
 }
 
 export const readmeChecks = [
@@ -271,17 +297,49 @@ export const readmeChecks = [
     axis: 'readme',
     weight: 5,
     title: 'README shows a demo visual (GIF, screenshot or before/after)',
-    why: 'A visual is the fastest way for a human or an agent to understand what a project does; a text-only README makes the reader work for it.',
-    fix: 'Add one demo asset under assets/ and embed it near the top with a relative image. Load the repo-discoverability skill reference references/visual-assets.md and render the before/after with scripts/render-demo.mjs.',
+    why: 'A visual is the fastest way for a human or an agent to understand what a project does; a text-only README makes the reader work for it. This is a warning, not a requirement: a project with no observable before/after (a pure utility, a numbers-only win, a UI that cannot be run headlessly) is better served by prose than by an invented picture.',
+    fix: 'If the project has a real, runnable before/after, add one demo asset under assets/ and embed it near the top with a relative image; load references/visual-assets.md and render with scripts/render-demo.mjs. If it does not, leave the README text-only and say why in the PR - do not fabricate a screenshot.',
     effort: 'M',
+    autoFixable: false,
+    patchId: null,
+    run(ctx) {
+      const mode = (ctx.config && ctx.config.demo_visual) || 'auto';
+      if (mode === 'not_applicable') return null;
+      const text = readmeText(ctx);
+      if (text === null) return skip('README.md is missing');
+      const doc = readmeDoc(ctx, text);
+      if (hasDemoVisual(text, doc)) return null;
+      if (mode === 'auto' && !hasObservableSurface(ctx)) return null;
+      return finding({ id: this.id, axis: this.axis, severity: 'warn', title: this.title, why: this.why, fix: this.fix, effort: this.effort });
+    },
+  }),
+
+  check({
+    id: 'readme.demo_asset',
+    axis: 'readme',
+    weight: 3,
+    title: 'Demo assets have a valid source slot JSON',
+    why: 'A demo image is only trustworthy when its source slot JSON is committed next to it: the JSON is the reviewable source of truth and the renderer can regenerate the PNG from it. An image with no source, or a slot JSON that breaks the schema, cannot be verified or refreshed.',
+    fix: 'Commit the slot JSON under demo/ next to the asset and keep it valid: theme, takeaway, and at most 5 blocks per panel with lines under 50 characters. Check it with `node skills/repo-discoverability/scripts/check-slot.mjs demo/<name>.json`.',
+    effort: 'S',
     autoFixable: false,
     patchId: null,
     run(ctx) {
       const text = readmeText(ctx);
       if (text === null) return skip('README.md is missing');
+      const demoDir = join(ctx.cwd, 'demo');
+      const files = listFiles(demoDir, { recursive: false }).filter((file) => file.endsWith('.json'));
+      for (const file of files) {
+        const { errors } = validateSlot(readJsonIfExists(file));
+        if (errors.length > 0) {
+          return finding({ id: this.id, axis: this.axis, severity: 'warn', title: `Invalid demo slot JSON: ${basename(file)}`, why: this.why, fix: errors[0], effort: 'S' });
+        }
+      }
       const doc = readmeDoc(ctx, text);
-      if (hasDemoVisual(text, doc)) return null;
-      return finding({ id: this.id, axis: this.axis, severity: 'warn', title: this.title, why: this.why, fix: this.fix, effort: this.effort });
+      if (hasDemoVisual(text, doc) && files.length === 0) {
+        return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'Demo image without source slot JSON', why: this.why, fix: this.fix, effort: 'S' });
+      }
+      return null;
     },
   }),
 ];

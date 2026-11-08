@@ -1,5 +1,7 @@
 # Docs: https://github.com/WhiteBite/repo-aeo/blob/main/docs/configuration.md
 
+demo_visual: required   # required | not_applicable | auto
+
 project:
   name: "repo-aeo"
   one_liner: "Make any repository, npm package and docs site findable and recommendable to humans, AI agents and search engines."

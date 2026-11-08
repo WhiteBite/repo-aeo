@@ -25,6 +25,7 @@ exists, docs only when a homepage/docs site is configured).
 | `readme.verifiable_claims` | 6 | numbers with named sources |
 | `readme.local_links` | 4 | relative links must resolve |
 | `readme.demo_visual` | 5 | a demo GIF / screenshot / before-after embedded in the README |
+| `readme.demo_asset` | 3 | demo/*.json slot JSON valid; a demo image needs its source slot JSON |
 
 ## Agent readiness (weight 15)
 

@@ -17,11 +17,53 @@ consistent.
    | Agent tool (plugin / CLI for coding agents) | the **agent terminal** (OpenCode / Claude Code look) | stop-ai-slop, dejavu-gates |
    | Web / UI app | a real **screenshot** of the page | Domain-Hunter |
    | Library / config tool (no runnable surface) | **before/after of the artifact** it manages | harness-kit |
-   | MCP server | an agent session calling the MCP tool | remote-devbox-mcp |
+   | MCP server / bridge | the **command outcome** in a shell terminal | remote-devbox-mcp |
 
 4. **For agent tools:** left panel = the session **without** the tool (the
    problem), right panel = the same session **with** the tool (solved).
 5. Explanatory comments sit **above** the code they describe.
+
+## Choose the surface: what picture for what
+
+Make no picture when the project has no observable before/after. If the project is a pure utility with no runnable surface (a formatter, a parser, a math helper), or its value is only a number (speed, size, cost), or its UI cannot be run and screenshotted headlessly, then a demo visual would be invented, not observed - skip it and put the numbers in prose instead. A dishonest picture is worse than no picture.
+
+If you cannot run the project and capture its real output, you cannot make an honest picture.
+
+First ask WHERE the difference between before and after manifests; the surface follows from that, never from habit:
+
+1. In the agent's conversation or tool flow (gates, reminders, behavior rules that change what the agent does) -> terminal surface with the theme of THAT harness. Examples: dejavu-gates (opencode), stop-ai-slop (claude-code).
+
+   ```json
+   { "theme": "opencode", "takeaway": "One helper call replaces twelve lines of noise comments",
+     "before": { "blocks": [ { "type": "user", "text": "add pluralize to loadUser" },
+       { "type": "diff", "lines": [ { "type": "del", "text": "// twelve lines of noise comments ..." } ] } ] },
+     "after": { "blocks": [ { "type": "user", "text": "add pluralize to loadUser" },
+       { "type": "diff", "lines": [ { "type": "add", "text": "export const pluralize = (w) => w + 's'" } ] } ] } }
+   ```
+
+2. In file contents or shape (registries, codemods, scaffolders, config mergers) -> files surface. Example: harness-kit (three drifting configs vs one registry + merge call).
+
+   ```json
+   { "theme": "shell", "takeaway": "Three drifting configs become one registry",
+     "before": { "surface": "files", "blocks": [ { "type": "file", "path": ".eslintrc", "lines": [ { "type": "del", "text": "rules: { semi: 2 }" } ] } ] },
+     "after": { "surface": "files", "blocks": [ { "type": "file", "path": "config/index.js", "lines": [ { "type": "add", "text": "export const rules = { semi: 2 }" } ] } ] } }
+   ```
+
+3. In a command's outcome while the actor is a human or harness-irrelevant (CLIs, remote runners, bridges) -> terminal surface with the `shell` theme. Examples: repo-aeo audit, remote-devbox-mcp bridge.
+
+   ```json
+   { "theme": "shell", "takeaway": "One audit command lists every gap",
+     "before": { "blocks": [ { "type": "user", "text": "audit this repository" },
+       { "type": "diff", "lines": [ { "type": "del", "text": "score: 56/100 (grade D)" } ] } ] },
+     "after": { "blocks": [ { "type": "user", "text": "audit this repository" },
+       { "type": "diff", "lines": [ { "type": "add", "text": "score: 92/100 (grade A)" } ] } ] } }
+   ```
+
+4. In rendered UI (components, themes, visual tools) -> real screenshots of the product, never the template. Screenshot the real running page; if it cannot run headlessly, make no picture. Self-check: if the image shows the green arrow badge it is the template, not a UI.
+
+5. Only in numbers (time, tokens, cost, size) -> do not make a numbers-only picture; embed the numbers as payoff/status lines inside the surface chosen above.
+
+Theme derivation: theme = the harness the actor runs in; human or generic actor => shell; when both panels are files the theme is ignored, set shell.
 
 ## Rendering an agent-terminal demo (the locked template)
 
@@ -42,10 +84,11 @@ own screenshot capability on the same template.
 
 ### Slot schema (v4)
 
-Top-level: `theme` (`opencode` | `claude-code` | `codex` | `shell`), `windowTitle` (the
-session part; the theme supplies the window prefix), `takeaway` (one
-plain-language sentence rendered in the full-width banner below both panels;
-omit it and the banner is hidden). `arrowCaption`, `statusLeft` and
+Top-level: `schema` (optional; must be `4` when present, and an absent key means
+4), `theme` (`opencode` | `claude-code` | `codex` | `shell`), `windowTitle` (the
+session part; the theme supplies the window prefix), `takeaway` (**required**:
+one plain-language sentence rendered in the full-width banner below both panels).
+`arrowCaption`, `statusLeft` and
 `statusRight` are ignored since v3.
 Per panel (`before`, `after`): `caption`, `sessionTitle`, `surface`, `blocks[]`.
 `usage`, `agentName`, `agentModel`, `inputAgent`, `inputModel` and
@@ -80,6 +123,11 @@ Legibility rules (v4):
   before/after content stays aligned.
 - Traffic lights are honored per theme: `opencode` and `shell` show them,
   `claude-code` and `codex` do not.
+
+Validate a slot before rendering: `node scripts/check-slot.mjs demo/<name>.json`
+exits non-zero on any schema error (missing takeaway, more than 5 blocks per
+panel, a line over 50 characters, an unknown theme or surface) and prints
+warnings for an absent surface or an unknown block type.
 
 Minimal example:
 
@@ -116,31 +164,6 @@ Minimal example:
   }
 }
 ```
-
-## Choose the surface: what picture for what
-
-First ask WHERE the difference between before and after manifests; the surface
-follows from that, never from habit:
-
-1. In the agent's conversation or tool flow (gates, reminders, behavior rules
-   that change what the agent does) -> terminal surface with the theme of THAT
-   harness. Examples: dejavu-gates (opencode), stop-ai-slop (claude-code).
-2. In file contents or shape (registries, codemods, scaffolders, config
-   mergers) -> files surface. Example: harness-kit (three drifting configs vs
-   one registry + merge call).
-3. In a command's outcome while the actor is a human or harness-irrelevant
-   (CLIs, remote runners, bridges) -> terminal surface with the `shell` theme.
-   Examples: repo-aeo audit, remote-devbox-mcp bridge.
-4. In rendered UI (components, themes, visual tools) -> real screenshots of the
-   product, never the template; the template must not fake a UI it cannot run.
-5. Only in numbers (time, tokens, cost, size) -> do not make a numbers-only
-   picture; embed the numbers as payoff/status lines inside the surface chosen
-   above.
-
-Theme honesty rule: the theme is the harness chrome you are mimicking; never
-borrow another harness's chrome for a different actor (no OC titlebar on a
-human CLI session, no claude chrome on a codex run). When the actor is generic
-or human, use `shell`.
 
 ## Storing and embedding
 

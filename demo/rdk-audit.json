@@ -1,4 +1,5 @@
 {
+  "schema": 4,
   "theme": "shell",
   "windowTitle": "rdk audit",
   "takeaway": "One audit command lists every discoverability gap with a safe fix",
