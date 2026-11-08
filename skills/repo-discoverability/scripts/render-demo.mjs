@@ -10,11 +10,12 @@ function arg(name, fallback) {
 }
 
 const template = path.resolve(arg("template", "template.html"));
-const dataFile = path.resolve(arg("data", "sample-stop-ai-slop.json"));
-const out = path.resolve(arg("out", "demo-template-sample.png"));
+const dataFile = path.resolve(arg("data", "sample-opencode.json"));
+const out = path.resolve(arg("out", "sample.png"));
 const width = Number(arg("width", "1200"));
-const height = Number(arg("height", "700"));
+const heightArg = arg("height", "auto");
 const scale = Number(arg("scale", "2"));
+const themeOverride = arg("theme", "");
 
 function findChromium() {
   const roots = [
@@ -47,17 +48,28 @@ for (const f of [template, dataFile]) {
 }
 
 const data = JSON.parse(fs.readFileSync(dataFile, "utf8"));
+if (themeOverride) data.theme = themeOverride;
+
 const executablePath = findChromium();
 const browser = await chromium.launch(executablePath ? { executablePath } : {});
 try {
-  const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: scale });
+  const page = await browser.newPage({ viewport: { width, height: 800 }, deviceScaleFactor: scale });
   await page.goto(pathToFileURL(template).href, { waitUntil: "load" });
   await page.evaluate((d) => window.fillTemplate(d), data);
   await page.evaluate(() => document.fonts.ready);
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+
+  let height = heightArg === "auto" ? 0 : Number(heightArg);
+  if (!height) {
+    height = await page.evaluate(() => Math.ceil(document.documentElement.getBoundingClientRect().height));
+    height = Math.max(height, 200);
+    await page.setViewportSize({ width, height });
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  }
+
   fs.mkdirSync(path.dirname(out), { recursive: true });
   await page.screenshot({ path: out, fullPage: false });
-  console.log(`rendered ${path.basename(dataFile)} -> ${out} (${width}x${height} x${scale})`);
+  console.log(`rendered ${path.basename(dataFile)} [${data.theme}] -> ${out} (${width}x${height} x${scale})`);
 } finally {
   await browser.close();
 }

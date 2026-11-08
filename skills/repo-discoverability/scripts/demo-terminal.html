@@ -2,33 +2,74 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>OpenCode TUI — before / after template</title>
+<title>Agent terminal — before / after template (v2)</title>
 <style>
   :root {
-    /* Palette: OpenCode TUI (packages/tui theme) tuned to the reference stills. */
     --page:          #000000;
-    --bg:            #0d0d0d; /* terminal body            */
-    --panel:         #1a1a1a; /* header / user / input /   */
-    --border:        #2a2a2a; /* window hairline           */
+    --bg:            #0d0d0d;
+    --panel:         #1a1a1a;
+    --border:        #2a2a2a;
     --border-subtle: #1e1e1e;
-    --text:          #d0d0d0; /* agent prose + UI text     */
-    --muted:         #888888; /* tool lines, meta, status  */
-    --blue:          #3b82f6; /* accent left-bars, agent   */
-    --green:         #4ade80; /* success + arrow           */
+    --text:          #d0d0d0;
+    --muted:         #888888;
+    --accent:        #3b82f6;
+    --green:         #4ade80;
     --red:           #e06c75;
     --yellow:        #f5a742;
-    --diff-added:    #7ee787; /* green added line text     */
-    --diff-added-bg: #10231a; /* green added line fill     */
+    --diff-added:    #7ee787;
+    --diff-added-bg: #10231a;
     --diff-del:      #ff8f8f;
     --diff-del-bg:   #2c1618;
+    --tool-glyph:    var(--muted);
+    --titlebar:      #161616;
 
     --mono: ui-monospace, "Cascadia Mono", "Cascadia Code", "SF Mono", "JetBrains Mono",
             Menlo, Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace;
   }
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  /* ---------- theme: claude-code (warm / coral) ---------- */
+  body[data-theme="claude-code"] {
+    --page:          #0a0807;
+    --bg:            #17120f;
+    --panel:         #241c17;
+    --border:        #3b2f27;
+    --border-subtle: #2b221c;
+    --text:          #ece3da;
+    --muted:         #a2938a;
+    --accent:        #d97757;
+    --green:         #8fce9f;
+    --red:           #e08a7a;
+    --yellow:        #e0b070;
+    --diff-added:    #a8d8a0;
+    --diff-added-bg: #1c2a1c;
+    --diff-del:      #e8a08f;
+    --diff-del-bg:   #2e1c18;
+    --tool-glyph:    var(--accent);
+    --titlebar:      #1d1713;
+  }
 
-  html, body { height: 100%; }
+  /* ---------- theme: codex (minimal / green) ---------- */
+  body[data-theme="codex"] {
+    --page:          #000000;
+    --bg:            #0b0f0e;
+    --panel:         #141a18;
+    --border:        #223029;
+    --border-subtle: #182420;
+    --text:          #d6e0dc;
+    --muted:         #7f8f89;
+    --accent:        #10a37f;
+    --green:         #4ade80;
+    --red:           #e06c75;
+    --yellow:        #f5a742;
+    --diff-added:    #7ee787;
+    --diff-added-bg: #0f231c;
+    --diff-del:      #ff8f8f;
+    --diff-del-bg:   #2c1618;
+    --tool-glyph:    var(--muted);
+    --titlebar:      #101614;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
     background: var(--page);
@@ -36,15 +77,14 @@
     font-family: var(--mono);
     -webkit-font-smoothing: antialiased;
     text-rendering: geometricPrecision;
-    padding: 22px 24px;
+    padding: 22px 18px;
   }
 
   /* ---------- comparison scaffold ---------- */
   .compare {
     display: flex;
-    align-items: stretch;
+    align-items: flex-start;
     justify-content: center;
-    height: 100%;
   }
 
   .panel {
@@ -76,10 +116,10 @@
   .panel[data-panel="before"] .panel-caption { color: var(--red); }
   .panel[data-panel="after"]  .panel-caption { color: var(--green); }
 
-  /* ---------- terminal window ---------- */
+  /* ---------- terminal window (hugs its content) ---------- */
   .window {
-    flex: 1 1 auto;
-    min-height: 0;
+    flex: 0 0 auto;
+    height: fit-content;
     display: flex;
     flex-direction: column;
     background: var(--bg);
@@ -96,7 +136,7 @@
     align-items: center;
     gap: 12px;
     padding: 0 16px;
-    background: #161616;
+    background: var(--titlebar);
     border-bottom: 1px solid var(--border-subtle);
   }
   .dots { display: flex; gap: 8px; flex: 0 0 auto; }
@@ -114,38 +154,30 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    min-width: 0;
   }
   .win-icon {
     width: 13px; height: 13px;
     border-radius: 3px;
-    background: var(--blue);
+    background: var(--accent);
     flex: 0 0 auto;
   }
+  .win-prefix { color: var(--accent); font-weight: 600; flex: 0 0 auto; }
+  .win-sep { color: var(--muted); flex: 0 0 auto; }
+  .win-title-text { overflow: hidden; text-overflow: ellipsis; }
 
   /* ---------- session body ---------- */
   .body {
-    flex: 1 1 auto;
-    min-height: 0;
     display: flex;
     flex-direction: column;
+    gap: 10px;
     padding: 12px 16px 10px;
   }
 
   .messages {
-    flex: 1 1 auto;
-    min-height: 0;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    overflow: hidden;
-  }
-
-  .pinned {
-    flex: 0 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-    padding-top: 10px;
   }
 
   .header-panel {
@@ -156,7 +188,6 @@
     align-items: baseline;
     justify-content: space-between;
     gap: 12px;
-    flex: 0 0 auto;
   }
   .session-title {
     font-size: 14px;
@@ -172,30 +203,39 @@
     flex: 0 0 auto;
   }
 
+  /* ---------- event blocks ---------- */
   .user-msg {
     background: var(--panel);
-    border-left: 3px solid var(--blue);
+    border-left: 3px solid var(--accent);
     border-radius: 0 6px 6px 0;
     padding: 10px 14px;
     font-size: 14px;
     color: var(--text);
     line-height: 1.45;
-    flex: 0 0 auto;
   }
 
-  .prose { display: flex; flex-direction: column; gap: 7px; flex: 0 0 auto; }
   .prose-line {
     font-size: 13.5px;
     color: var(--text);
     line-height: 1.5;
   }
 
-  .tools { display: flex; flex-direction: column; gap: 3px; padding-left: 14px; flex: 0 0 auto; }
   .tool-line {
+    display: flex;
+    gap: 8px;
     font-size: 13px;
     color: var(--muted);
-    line-height: 1.45;
-    white-space: pre-wrap;
+    line-height: 1.5;
+    padding-left: 14px;
+  }
+  .tool-glyph { color: var(--tool-glyph); flex: 0 0 auto; min-width: 14px; }
+  .tool-text { white-space: pre-wrap; min-width: 0; }
+
+  body[data-theme="claude-code"] .tool-line {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--panel);
   }
 
   /* ---------- diff block ---------- */
@@ -204,7 +244,7 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    flex: 0 0 auto;
+    border-left: 2px solid var(--border);
   }
   .diff-line {
     font-size: 12px;
@@ -222,33 +262,57 @@
   .diff-line.ctx::before { content: "  "; }
 
   .status {
+    display: flex;
+    gap: 8px;
     font-size: 13px;
     color: var(--muted);
     line-height: 1.4;
-    flex: 0 0 auto;
   }
+  .status-glyph { color: var(--muted); flex: 0 0 auto; min-width: 14px; }
+  .status-text { white-space: pre-wrap; }
 
+  .done {
+    display: flex;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--green);
+    line-height: 1.4;
+  }
+  .done-glyph { color: var(--green); flex: 0 0 auto; min-width: 14px; }
+  .done-text { white-space: pre-wrap; }
+
+  /* ---------- inline markdown ---------- */
+  code {
+    font-family: var(--mono);
+    font-size: 0.92em;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    padding: 0 4px;
+    color: var(--text);
+  }
+  strong { color: var(--text); font-weight: 700; }
+
+  /* ---------- agent line ---------- */
   .agent-line {
     font-size: 13px;
     color: var(--muted);
     display: flex;
     align-items: center;
     gap: 7px;
-    flex: 0 0 auto;
   }
-  .agent-line .glyph { color: var(--blue); font-size: 11px; }
-  .agent-line .agent-name { color: var(--blue); }
+  .agent-glyph { color: var(--accent); font-size: 12px; }
+  .agent-line .agent-name { color: var(--accent); }
 
   /* ---------- input box ---------- */
   .input-box {
     background: var(--panel);
-    border-left: 3px solid var(--blue);
+    border-left: 3px solid var(--accent);
     border-radius: 0 6px 6px 0;
     padding: 12px 14px;
     min-height: 46px;
     display: flex;
     align-items: center;
-    flex: 0 0 auto;
   }
   .cursor {
     display: inline-block;
@@ -265,34 +329,63 @@
     gap: 12px;
     padding-left: 3px;
   }
-  .input-meta .agent-name { color: var(--blue); }
+  .input-meta .agent-name { color: var(--accent); }
 
+  /* ---------- status bar ---------- */
   .statusbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 12px;
+    gap: 12px;
+    font-size: 11px;
     color: var(--muted);
+    overflow: hidden;
   }
-  .statusbar .keys { display: flex; gap: 20px; }
+  .status-left-group { display: flex; align-items: center; min-width: 0; flex: 0 0 auto; }
+  .status-dots { color: var(--border); letter-spacing: 1px; margin-right: 8px; flex: 0 0 auto; }
+  .status-left, .status-right { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+  .hk { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .hk kbd {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    line-height: 1.5;
+  }
+  .hk-label { color: var(--muted); }
+  .hk-sep {
+    width: 1px;
+    height: 12px;
+    background: var(--border);
+    flex: 0 0 auto;
+  }
 
   /* ---------- arrow column ---------- */
   .arrow-col {
-    flex: 0 0 150px;
+    flex: 0 0 120px;
     align-self: stretch;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 12px;
+    gap: 14px;
     padding: 0 12px;
   }
-  .arrow {
-    font-size: 44px;
-    line-height: 1;
+  .arrow-badge {
+    width: 58px;
+    height: 58px;
+    border-radius: 16px;
+    display: grid;
+    place-items: center;
     color: var(--green);
-    font-family: var(--mono);
+    background: radial-gradient(circle at 50% 38%, rgba(74, 222, 128, 0.18), rgba(74, 222, 128, 0.02) 72%);
+    border: 1px solid rgba(74, 222, 128, 0.35);
+    box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.06), 0 0 24px rgba(74, 222, 128, 0.18);
   }
+  .arrow-badge svg { width: 26px; height: 26px; }
   .arrow-caption {
     font-size: 12px;
     color: var(--green);
@@ -301,7 +394,7 @@
   }
 </style>
 </head>
-<body>
+<body data-theme="opencode">
   <div class="compare">
 
     <!-- ============ BEFORE PANEL ============ -->
@@ -310,7 +403,12 @@
       <div class="window">
         <div class="titlebar">
           <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
-          <div class="window-title"><span class="win-icon"></span><span data-slot="windowTitle">OC | session</span></div>
+          <div class="window-title">
+            <span class="win-icon"></span>
+            <span class="win-prefix">OC</span>
+            <span class="win-sep">|</span>
+            <span class="win-title-text" data-slot="windowTitle">session</span>
+          </div>
         </div>
         <div class="body">
           <div class="messages">
@@ -318,28 +416,25 @@
               <div class="session-title" data-slot="sessionTitle"># session</div>
               <div class="usage" data-slot="usage">0  0%  ($0.00)</div>
             </div>
-            <div class="user-msg" data-slot="userMessage">user message</div>
-            <div class="prose" data-repeat="prose"></div>
-            <div class="tools" data-repeat="tools"></div>
-            <div class="diff" data-repeat="diff"></div>
-            <div class="status" data-slot="status">~ working...</div>
+            <div data-blocks></div>
             <div class="agent-line">
-              <span class="glyph">▣</span>
+              <span class="agent-glyph">▣</span>
               <span class="agent-name" data-slot="agentName">Build</span>
-              <span data-slot="agentModel">· claude-opus-4-5</span>
+              <span class="agent-model" data-slot="agentModel">· claude-opus-4-5</span>
             </div>
           </div>
-          <div class="pinned">
-            <div class="input-box"><span class="cursor"></span></div>
-            <div class="input-meta">
-              <span class="agent-name" data-slot="inputAgent">Build</span>
-              <span data-slot="inputModel">Claude Opus 4.5</span>
-              <span data-slot="inputProvider">OpenCode Zen</span>
-            </div>
-            <div class="statusbar">
-              <span data-slot="statusLeft">esc interrupt</span>
-              <span class="keys" data-slot="statusRight">ctrl+t variants  tab agents  ctrl+p commands</span>
-            </div>
+          <div class="input-box"><span class="cursor"></span></div>
+          <div class="input-meta">
+            <span class="agent-name" data-slot="inputAgent">Build</span>
+            <span data-slot="inputModel">Claude Opus 4.5</span>
+            <span data-slot="inputProvider">OpenCode Zen</span>
+          </div>
+          <div class="statusbar">
+            <span class="status-left-group">
+              <span class="status-dots" aria-hidden="true">······</span>
+              <span class="status-left"></span>
+            </span>
+            <span class="status-right"></span>
           </div>
         </div>
       </div>
@@ -347,7 +442,12 @@
 
     <!-- ============ ARROW ============ -->
     <div class="arrow-col">
-      <div class="arrow">→</div>
+      <div class="arrow-badge" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 12h15" />
+          <path d="M13 6l6 6-6 6" />
+        </svg>
+      </div>
       <div class="arrow-caption" data-slot="arrowCaption">plugin</div>
     </div>
 
@@ -357,7 +457,12 @@
       <div class="window">
         <div class="titlebar">
           <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
-          <div class="window-title"><span class="win-icon"></span><span data-slot="windowTitle">OC | session</span></div>
+          <div class="window-title">
+            <span class="win-icon"></span>
+            <span class="win-prefix">OC</span>
+            <span class="win-sep">|</span>
+            <span class="win-title-text" data-slot="windowTitle">session</span>
+          </div>
         </div>
         <div class="body">
           <div class="messages">
@@ -365,28 +470,25 @@
               <div class="session-title" data-slot="sessionTitle"># session</div>
               <div class="usage" data-slot="usage">0  0%  ($0.00)</div>
             </div>
-            <div class="user-msg" data-slot="userMessage">user message</div>
-            <div class="prose" data-repeat="prose"></div>
-            <div class="tools" data-repeat="tools"></div>
-            <div class="diff" data-repeat="diff"></div>
-            <div class="status" data-slot="status">~ working...</div>
+            <div data-blocks></div>
             <div class="agent-line">
-              <span class="glyph">▣</span>
+              <span class="agent-glyph">▣</span>
               <span class="agent-name" data-slot="agentName">Build</span>
-              <span data-slot="agentModel">· claude-opus-4-5</span>
+              <span class="agent-model" data-slot="agentModel">· claude-opus-4-5</span>
             </div>
           </div>
-          <div class="pinned">
-            <div class="input-box"><span class="cursor"></span></div>
-            <div class="input-meta">
-              <span class="agent-name" data-slot="inputAgent">Build</span>
-              <span data-slot="inputModel">Claude Opus 4.5</span>
-              <span data-slot="inputProvider">OpenCode Zen</span>
-            </div>
-            <div class="statusbar">
-              <span data-slot="statusLeft">esc interrupt</span>
-              <span class="keys" data-slot="statusRight">ctrl+t variants  tab agents  ctrl+p commands</span>
-            </div>
+          <div class="input-box"><span class="cursor"></span></div>
+          <div class="input-meta">
+            <span class="agent-name" data-slot="inputAgent">Build</span>
+            <span data-slot="inputModel">Claude Opus 4.5</span>
+            <span data-slot="inputProvider">OpenCode Zen</span>
+          </div>
+          <div class="statusbar">
+            <span class="status-left-group">
+              <span class="status-dots" aria-hidden="true">······</span>
+              <span class="status-left"></span>
+            </span>
+            <span class="status-right"></span>
           </div>
         </div>
       </div>
@@ -394,47 +496,140 @@
 
   </div>
 
-  <!-- ============ REPEAT TEMPLATES ============ -->
-  <template data-template="prose"><p class="prose-line"></p></template>
-  <template data-template="tools"><div class="tool-line"></div></template>
-  <template data-template="diff"><div class="diff-line"></div></template>
-
   <script>
-    // Slot filler. Scalar slots: [data-slot="key"] -> text.
-    // Repeat slots: [data-repeat="key"] -> clone <template data-template="key"> per item.
-    // Panel-scoped keys resolve from data[panelName] first, then top-level data.
+    var THEMES = {
+      opencode: {
+        prefix: "OC",
+        agentGlyph: "\u25A3",
+        dots: true,
+        glyphs: { call: "*", read: "->", write: "*", search: "*", status: "~", done: "\u2713" },
+        defaultStatusLeft: "esc interrupt",
+        defaultStatusRight: "ctrl+t variants  tab agents  ctrl+p commands"
+      },
+      "claude-code": {
+        prefix: "claude",
+        agentGlyph: "\u23FA",
+        dots: false,
+        glyphs: { call: "\u23FA", read: "\u23FA", write: "\u23FA", search: "\u23FA", status: "\u273B", done: "\u2714" },
+        defaultStatusLeft: "esc to interrupt",
+        defaultStatusRight: "? for shortcuts"
+      },
+      codex: {
+        prefix: "codex",
+        agentGlyph: "\u258C",
+        dots: false,
+        glyphs: { call: "\u2022", read: "\u203A", write: "\u2022", search: "\u2022", status: "\u2026", done: "\u2713" },
+        defaultStatusLeft: "esc to interrupt",
+        defaultStatusRight: "ctrl+c quit  / commands"
+      }
+    };
+
+    function esc(s) {
+      return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+        return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+      });
+    }
+
+    function md(s) {
+      var out = esc(s);
+      out = out.replace(/`([^`]+)`/g, "<code>$1</code>");
+      out = out.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+      return out;
+    }
+
+    function hotkeys(str) {
+      if (!str) return "";
+      return String(str).split(/\s{2,}/).map(function (group) {
+        var m = group.match(/^(\S+)\s*(.*)$/);
+        if (!m) return "";
+        var key = m[1];
+        var label = m[2] || "";
+        return '<span class="hk"><kbd>' + esc(key) + "</kbd>" +
+          (label ? '<span class="hk-label">' + esc(label) + "</span>" : "") + "</span>";
+      }).join('<span class="hk-sep"></span>');
+    }
+
+    function renderBlock(b, T) {
+      var el;
+      if (b.type === "user") {
+        el = document.createElement("div");
+        el.className = "user-msg";
+        el.innerHTML = md(b.text);
+      } else if (b.type === "prose") {
+        el = document.createElement("p");
+        el.className = "prose-line";
+        el.innerHTML = md(b.text);
+      } else if (b.type === "tool") {
+        var kind = b.kind || "call";
+        var glyph = (T.glyphs && T.glyphs[kind]) || T.glyphs.call;
+        el = document.createElement("div");
+        el.className = "tool-line tool-" + kind;
+        el.innerHTML = '<span class="tool-glyph">' + esc(glyph) + '</span>' +
+          '<span class="tool-text">' + md(b.text) + "</span>";
+      } else if (b.type === "diff") {
+        el = document.createElement("div");
+        el.className = "diff";
+        (b.lines || []).forEach(function (l) {
+          var d = document.createElement("div");
+          d.className = "diff-line " + (l.type || "ctx");
+          d.innerHTML = md(l.text);
+          el.appendChild(d);
+        });
+      } else if (b.type === "status") {
+        el = document.createElement("div");
+        el.className = "status";
+        el.innerHTML = '<span class="status-glyph">' + esc(T.glyphs.status) + '</span>' +
+          '<span class="status-text">' + md(b.text) + "</span>";
+      } else if (b.type === "done") {
+        el = document.createElement("div");
+        el.className = "done";
+        el.innerHTML = '<span class="done-glyph">' + esc(T.glyphs.done) + '</span>' +
+          '<span class="done-text">' + md(b.text) + "</span>";
+      } else {
+        el = document.createElement("p");
+        el.className = "prose-line";
+        el.innerHTML = md(b.text || "");
+      }
+      return el;
+    }
+
     window.fillTemplate = function (data) {
+      var theme = data.theme || "opencode";
+      var T = THEMES[theme] || THEMES.opencode;
+      document.body.setAttribute("data-theme", theme);
+
       function resolve(el, key) {
         var panel = el.closest("[data-panel]");
-        var panelKey = panel ? panel.getAttribute("data-panel") : null;
-        if (panelKey && data[panelKey] && key in data[panelKey]) return data[panelKey][key];
+        var pk = panel ? panel.getAttribute("data-panel") : null;
+        if (pk && data[pk] && key in data[pk]) return data[pk][key];
         if (key in data) return data[key];
         return undefined;
       }
+
+      document.querySelectorAll(".win-prefix").forEach(function (el) { el.textContent = T.prefix; });
+      document.querySelectorAll(".agent-glyph").forEach(function (el) { el.textContent = T.agentGlyph; });
+      document.querySelectorAll(".status-dots").forEach(function (el) {
+        el.style.display = T.dots ? "" : "none";
+      });
 
       document.querySelectorAll("[data-slot]").forEach(function (el) {
         var value = resolve(el, el.getAttribute("data-slot"));
         if (value !== undefined && value !== null) el.textContent = value;
       });
 
-      document.querySelectorAll("[data-repeat]").forEach(function (container) {
-        var key = container.getAttribute("data-repeat");
-        var items = resolve(container, key) || [];
-        var tpl = document.querySelector('template[data-template="' + key + '"]');
-        if (!tpl) return;
+      document.querySelectorAll(".status-left").forEach(function (el) {
+        el.innerHTML = hotkeys(resolve(el, "statusLeft") || T.defaultStatusLeft);
+      });
+      document.querySelectorAll(".status-right").forEach(function (el) {
+        el.innerHTML = hotkeys(resolve(el, "statusRight") || T.defaultStatusRight);
+      });
+
+      document.querySelectorAll("[data-blocks]").forEach(function (container) {
+        var panel = container.closest("[data-panel]");
+        var pk = panel ? panel.getAttribute("data-panel") : null;
+        var blocks = (pk && data[pk] && data[pk].blocks) || [];
         container.innerHTML = "";
-        items.forEach(function (item) {
-          var node = tpl.content.cloneNode(true);
-          var root = node.firstElementChild;
-          if (typeof item === "string") {
-            root.textContent = item;
-          } else {
-            if (item.type) root.classList.add(item.type);
-            var textEl = root.querySelector("[data-text]") || root;
-            textEl.textContent = item.text != null ? item.text : "";
-          }
-          container.appendChild(node);
-        });
+        blocks.forEach(function (b) { container.appendChild(renderBlock(b, T)); });
       });
     };
   </script>

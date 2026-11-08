@@ -41,38 +41,49 @@ fall back to your own screenshot capability on the same template.
 
 ### Slot schema
 
-Top-level: `windowTitle`, `arrowCaption`, `statusLeft`, `statusRight`.
-Per panel (`before`, `after`): `caption`, `sessionTitle`, `usage`,
-`userMessage`, `prose[]`, `tools[]`, `diff[{type,text}]`, `status`,
+Top-level: `theme` (`opencode` | `claude-code` | `codex`), `windowTitle` (the
+session part; the theme supplies the window prefix), `arrowCaption`,
+`statusLeft`, `statusRight`.
+Per panel (`before`, `after`): `caption`, `sessionTitle`, `usage`, `blocks[]`,
 `agentName`, `agentModel`, `inputAgent`, `inputModel`, `inputProvider`.
-`diff.type` is `add` (green `+`), `del` (red `-`) or `ctx`.
+`blocks[]` is an ordered event stream: `{type:"user"|"prose"|"tool"|"status"|"done",text}`
+or `{type:"diff",lines:[{type:"add"|"del"|"ctx",text}]}`. `tool` takes an
+optional `kind` (`call|read|write|search`) that picks the theme's glyph. Text
+supports `` `code` `` and `**bold**`.
 
 Minimal example:
 
 ```json
 {
-  "windowTitle": "OC | add pluralize to loadUser",
+  "theme": "opencode",
+  "windowTitle": "add pluralize to loadUser",
   "arrowCaption": "stop-ai-slop plugin",
   "before": {
     "caption": "without plugin",
     "sessionTitle": "# add pluralize to loadUser",
-    "userMessage": "add pluralize to loadUser",
-    "prose": ["I'll add a pluralize helper."],
-    "tools": ["* Edit src/pluralize.ts"],
-    "diff": [
-      { "type": "add", "text": "// twelve lines of noise comments ..." },
-      { "type": "add", "text": "export const pluralize = (w) => w + 's'" }
+    "blocks": [
+      { "type": "user", "text": "add pluralize to loadUser" },
+      { "type": "prose", "text": "I'll add a `pluralize` helper." },
+      { "type": "tool", "kind": "call", "text": "Edit src/pluralize.ts" },
+      { "type": "diff", "lines": [
+        { "type": "add", "text": "// twelve lines of noise comments ..." },
+        { "type": "add", "text": "export const pluralize = (w) => w + 's'" }
+      ] },
+      { "type": "status", "text": "Writing src/pluralize.ts..." }
     ]
   },
   "after": {
     "caption": "with plugin",
     "sessionTitle": "# add pluralize to loadUser",
-    "userMessage": "add pluralize to loadUser",
-    "prose": ["I'll add a pluralize helper."],
-    "tools": ["* Edit src/pluralize.ts"],
-    "diff": [
-      { "type": "add", "text": "// pluralize — one line, above the code" },
-      { "type": "add", "text": "export const pluralize = (w) => w + 's'" }
+    "blocks": [
+      { "type": "user", "text": "add pluralize to loadUser" },
+      { "type": "prose", "text": "I'll add a `pluralize` helper." },
+      { "type": "tool", "kind": "call", "text": "Edit src/pluralize.ts" },
+      { "type": "diff", "lines": [
+        { "type": "add", "text": "// pluralize — one line, above the code" },
+        { "type": "add", "text": "export const pluralize = (w) => w + 's'" }
+      ] },
+      { "type": "done", "text": "done in 2.4s" }
     ]
   }
 }

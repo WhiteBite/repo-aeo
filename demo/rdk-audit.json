@@ -1,5 +1,6 @@
 {
-  "windowTitle": "OC | rdk audit",
+  "theme": "opencode",
+  "windowTitle": "rdk audit",
   "arrowCaption": "rdk fix --apply",
   "statusLeft": "esc interrupt",
   "statusRight": "ctrl+t variants  tab agents  ctrl+p commands",
@@ -8,18 +9,20 @@
     "caption": "before",
     "sessionTitle": "# rdk audit (demo-repo)",
     "usage": "23/44  56%  (grade D)",
-    "userMessage": "audit this repository",
-    "prose": ["Running the offline discoverability audit."],
-    "tools": ["* rdk audit"],
-    "diff": [
-      { "type": "del", "text": "score: 56/100 (grade D)" },
-      { "type": "del", "text": "readme: no install/run in the first 60 lines" },
-      { "type": "del", "text": "agents.md is missing" },
-      { "type": "del", "text": "no LICENSE, no CITATION.cff" },
-      { "type": "del", "text": "no code examples in README" },
-      { "type": "del", "text": "9 errors - 12 warnings" }
+    "blocks": [
+      { "type": "user", "text": "audit this repository" },
+      { "type": "prose", "text": "Running the offline discoverability audit." },
+      { "type": "tool", "kind": "call", "text": "rdk audit" },
+      { "type": "diff", "lines": [
+        { "type": "del", "text": "score: 56/100 (grade D)" },
+        { "type": "del", "text": "readme: no install/run in the first 60 lines" },
+        { "type": "del", "text": "agents.md is missing" },
+        { "type": "del", "text": "no LICENSE, no CITATION.cff" },
+        { "type": "del", "text": "no code examples in README" },
+        { "type": "del", "text": "9 errors - 12 warnings" }
+      ] },
+      { "type": "status", "text": "23/44 checks passed" }
     ],
-    "status": "~ 23/44 checks passed",
     "agentName": "Build",
     "agentModel": "· claude-opus-4-5",
     "inputAgent": "Build",
@@ -31,18 +34,21 @@
     "caption": "after",
     "sessionTitle": "# rdk audit (demo-repo)",
     "usage": "45/45  100%  (grade A)",
-    "userMessage": "audit this repository",
-    "prose": ["Re-running the audit after the safe autofixes."],
-    "tools": ["* rdk fix --apply", "* rdk audit"],
-    "diff": [
-      { "type": "add", "text": "score: 92/100 (grade A)" },
-      { "type": "add", "text": "install + run above the fold" },
-      { "type": "add", "text": "AGENTS.md with real commands" },
-      { "type": "add", "text": "LICENSE, CITATION.cff, topics" },
-      { "type": "add", "text": "llms.txt + 2-5 examples" },
-      { "type": "add", "text": "0 errors - 0 warnings" }
+    "blocks": [
+      { "type": "user", "text": "audit this repository" },
+      { "type": "prose", "text": "Re-running the audit after the safe autofixes." },
+      { "type": "tool", "kind": "call", "text": "rdk fix --apply" },
+      { "type": "tool", "kind": "call", "text": "rdk audit" },
+      { "type": "diff", "lines": [
+        { "type": "add", "text": "score: 92/100 (grade A)" },
+        { "type": "add", "text": "install + run above the fold" },
+        { "type": "add", "text": "AGENTS.md with real commands" },
+        { "type": "add", "text": "LICENSE, CITATION.cff, topics" },
+        { "type": "add", "text": "llms.txt + 2-5 examples" },
+        { "type": "add", "text": "0 errors - 0 warnings" }
+      ] },
+      { "type": "done", "text": "done in 2.4s" }
     ],
-    "status": "~ 45/45 checks passed",
     "agentName": "Build",
     "agentModel": "· claude-opus-4-5",
     "inputAgent": "Build",
