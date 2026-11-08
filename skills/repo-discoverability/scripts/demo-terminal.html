@@ -36,6 +36,18 @@
     --hl-bg:             rgba(245, 167, 66, 0.14);
     --hl-bar:            var(--yellow);
 
+    --hud-bg:            rgba(255, 255, 255, 0.035);
+    --hud-border:        var(--border-subtle);
+    --hud-label:         var(--muted);
+    --hud-muted:         var(--muted);
+    --hud-learn:         var(--yellow);
+    --hud-block:         #e88a4a;
+    --hud-heal:          var(--green);
+    --gate-bg:           rgba(245, 167, 66, 0.10);
+    --gate-border:       rgba(245, 167, 66, 0.42);
+    --gate-ink:          var(--yellow);
+    --gate-line:         #d9a860;
+
     --mono: ui-monospace, "Cascadia Mono", "Cascadia Code", "SF Mono", "JetBrains Mono",
             Menlo, Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace;
   }
@@ -112,6 +124,13 @@
     --anno-green-ink:    #ffffff;
     --hl-bg:             rgba(180, 118, 20, 0.15);
     --hl-bar:            #b47614;
+
+    --hud-bg:            rgba(0, 0, 0, 0.035);
+    --hud-block:         #c2410c;
+    --gate-bg:           rgba(180, 118, 20, 0.10);
+    --gate-border:       rgba(180, 118, 20, 0.45);
+    --gate-ink:          #b45309;
+    --gate-line:         #8a5a12;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -541,6 +560,89 @@
     box-shadow: inset 3px 0 0 var(--hl-bar);
     border-radius: 4px;
   }
+
+  /* ---------- hud strip: the tool's learned state, survives session boundaries ---------- */
+  .hud {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 4px 14px;
+    background: var(--hud-bg);
+    border-bottom: 1px solid var(--hud-border);
+    font-size: 11px;
+    font-variant: small-caps;
+    letter-spacing: 0.06em;
+    line-height: 1.4;
+  }
+  .hud[hidden] { display: none; }
+  .hud-label { color: var(--hud-label); flex: 0 0 auto; }
+  .hud-text {
+    color: var(--hud-tone, var(--hud-muted));
+    text-align: right;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .hud[data-tone="muted"] { --hud-tone: var(--hud-muted); }
+  .hud[data-tone="learn"] { --hud-tone: var(--hud-learn); }
+  .hud[data-tone="block"] { --hud-tone: var(--hud-block); }
+  .hud[data-tone="heal"]  { --hud-tone: var(--hud-heal); }
+
+  /* ---------- gate card: the exact moment the tool intervenes ---------- */
+  .gate {
+    border-radius: 8px;
+    padding: 9px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+    background: var(--gate-bg);
+    border: 1px solid var(--gate-border);
+  }
+  .gate-head {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--gate-ink);
+    font-weight: 700;
+  }
+  .gate-glyph { flex: 0 0 auto; display: flex; }
+  .gate-glyph svg { width: 14px; height: 14px; }
+  .gate-title { min-width: 0; }
+  .gate-line {
+    color: var(--gate-line);
+    line-height: 1.4;
+    white-space: pre-wrap;
+    padding-left: 21px;
+  }
+  .gate.hl {
+    background: var(--gate-bg);
+    border-radius: 8px;
+    box-shadow: inset 3px 0 0 var(--gate-ink);
+  }
+
+  /* ---------- divider: a session or phase boundary ---------- */
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--muted);
+    font-size: 12px;
+    font-variant: small-caps;
+    letter-spacing: 0.08em;
+    padding: 2px 0;
+  }
+  .divider::before,
+  .divider::after {
+    content: "";
+    flex: 1 1 auto;
+    height: 1px;
+    background: var(--border);
+  }
+  .divider-text { flex: 0 0 auto; }
 </style>
 </head>
 <body data-theme="opencode">
@@ -559,6 +661,10 @@
               <span class="win-sep">|</span>
               <span class="win-title-text" data-slot="windowTitle">session</span>
             </div>
+          </div>
+          <div class="hud" data-hud hidden>
+            <span class="hud-label">state</span>
+            <span class="hud-text" data-hud-text></span>
           </div>
           <div class="body">
             <div class="session-title" data-slot="sessionTitle"># session</div>
@@ -590,6 +696,10 @@
               <span class="win-sep">|</span>
               <span class="win-title-text" data-slot="windowTitle">session</span>
             </div>
+          </div>
+          <div class="hud" data-hud hidden>
+            <span class="hud-label">state</span>
+            <span class="hud-text" data-hud-text></span>
           </div>
           <div class="body">
             <div class="session-title" data-slot="sessionTitle"># session</div>
@@ -645,6 +755,8 @@
         return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
       });
     }
+
+    var GATE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/></svg>';
 
     function md(s) {
       var out = esc(s);
@@ -741,6 +853,24 @@
           more.textContent = "... +" + (steps.length - 8) + " more steps";
           el.appendChild(more);
         }
+      } else if (b.type === "gate") {
+        el = document.createElement("div");
+        el.className = "gate";
+        var gateHead = document.createElement("div");
+        gateHead.className = "gate-head";
+        gateHead.innerHTML = '<span class="gate-glyph">' + GATE_SVG + '</span>' +
+          '<span class="gate-title">' + md(b.title || "") + "</span>";
+        el.appendChild(gateHead);
+        (b.lines || []).forEach(function (l) {
+          var gateLine = document.createElement("div");
+          gateLine.className = "gate-line";
+          gateLine.innerHTML = md(typeof l === "string" ? l : (l && l.text) || "");
+          el.appendChild(gateLine);
+        });
+      } else if (b.type === "divider") {
+        el = document.createElement("div");
+        el.className = "divider";
+        el.innerHTML = '<span class="divider-text">' + md(b.text || "") + "</span>";
       } else {
         el = document.createElement("p");
         el.className = "prose-line";
@@ -812,6 +942,20 @@
       document.querySelectorAll("[data-slot]").forEach(function (el) {
         var value = resolve(el, el.getAttribute("data-slot"));
         if (value !== undefined && value !== null) el.textContent = value;
+      });
+
+      document.querySelectorAll("[data-hud]").forEach(function (el) {
+        var panel = el.closest("[data-panel]");
+        var pk = panel ? panel.getAttribute("data-panel") : null;
+        var hud = (pk && data[pk] && data[pk].hud) || data.hud;
+        if (!hud || typeof hud !== "object" || !hud.text) {
+          el.hidden = true;
+          return;
+        }
+        el.hidden = false;
+        el.setAttribute("data-tone", hud.tone || "muted");
+        var hudText = el.querySelector("[data-hud-text]");
+        if (hudText) hudText.textContent = hud.text;
       });
 
       document.querySelectorAll("[data-blocks]").forEach(function (container) {

@@ -317,6 +317,21 @@ On an after panel every diff line is tinted green and on a before panel red,
 regardless of add/del/ctx - put narration you do not want tint-shifted into a
 status or prose block instead.
 
+Three v4 mechanisms carry a temporal story's state and its turning points:
+
+- `hud` (top-level, optional): `{text, tone}` renders a thin strip between the
+  titlebar and the body of every window - the tool's learned/persistent state
+  that survives session boundaries. `text` is the right-aligned state string;
+  `tone` is `muted` (gray), `learn` (amber, counting), `block` (red-amber,
+  enforcing) or `heal` (green). An absent `hud` hides the strip; it adapts to
+  the light palette.
+- `{type:"gate",title,lines:[...]}`: an amber-bordered card, visually distinct
+  from the red pain / green payoff blocks - the exact moment the tool intervenes
+  (teach or block). `title` is the amber bold header (a shield glyph leads it);
+  `lines` are amber-tinted mono body lines.
+- `{type:"divider",text}`: a muted centered `── text ──` rule - a session or
+  phase boundary, so cross-session persistence of the `hud` is visible.
+
 Legibility rules (v4):
 
 - Keep each panel to **at most 5 blocks**: the user command, one or two short

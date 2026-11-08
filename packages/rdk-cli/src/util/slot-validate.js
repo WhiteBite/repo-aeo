@@ -7,7 +7,8 @@
 const THEMES = new Set(['opencode', 'claude-code', 'codex', 'shell']);
 const PALETTES = new Set(['dark', 'light']);
 const SURFACES = new Set(['terminal', 'files', 'shots', 'single']);
-const BLOCK_TYPES = new Set(['user', 'prose', 'tool', 'status', 'done', 'diff', 'file', 'steps']);
+const BLOCK_TYPES = new Set(['user', 'prose', 'tool', 'status', 'done', 'diff', 'file', 'steps', 'gate', 'divider']);
+const HUD_TONES = new Set(['muted', 'learn', 'block', 'heal']);
 const MAX_BLOCKS = 5;
 const MAX_LINE = 50;
 const MAX_BLOCKS_SINGLE = 12;
@@ -17,8 +18,13 @@ const MAX_STEPS = 8;
 function lineTexts(block) {
   const texts = [];
   if (typeof block.text === 'string') texts.push(block.text);
+  if (typeof block.title === 'string') texts.push(block.title);
   if (Array.isArray(block.lines)) {
     for (const line of block.lines) {
+      if (typeof line === 'string') {
+        texts.push(line);
+        continue;
+      }
       if (!line || typeof line !== 'object') continue;
       for (const key of ['text', 'left', 'right']) {
         if (typeof line[key] === 'string') texts.push(line[key]);
@@ -31,6 +37,20 @@ function lineTexts(block) {
     }
   }
   return texts;
+}
+
+function validateHud(hud, label, errors) {
+  if (hud === undefined) return;
+  if (!hud || typeof hud !== 'object' || Array.isArray(hud)) {
+    errors.push(`${label}: hud must be an object`);
+    return;
+  }
+  if (typeof hud.text !== 'string' || hud.text.trim() === '') {
+    errors.push(`${label}: hud.text is required and must be a non-empty string`);
+  }
+  if (!HUD_TONES.has(hud.tone)) {
+    errors.push(`${label}: hud.tone must be one of muted|learn|block|heal, got ${JSON.stringify(hud.tone)}`);
+  }
 }
 
 export function validateSlot(obj) {
@@ -52,6 +72,7 @@ export function validateSlot(obj) {
   if (typeof obj.takeaway !== 'string' || obj.takeaway.trim() === '') {
     errors.push('takeaway is required and must be a non-empty string');
   }
+  validateHud(obj.hud, 'hud', errors);
   if (typeof obj.delay === 'number' && obj.delay > 0 && obj.delay < 0.02) {
     warnings.push(`delay ${obj.delay}s is below the 0.02s GIF floor; browsers clamp sub-20ms delays to 100ms`);
   }
@@ -67,6 +88,7 @@ export function validateSlot(obj) {
     } else if (!SURFACES.has(surface)) {
       errors.push(`${panelName}: surface must be terminal|files|shots|single, got ${JSON.stringify(surface)}`);
     }
+    validateHud(panel.hud, `${panelName}.hud`, errors);
     const blocks = Array.isArray(panel.blocks) ? panel.blocks : [];
     if (surface === 'shots') {
       if (typeof panel.shot !== 'string' || panel.shot.trim() === '') {
@@ -91,6 +113,17 @@ export function validateSlot(obj) {
       }
       if (block.type === 'steps' && Array.isArray(block.steps) && block.steps.length > MAX_STEPS) {
         warnings.push(`${panelName}: steps block has ${block.steps.length} entries; only ${MAX_STEPS} render`);
+      }
+      if (block.type === 'gate') {
+        if (typeof block.title !== 'string' || block.title.trim() === '') {
+          errors.push(`${panelName}: gate block requires a non-empty title`);
+        }
+        if (!Array.isArray(block.lines)) {
+          errors.push(`${panelName}: gate block requires a lines array`);
+        }
+      }
+      if (block.type === 'divider' && (typeof block.text !== 'string' || block.text.trim() === '')) {
+        errors.push(`${panelName}: divider block requires a non-empty text`);
       }
       for (const text of lineTexts(block)) {
         if (text.length > maxLine) {

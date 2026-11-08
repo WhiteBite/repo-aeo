@@ -282,3 +282,87 @@ test('render-demo --frames rejects a non-array frames file', () => {
     assert.match(result.stderr, /non-empty array/);
   });
 });
+
+test('validateSlot accepts a gate block with a title and lines', () => {
+  const { errors } = validateSlot({
+    theme: 'shell',
+    takeaway: 'ok',
+    before: { surface: 'single', blocks: [{ type: 'gate', title: 'DEJAVU GATE - call aborted', lines: ['CORRECTION: use --environment, not --env'] }] },
+    after: { blocks: [] },
+  });
+  assert.deepEqual(errors, []);
+});
+
+test('validateSlot rejects a gate block without a title', () => {
+  const { errors } = validateSlot({
+    theme: 'shell',
+    takeaway: 'ok',
+    before: { surface: 'single', blocks: [{ type: 'gate', lines: ['x'] }] },
+    after: { blocks: [] },
+  });
+  assert.ok(errors.some((error) => /gate block requires a non-empty title/.test(error)), 'expected a gate title error');
+});
+
+test('validateSlot rejects a gate block without a lines array', () => {
+  const { errors } = validateSlot({
+    theme: 'shell',
+    takeaway: 'ok',
+    before: { surface: 'single', blocks: [{ type: 'gate', title: 'gate' }] },
+    after: { blocks: [] },
+  });
+  assert.ok(errors.some((error) => /gate block requires a lines array/.test(error)), 'expected a gate lines error');
+});
+
+test('validateSlot accepts a divider block with text', () => {
+  const { errors } = validateSlot({
+    theme: 'shell',
+    takeaway: 'ok',
+    before: { surface: 'single', blocks: [{ type: 'divider', text: 'session 2' }] },
+    after: { blocks: [] },
+  });
+  assert.deepEqual(errors, []);
+});
+
+test('validateSlot rejects a divider block without text', () => {
+  const { errors } = validateSlot({
+    theme: 'shell',
+    takeaway: 'ok',
+    before: { surface: 'single', blocks: [{ type: 'divider' }] },
+    after: { blocks: [] },
+  });
+  assert.ok(errors.some((error) => /divider block requires a non-empty text/.test(error)), 'expected a divider text error');
+});
+
+test('validateSlot accepts a hud with every tone and an absent hud', () => {
+  const base = { theme: 'shell', takeaway: 'ok', before: { blocks: [] }, after: { blocks: [] } };
+  for (const tone of ['muted', 'learn', 'block', 'heal']) {
+    assert.deepEqual(validateSlot({ ...base, hud: { text: 'counting: failure 1/3', tone } }).errors, []);
+  }
+  assert.deepEqual(validateSlot(base).errors, []);
+});
+
+test('validateSlot rejects a hud with empty text and an unknown tone', () => {
+  const base = { theme: 'shell', takeaway: 'ok', before: { blocks: [] }, after: { blocks: [] } };
+  const { errors } = validateSlot({ ...base, hud: { text: '  ', tone: 'glow' } });
+  assert.ok(errors.some((error) => /hud\.text/.test(error)), 'expected a hud text error');
+  assert.ok(errors.some((error) => /hud\.tone/.test(error)), 'expected a hud tone error');
+});
+
+test('check-slot.mjs accepts a frames file using hud, gate and divider', () => {
+  const frame = {
+    theme: 'opencode',
+    takeaway: 'ok',
+    hud: { text: 'gate blocking - intercepts repeats', tone: 'block' },
+    before: {
+      surface: 'single',
+      blocks: [
+        { type: 'divider', text: 'session 2' },
+        { type: 'gate', title: 'DEJAVU GATE - call aborted', lines: ['CORRECTION: use --environment, not --env', 'EVIDENCE: 3 failures across 2 sessions'] },
+      ],
+    },
+    after: { blocks: [] },
+  };
+  withTempFrames([frame], (file) => {
+    assert.equal(checkSlotExit([file]), 0);
+  });
+});
