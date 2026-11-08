@@ -1,58 +1,35 @@
 {
   "theme": "opencode",
   "windowTitle": "rdk audit",
-  "arrowCaption": "rdk fix --apply",
-  "statusLeft": "esc interrupt",
-  "statusRight": "ctrl+t variants  tab agents  ctrl+p commands",
+  "takeaway": "One audit command lists every discoverability gap with a safe fix",
 
   "before": {
     "caption": "before",
     "sessionTitle": "# rdk audit (demo-repo)",
-    "usage": "23/44  56%  (grade D)",
     "blocks": [
       { "type": "user", "text": "audit this repository" },
-      { "type": "prose", "text": "Running the offline discoverability audit." },
-      { "type": "tool", "kind": "call", "text": "rdk audit" },
+      { "type": "prose", "text": "Running the offline audit." },
       { "type": "diff", "lines": [
         { "type": "del", "text": "score: 56/100 (grade D)" },
-        { "type": "del", "text": "readme: no install/run in the first 60 lines" },
-        { "type": "del", "text": "agents.md is missing" },
-        { "type": "del", "text": "no LICENSE, no CITATION.cff" },
-        { "type": "del", "text": "no code examples in README" },
+        { "type": "del", "text": "AGENTS.md is missing" },
         { "type": "del", "text": "9 errors - 12 warnings" }
       ] },
       { "type": "status", "text": "23/44 checks passed" }
-    ],
-    "agentName": "Build",
-    "agentModel": "· claude-opus-4-5",
-    "inputAgent": "Build",
-    "inputModel": "Claude Opus 4.5",
-    "inputProvider": "OpenCode Zen"
+    ]
   },
 
   "after": {
     "caption": "after",
     "sessionTitle": "# rdk audit (demo-repo)",
-    "usage": "45/45  100%  (grade A)",
     "blocks": [
       { "type": "user", "text": "audit this repository" },
-      { "type": "prose", "text": "Re-running the audit after the safe autofixes." },
-      { "type": "tool", "kind": "call", "text": "rdk fix --apply" },
-      { "type": "tool", "kind": "call", "text": "rdk audit" },
+      { "type": "prose", "text": "Re-running after the safe autofixes." },
       { "type": "diff", "lines": [
         { "type": "add", "text": "score: 92/100 (grade A)" },
-        { "type": "add", "text": "install + run above the fold" },
         { "type": "add", "text": "AGENTS.md with real commands" },
-        { "type": "add", "text": "LICENSE, CITATION.cff, topics" },
-        { "type": "add", "text": "llms.txt + 2-5 examples" },
         { "type": "add", "text": "0 errors - 0 warnings" }
       ] },
       { "type": "done", "text": "done in 2.4s" }
-    ],
-    "agentName": "Build",
-    "agentModel": "· claude-opus-4-5",
-    "inputAgent": "Build",
-    "inputModel": "Claude Opus 4.5",
-    "inputProvider": "OpenCode Zen"
+    ]
   }
 }

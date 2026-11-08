@@ -31,25 +31,38 @@ the result cannot look crooked.
 ```bash
 # 1. write a slot JSON (see schema below), e.g. demo/stop-ai-slop.json
 # 2. render it (needs playwright-core; install on demand, never a repo dep)
-node <skill>/scripts/render-demo.mjs --data demo/stop-ai-slop.json --out assets/demo.png
+node <skill>/scripts/render-demo.mjs --data demo/stop-ai-slop.json --out assets/demo.png --width 900
 ```
 
-`scripts/demo-terminal.html` is the locked look (two OpenCode-style panels +
-green arrow). `scripts/render-demo.mjs` fills it from JSON and screenshots to
-PNG via a cached Chromium (no browser download). If playwright is unavailable,
-fall back to your own screenshot capability on the same template.
+`scripts/demo-terminal.html` is the locked look (two OpenCode-style panels, a
+green arrow between them, and a full-width takeaway banner below).
+`scripts/render-demo.mjs` fills it from JSON and screenshots to PNG via a cached
+Chromium (no browser download). If playwright is unavailable, fall back to your
+own screenshot capability on the same template.
 
-### Slot schema
+### Slot schema (v3)
 
 Top-level: `theme` (`opencode` | `claude-code` | `codex`), `windowTitle` (the
-session part; the theme supplies the window prefix), `arrowCaption`,
-`statusLeft`, `statusRight`.
-Per panel (`before`, `after`): `caption`, `sessionTitle`, `usage`, `blocks[]`,
-`agentName`, `agentModel`, `inputAgent`, `inputModel`, `inputProvider`.
+session part; the theme supplies the window prefix), `takeaway` (one
+plain-language sentence rendered in the full-width banner below both panels).
+`arrowCaption`, `statusLeft` and `statusRight` are ignored since v3.
+Per panel (`before`, `after`): `caption`, `sessionTitle`, `blocks[]`. `usage`,
+`agentName`, `agentModel`, `inputAgent`, `inputModel` and `inputProvider` are
+ignored since v3.
 `blocks[]` is an ordered event stream: `{type:"user"|"prose"|"tool"|"status"|"done",text}`
 or `{type:"diff",lines:[{type:"add"|"del"|"ctx",text}]}`. `tool` takes an
 optional `kind` (`call|read|write|search`) that picks the theme's glyph. Text
 supports `` `code` `` and `**bold**`.
+
+Legibility rules (v3):
+
+- Keep each panel to **at most 5 blocks**: the user command, one or two short
+  body lines, the red pain block (before) or green payoff block (after), and a
+  done/status line.
+- Keep every body line to **~50 characters**; trim longer content in the slot
+  JSON rather than letting it overflow the panel.
+- Design at **~900 CSS px** total width and render at `--scale 2` (PNG ~1800 px
+  wide), so the image stays legible when GitHub downscales it to ~800 px.
 
 Minimal example:
 
@@ -57,19 +70,18 @@ Minimal example:
 {
   "theme": "opencode",
   "windowTitle": "add pluralize to loadUser",
-  "arrowCaption": "stop-ai-slop plugin",
+  "takeaway": "One helper call replaces twelve lines of noise comments",
   "before": {
     "caption": "without plugin",
     "sessionTitle": "# add pluralize to loadUser",
     "blocks": [
       { "type": "user", "text": "add pluralize to loadUser" },
       { "type": "prose", "text": "I'll add a `pluralize` helper." },
-      { "type": "tool", "kind": "call", "text": "Edit src/pluralize.ts" },
       { "type": "diff", "lines": [
-        { "type": "add", "text": "// twelve lines of noise comments ..." },
-        { "type": "add", "text": "export const pluralize = (w) => w + 's'" }
+        { "type": "del", "text": "// twelve lines of noise comments ..." },
+        { "type": "del", "text": "// TODO: add a TTL later" }
       ] },
-      { "type": "status", "text": "Writing src/pluralize.ts..." }
+      { "type": "status", "text": "12 comment lines written" }
     ]
   },
   "after": {
@@ -78,7 +90,6 @@ Minimal example:
     "blocks": [
       { "type": "user", "text": "add pluralize to loadUser" },
       { "type": "prose", "text": "I'll add a `pluralize` helper." },
-      { "type": "tool", "kind": "call", "text": "Edit src/pluralize.ts" },
       { "type": "diff", "lines": [
         { "type": "add", "text": "// pluralize — one line, above the code" },
         { "type": "add", "text": "export const pluralize = (w) => w + 's'" }

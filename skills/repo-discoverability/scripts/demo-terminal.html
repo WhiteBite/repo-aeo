@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Agent terminal — before / after template (v2)</title>
+<title>Agent terminal — before / after template (v3)</title>
 <style>
   :root {
     --page:          #000000;
@@ -11,7 +11,7 @@
     --border:        #2a2a2a;
     --border-subtle: #1e1e1e;
     --text:          #d0d0d0;
-    --muted:         #888888;
+    --muted:         #8a8a8a;
     --accent:        #3b82f6;
     --green:         #4ade80;
     --red:           #e06c75;
@@ -77,13 +77,15 @@
     font-family: var(--mono);
     -webkit-font-smoothing: antialiased;
     text-rendering: geometricPrecision;
-    padding: 22px 18px;
+    padding: 20px 22px;
   }
+
+  .stage { display: flex; flex-direction: column; }
 
   /* ---------- comparison scaffold ---------- */
   .compare {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: center;
   }
 
@@ -96,8 +98,9 @@
   }
 
   .panel-caption {
-    font-size: 11px;
-    letter-spacing: 0.12em;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--muted);
     padding-left: 2px;
@@ -108,7 +111,7 @@
   }
   .panel-caption::before {
     content: "";
-    width: 7px; height: 7px;
+    width: 8px; height: 8px;
     border-radius: 50%;
     background: currentColor;
     flex: 0 0 auto;
@@ -130,12 +133,12 @@
   }
 
   .titlebar {
-    height: 40px;
+    height: 38px;
     flex: 0 0 auto;
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 0 16px;
+    padding: 0 14px;
     background: var(--titlebar);
     border-bottom: 1px solid var(--border-subtle);
   }
@@ -171,53 +174,42 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
-    padding: 12px 16px 10px;
+    padding: 12px 14px;
   }
 
-  .messages {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .header-panel {
-    background: var(--panel);
-    border-radius: 6px;
-    padding: 10px 14px;
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
-  }
   .session-title {
-    font-size: 14px;
+    font-size: 15px;
+    font-weight: 700;
     color: var(--text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .usage {
-    font-size: 13px;
-    color: var(--muted);
-    white-space: nowrap;
-    flex: 0 0 auto;
+
+  .messages {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
   }
 
   /* ---------- event blocks ---------- */
   .user-msg {
+    display: flex;
+    gap: 8px;
     background: var(--panel);
-    border-left: 3px solid var(--accent);
-    border-radius: 0 6px 6px 0;
-    padding: 10px 14px;
-    font-size: 14px;
+    border-radius: 6px;
+    padding: 9px 12px;
+    font-size: 13px;
     color: var(--text);
-    line-height: 1.45;
+    line-height: 1.4;
   }
+  .user-glyph { color: var(--accent); font-weight: 700; flex: 0 0 auto; }
+  .user-text { min-width: 0; }
 
   .prose-line {
-    font-size: 13.5px;
+    font-size: 13px;
     color: var(--text);
-    line-height: 1.5;
+    line-height: 1.45;
   }
 
   .tool-line {
@@ -225,40 +217,38 @@
     gap: 8px;
     font-size: 13px;
     color: var(--muted);
-    line-height: 1.5;
-    padding-left: 14px;
+    line-height: 1.45;
+    padding-left: 2px;
   }
   .tool-glyph { color: var(--tool-glyph); flex: 0 0 auto; min-width: 14px; }
   .tool-text { white-space: pre-wrap; min-width: 0; }
 
-  body[data-theme="claude-code"] .tool-line {
-    padding: 6px 10px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--panel);
-  }
-
-  /* ---------- diff block ---------- */
+  /* ---------- pain / payoff block ---------- */
   .diff {
-    border-radius: 5px;
-    overflow: hidden;
+    border-radius: 8px;
+    padding: 9px 12px;
     display: flex;
     flex-direction: column;
-    border-left: 2px solid var(--border);
+    gap: 3px;
+    font-size: 13px;
+  }
+  .panel[data-panel="before"] .diff {
+    background: var(--diff-del-bg);
+    border: 1px solid rgba(224, 108, 117, 0.28);
+  }
+  .panel[data-panel="after"] .diff {
+    background: var(--diff-added-bg);
+    border: 1px solid rgba(74, 222, 128, 0.28);
   }
   .diff-line {
-    font-size: 12px;
-    line-height: 1.34;
-    padding: 1px 10px 1px 8px;
-    white-space: pre;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    line-height: 1.4;
+    white-space: pre-wrap;
   }
-  .diff-line.add { background: var(--diff-added-bg); color: var(--diff-added); }
+  .diff-line { color: var(--diff-del); }
+  .panel[data-panel="after"] .diff-line { color: var(--diff-added); }
+  .diff-line.ctx { color: var(--muted); }
   .diff-line.add::before { content: "+ "; }
-  .diff-line.del { background: var(--diff-del-bg); color: var(--diff-del); }
   .diff-line.del::before { content: "- "; }
-  .diff-line.ctx { background: var(--panel); color: var(--muted); }
   .diff-line.ctx::before { content: "  "; }
 
   .status {
@@ -293,91 +283,34 @@
   }
   strong { color: var(--text); font-weight: 700; }
 
-  /* ---------- agent line ---------- */
-  .agent-line {
-    font-size: 13px;
-    color: var(--muted);
-    display: flex;
-    align-items: center;
-    gap: 7px;
-  }
-  .agent-glyph { color: var(--accent); font-size: 12px; }
-  .agent-line .agent-name { color: var(--accent); }
-
   /* ---------- input box ---------- */
   .input-box {
     background: var(--panel);
-    border-left: 3px solid var(--accent);
-    border-radius: 0 6px 6px 0;
-    padding: 12px 14px;
-    min-height: 46px;
+    border-radius: 6px;
+    padding: 10px 12px;
+    min-height: 40px;
     display: flex;
     align-items: center;
   }
   .cursor {
     display: inline-block;
     width: 8px;
-    height: 17px;
+    height: 16px;
     background: var(--text);
-  }
-
-  .input-meta {
-    font-size: 13px;
-    color: var(--muted);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding-left: 3px;
-  }
-  .input-meta .agent-name { color: var(--accent); }
-
-  /* ---------- status bar ---------- */
-  .statusbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    font-size: 11px;
-    color: var(--muted);
-    overflow: hidden;
-  }
-  .status-left-group { display: flex; align-items: center; min-width: 0; flex: 0 0 auto; }
-  .status-dots { color: var(--border); letter-spacing: 1px; margin-right: 8px; flex: 0 0 auto; }
-  .status-left, .status-right { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
-  .hk { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
-  .hk kbd {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--text);
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 1px 5px;
-    line-height: 1.5;
-  }
-  .hk-label { color: var(--muted); }
-  .hk-sep {
-    width: 1px;
-    height: 12px;
-    background: var(--border);
-    flex: 0 0 auto;
   }
 
   /* ---------- arrow column ---------- */
   .arrow-col {
-    flex: 0 0 120px;
-    align-self: stretch;
+    flex: 0 0 48px;
+    align-self: center;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 14px;
-    padding: 0 12px;
   }
   .arrow-badge {
-    width: 58px;
-    height: 58px;
-    border-radius: 16px;
+    width: 52px;
+    height: 52px;
+    border-radius: 15px;
     display: grid;
     place-items: center;
     color: var(--green);
@@ -385,115 +318,94 @@
     border: 1px solid rgba(74, 222, 128, 0.35);
     box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.06), 0 0 24px rgba(74, 222, 128, 0.18);
   }
-  .arrow-badge svg { width: 26px; height: 26px; }
-  .arrow-caption {
-    font-size: 12px;
-    color: var(--green);
-    text-align: center;
+  .arrow-badge svg { width: 24px; height: 24px; }
+
+  /* ---------- takeaway banner ---------- */
+  .takeaway {
+    margin-top: 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 15px 22px;
+    border-radius: 10px;
+    background: rgba(74, 222, 128, 0.09);
+    border: 1px solid rgba(74, 222, 128, 0.28);
+    font-size: 15px;
     line-height: 1.4;
+    color: var(--text);
   }
+  .takeaway-glyph { color: var(--green); flex: 0 0 auto; display: flex; }
+  .takeaway-glyph svg { width: 18px; height: 18px; }
+  .takeaway-text { min-width: 0; }
 </style>
 </head>
 <body data-theme="opencode">
-  <div class="compare">
+  <div class="stage">
+    <div class="compare">
 
-    <!-- ============ BEFORE PANEL ============ -->
-    <div class="panel" data-panel="before">
-      <div class="panel-caption" data-slot="caption">without plugin</div>
-      <div class="window">
-        <div class="titlebar">
-          <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
-          <div class="window-title">
-            <span class="win-icon"></span>
-            <span class="win-prefix">OC</span>
-            <span class="win-sep">|</span>
-            <span class="win-title-text" data-slot="windowTitle">session</span>
-          </div>
-        </div>
-        <div class="body">
-          <div class="messages">
-            <div class="header-panel">
-              <div class="session-title" data-slot="sessionTitle"># session</div>
-              <div class="usage" data-slot="usage">0  0%  ($0.00)</div>
-            </div>
-            <div data-blocks></div>
-            <div class="agent-line">
-              <span class="agent-glyph">▣</span>
-              <span class="agent-name" data-slot="agentName">Build</span>
-              <span class="agent-model" data-slot="agentModel">· claude-opus-4-5</span>
+      <!-- ============ BEFORE PANEL ============ -->
+      <div class="panel" data-panel="before">
+        <div class="panel-caption" data-slot="caption">before</div>
+        <div class="window">
+          <div class="titlebar">
+            <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+            <div class="window-title">
+              <span class="win-icon"></span>
+              <span class="win-prefix">OC</span>
+              <span class="win-sep">|</span>
+              <span class="win-title-text" data-slot="windowTitle">session</span>
             </div>
           </div>
-          <div class="input-box"><span class="cursor"></span></div>
-          <div class="input-meta">
-            <span class="agent-name" data-slot="inputAgent">Build</span>
-            <span data-slot="inputModel">Claude Opus 4.5</span>
-            <span data-slot="inputProvider">OpenCode Zen</span>
-          </div>
-          <div class="statusbar">
-            <span class="status-left-group">
-              <span class="status-dots" aria-hidden="true">······</span>
-              <span class="status-left"></span>
-            </span>
-            <span class="status-right"></span>
+          <div class="body">
+            <div class="session-title" data-slot="sessionTitle"># session</div>
+            <div class="messages" data-blocks></div>
+            <div class="input-box"><span class="cursor"></span></div>
           </div>
         </div>
       </div>
+
+      <!-- ============ ARROW ============ -->
+      <div class="arrow-col">
+        <div class="arrow-badge" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 12h15" />
+            <path d="M13 6l6 6-6 6" />
+          </svg>
+        </div>
+      </div>
+
+      <!-- ============ AFTER PANEL ============ -->
+      <div class="panel" data-panel="after">
+        <div class="panel-caption" data-slot="caption">after</div>
+        <div class="window">
+          <div class="titlebar">
+            <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+            <div class="window-title">
+              <span class="win-icon"></span>
+              <span class="win-prefix">OC</span>
+              <span class="win-sep">|</span>
+              <span class="win-title-text" data-slot="windowTitle">session</span>
+            </div>
+          </div>
+          <div class="body">
+            <div class="session-title" data-slot="sessionTitle"># session</div>
+            <div class="messages" data-blocks></div>
+            <div class="input-box"><span class="cursor"></span></div>
+          </div>
+        </div>
+      </div>
+
     </div>
 
-    <!-- ============ ARROW ============ -->
-    <div class="arrow-col">
-      <div class="arrow-badge" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 12h15" />
-          <path d="M13 6l6 6-6 6" />
+    <!-- ============ TAKEAWAY ============ -->
+    <div class="takeaway">
+      <span class="takeaway-glyph" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 6L9 17l-5-5" />
         </svg>
-      </div>
-      <div class="arrow-caption" data-slot="arrowCaption">plugin</div>
+      </span>
+      <span class="takeaway-text" data-slot="takeaway">takeaway</span>
     </div>
-
-    <!-- ============ AFTER PANEL ============ -->
-    <div class="panel" data-panel="after">
-      <div class="panel-caption" data-slot="caption">with plugin</div>
-      <div class="window">
-        <div class="titlebar">
-          <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
-          <div class="window-title">
-            <span class="win-icon"></span>
-            <span class="win-prefix">OC</span>
-            <span class="win-sep">|</span>
-            <span class="win-title-text" data-slot="windowTitle">session</span>
-          </div>
-        </div>
-        <div class="body">
-          <div class="messages">
-            <div class="header-panel">
-              <div class="session-title" data-slot="sessionTitle"># session</div>
-              <div class="usage" data-slot="usage">0  0%  ($0.00)</div>
-            </div>
-            <div data-blocks></div>
-            <div class="agent-line">
-              <span class="agent-glyph">▣</span>
-              <span class="agent-name" data-slot="agentName">Build</span>
-              <span class="agent-model" data-slot="agentModel">· claude-opus-4-5</span>
-            </div>
-          </div>
-          <div class="input-box"><span class="cursor"></span></div>
-          <div class="input-meta">
-            <span class="agent-name" data-slot="inputAgent">Build</span>
-            <span data-slot="inputModel">Claude Opus 4.5</span>
-            <span data-slot="inputProvider">OpenCode Zen</span>
-          </div>
-          <div class="statusbar">
-            <span class="status-left-group">
-              <span class="status-dots" aria-hidden="true">······</span>
-              <span class="status-left"></span>
-            </span>
-            <span class="status-right"></span>
-          </div>
-        </div>
-      </div>
-    </div>
-
   </div>
 
   <script>
@@ -502,25 +414,19 @@
         prefix: "OC",
         agentGlyph: "\u25A3",
         dots: true,
-        glyphs: { call: "*", read: "->", write: "*", search: "*", status: "~", done: "\u2713" },
-        defaultStatusLeft: "esc interrupt",
-        defaultStatusRight: "ctrl+t variants  tab agents  ctrl+p commands"
+        glyphs: { call: "*", read: "->", write: "*", search: "*", status: "~", done: "\u2713" }
       },
       "claude-code": {
         prefix: "claude",
         agentGlyph: "\u23FA",
         dots: false,
-        glyphs: { call: "\u23FA", read: "\u23FA", write: "\u23FA", search: "\u23FA", status: "\u273B", done: "\u2714" },
-        defaultStatusLeft: "esc to interrupt",
-        defaultStatusRight: "? for shortcuts"
+        glyphs: { call: "\u23FA", read: "\u23FA", write: "\u23FA", search: "\u23FA", status: "\u273B", done: "\u2714" }
       },
       codex: {
         prefix: "codex",
         agentGlyph: "\u258C",
         dots: false,
-        glyphs: { call: "\u2022", read: "\u203A", write: "\u2022", search: "\u2022", status: "\u2026", done: "\u2713" },
-        defaultStatusLeft: "esc to interrupt",
-        defaultStatusRight: "ctrl+c quit  / commands"
+        glyphs: { call: "\u2022", read: "\u203A", write: "\u2022", search: "\u2022", status: "\u2026", done: "\u2713" }
       }
     };
 
@@ -537,24 +443,13 @@
       return out;
     }
 
-    function hotkeys(str) {
-      if (!str) return "";
-      return String(str).split(/\s{2,}/).map(function (group) {
-        var m = group.match(/^(\S+)\s*(.*)$/);
-        if (!m) return "";
-        var key = m[1];
-        var label = m[2] || "";
-        return '<span class="hk"><kbd>' + esc(key) + "</kbd>" +
-          (label ? '<span class="hk-label">' + esc(label) + "</span>" : "") + "</span>";
-      }).join('<span class="hk-sep"></span>');
-    }
-
     function renderBlock(b, T) {
       var el;
       if (b.type === "user") {
         el = document.createElement("div");
         el.className = "user-msg";
-        el.innerHTML = md(b.text);
+        el.innerHTML = '<span class="user-glyph">&gt;</span>' +
+          '<span class="user-text">' + md(b.text) + "</span>";
       } else if (b.type === "prose") {
         el = document.createElement("p");
         el.className = "prose-line";
@@ -607,21 +502,10 @@
       }
 
       document.querySelectorAll(".win-prefix").forEach(function (el) { el.textContent = T.prefix; });
-      document.querySelectorAll(".agent-glyph").forEach(function (el) { el.textContent = T.agentGlyph; });
-      document.querySelectorAll(".status-dots").forEach(function (el) {
-        el.style.display = T.dots ? "" : "none";
-      });
 
       document.querySelectorAll("[data-slot]").forEach(function (el) {
         var value = resolve(el, el.getAttribute("data-slot"));
         if (value !== undefined && value !== null) el.textContent = value;
-      });
-
-      document.querySelectorAll(".status-left").forEach(function (el) {
-        el.innerHTML = hotkeys(resolve(el, "statusLeft") || T.defaultStatusLeft);
-      });
-      document.querySelectorAll(".status-right").forEach(function (el) {
-        el.innerHTML = hotkeys(resolve(el, "statusRight") || T.defaultStatusRight);
       });
 
       document.querySelectorAll("[data-blocks]").forEach(function (container) {
