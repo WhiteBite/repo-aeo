@@ -11,11 +11,11 @@
       { "type": "user", "text": "audit this repository" },
       { "type": "prose", "text": "Running the offline audit." },
       { "type": "diff", "lines": [
-        { "type": "del", "text": "score: 56/100 (grade D)" },
+        { "type": "del", "text": "score: 58/100 (grade D)" },
         { "type": "del", "text": "AGENTS.md is missing" },
-        { "type": "del", "text": "9 errors - 12 warnings" }
+        { "type": "del", "text": "errors 9 · warnings 13" }
       ] },
-      { "type": "status", "text": "23/44 checks passed" }
+      { "type": "status", "text": "26/48 checks passed" }
     ]
   },
 
@@ -26,11 +26,11 @@
       { "type": "user", "text": "audit this repository" },
       { "type": "prose", "text": "Re-running after the safe autofixes." },
       { "type": "diff", "lines": [
-        { "type": "add", "text": "score: 92/100 (grade A)" },
+        { "type": "add", "text": "score: 87/100 (grade B)" },
         { "type": "add", "text": "AGENTS.md with real commands" },
-        { "type": "add", "text": "0 errors - 0 warnings" }
+        { "type": "add", "text": "errors 0 · warnings 7" }
       ] },
-      { "type": "done", "text": "done in 2.4s" }
+      { "type": "done", "text": "exit 0" }
     ]
   }
 }

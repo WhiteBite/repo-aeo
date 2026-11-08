@@ -71,6 +71,34 @@
       "expected": { "surface": "files", "theme": "shell", "format": "static" },
       "essence": "Multiple value props: pick the defining one no adjacent tool offers - the shared registry killing per-machine drift - not the easiest to draw (the formatter run).",
       "catches": ["showing a formatting run because a terminal is easy to draw", "numbers-only picture"]
+    },
+    {
+      "id": "recurrence-gate-shows-recurrence",
+      "prompt": "A plugin that promotes a gate after the same tool call fails 3x across sessions and then reminds/blocks.",
+      "expected": { "surface": "terminal", "theme": "opencode", "format": "animated-gif" },
+      "essence": "the identical call is typed on EVERY attempt and the reaction (counter, gate card) escalates beside it - counters without their attempts read as magic",
+      "catches": ["static before/after", "failure counters shown without the repeated calls"]
+    },
+    {
+      "id": "silent-store-state-hud",
+      "prompt": "A tool that counts failures silently in a JSON store and only speaks in-session when the gate fires.",
+      "expected": { "surface": "terminal", "theme": "opencode", "format": "animated-gif" },
+      "essence": "the silent store state is shown as a hud annotation labeled with the store file (gates.json), never as invented session output lines",
+      "catches": ["invented [tool] failure N/M session lines", "invented promotion line in the session"]
+    },
+    {
+      "id": "real-strings-verbatim",
+      "prompt": "Any gate/reminder tool demo.",
+      "expected": { "surface": "terminal" },
+      "essence": "reminder/correction/evidence lines are copied verbatim from the tool's message source (punctuation and counts included), not paraphrased",
+      "catches": ["paraphrased gate messages", "plausible-but-fake output shapes"]
+    },
+    {
+      "id": "typed-input-streamed-output",
+      "prompt": "An animated terminal demo.",
+      "expected": { "format": "animated-gif" },
+      "essence": "input lines type 2-3 chars per frame at 0.03s while tool/system output arrives as whole or word-chunk bursts at 0.06-0.08s - output is never keystroked",
+      "catches": ["output typed char by char", "input popping in whole"]
     }
   ]
 }
