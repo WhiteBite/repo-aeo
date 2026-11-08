@@ -101,7 +101,7 @@ before/after difference manifests, then read `references/visual-assets.md`:
 | agent conversation / tool flow | terminal + that harness theme |
 | file contents / shape | files + shell |
 | command outcome, human or generic actor | terminal + shell |
-| rendered UI | a real screenshot, never the template |
+| rendered UI | a real screenshot framed by the shots surface, never faked |
 | numbers only | no picture: prose or a markdown table |
 
 Make no picture when the project has no observable before/after. Fill the slot

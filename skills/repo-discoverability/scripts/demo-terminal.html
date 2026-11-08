@@ -352,6 +352,99 @@
 
   .panel[data-surface="files"] .input-box { display: none; }
 
+  /* ---------- shots surface ---------- */
+  .panel[data-surface="shots"] .titlebar,
+  .panel[data-surface="shots"] .session-title,
+  .panel[data-surface="shots"] .input-box { display: none; }
+  .panel[data-surface="shots"] .body { padding: 0; }
+  .panel[data-surface="shots"] .messages {
+    align-items: center;
+    justify-content: center;
+  }
+
+  .shot-canvas {
+    position: relative;
+    display: inline-block;
+    line-height: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+  .shot-canvas img {
+    display: block;
+    width: var(--shot-w, auto);
+    height: auto;
+    max-width: 100%;
+    max-height: 420px;
+  }
+  .shot-anno {
+    position: absolute;
+    border: 2px solid var(--red);
+    border-radius: 4px;
+  }
+  .shot-anno.green { border-color: var(--green); }
+  .shot-anno.dim { box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45); }
+  .shot-anno-label {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.5;
+    padding: 0 6px;
+    border-radius: 3px;
+    background: var(--red);
+    color: #ffffff;
+    white-space: nowrap;
+  }
+  .shot-anno.green .shot-anno-label { background: var(--green); color: #06210f; }
+  .shot-caption {
+    align-self: stretch;
+    width: 100%;
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+    border-top: 1px solid var(--border-subtle);
+    padding: 6px 10px;
+  }
+
+  /* ---------- steps block ---------- */
+  .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 13px;
+  }
+  .step {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+  }
+  .step-num {
+    flex: 0 0 auto;
+    min-width: 16px;
+    text-align: right;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .step-glyph { flex: 0 0 auto; min-width: 14px; }
+  .step-glyph.ok { color: var(--green); }
+  .step-glyph.pain { color: var(--red); }
+  .step-glyph.removed { color: var(--muted); }
+  .step-text { min-width: 0; }
+  .step.removed .step-text { color: var(--muted); text-decoration: line-through; }
+  .steps-more {
+    color: var(--muted);
+    font-size: 12px;
+    padding-left: 24px;
+  }
+  .steps-collapse {
+    display: flex;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--green);
+  }
+  .steps-collapse-glyph { flex: 0 0 auto; min-width: 14px; }
+
   /* ---------- arrow column ---------- */
   .arrow-col {
     flex: 0 0 40px;
@@ -561,6 +654,34 @@
         el.className = "done";
         el.innerHTML = '<span class="done-glyph">' + esc(T.glyphs.done) + '</span>' +
           '<span class="done-text">' + md(b.text) + "</span>";
+      } else if (b.type === "steps") {
+        el = document.createElement("div");
+        el.className = "steps";
+        var steps = Array.isArray(b.steps) ? b.steps : [];
+        steps.slice(0, 8).forEach(function (s, i) {
+          var state = s && s.state ? s.state : "ok";
+          var row = document.createElement("div");
+          row.className = "step" + (state === "removed" ? " removed" : "");
+          var num = document.createElement("span");
+          num.className = "step-num";
+          num.textContent = String(i + 1);
+          var glyph = document.createElement("span");
+          glyph.className = "step-glyph " + state;
+          glyph.textContent = state === "pain" ? "\u2717" : state === "removed" ? "\u2013" : "\u2713";
+          var text = document.createElement("span");
+          text.className = "step-text";
+          text.innerHTML = md(s ? s.text : "");
+          row.appendChild(num);
+          row.appendChild(glyph);
+          row.appendChild(text);
+          el.appendChild(row);
+        });
+        if (steps.length > 8) {
+          var more = document.createElement("div");
+          more.className = "steps-more";
+          more.textContent = "... +" + (steps.length - 8) + " more steps";
+          el.appendChild(more);
+        }
       } else {
         el = document.createElement("p");
         el.className = "prose-line";
@@ -588,8 +709,17 @@
         return "terminal";
       }
 
+      function panelValue(pk, key) {
+        if (pk && data[pk] && key in data[pk]) return data[pk][key];
+        if (key in data) return data[key];
+        return undefined;
+      }
+
       document.querySelectorAll("[data-panel]").forEach(function (panel) {
-        panel.setAttribute("data-surface", surfaceFor(panel.getAttribute("data-panel")));
+        var pk = panel.getAttribute("data-panel");
+        panel.setAttribute("data-surface", surfaceFor(pk));
+        var win = panel.querySelector(".window");
+        if (win && surfaceFor(pk) === "shots") win.classList.add("shot");
       });
 
       document.querySelectorAll(".win-prefix").forEach(function (el) {
@@ -612,9 +742,56 @@
       document.querySelectorAll("[data-blocks]").forEach(function (container) {
         var panel = container.closest("[data-panel]");
         var pk = panel ? panel.getAttribute("data-panel") : null;
-        var blocks = (pk && data[pk] && data[pk].blocks) || [];
         container.innerHTML = "";
+        if (surfaceFor(pk) === "shots") {
+          var shot = panelValue(pk, "shot");
+          if (shot) {
+            var canvas = document.createElement("div");
+            canvas.className = "shot-canvas";
+            var shotW = panelValue(pk, "shotW");
+            var shotScale = panelValue(pk, "shotScale") || 2;
+            if (shotW) canvas.style.setProperty("--shot-w", (shotW / shotScale) + "px");
+            var img = document.createElement("img");
+            img.src = shot;
+            img.alt = "";
+            canvas.appendChild(img);
+            var annos = panelValue(pk, "annotations");
+            (Array.isArray(annos) ? annos : []).forEach(function (a) {
+              if (!a || typeof a !== "object") return;
+              var rect = document.createElement("div");
+              rect.className = "shot-anno" + (a.color === "green" ? " green" : "") + (a.dim ? " dim" : "");
+              rect.style.left = "calc(" + a.x + " * 100%)";
+              rect.style.top = "calc(" + a.y + " * 100%)";
+              rect.style.width = "calc(" + a.w + " * 100%)";
+              rect.style.height = "calc(" + a.h + " * 100%)";
+              if (a.label) {
+                var label = document.createElement("span");
+                label.className = "shot-anno-label";
+                label.textContent = a.label;
+                rect.appendChild(label);
+              }
+              canvas.appendChild(rect);
+            });
+            container.appendChild(canvas);
+          }
+          var shotCaption = panelValue(pk, "shotCaption");
+          if (shotCaption) {
+            var cap = document.createElement("div");
+            cap.className = "shot-caption";
+            cap.textContent = shotCaption;
+            container.appendChild(cap);
+          }
+          return;
+        }
+        var blocks = (pk && data[pk] && data[pk].blocks) || [];
         blocks.forEach(function (b) { container.appendChild(renderBlock(b, T)); });
+        var collapses = panelValue(pk, "collapses");
+        if (typeof collapses === "number" && collapses > 0) {
+          var line = document.createElement("div");
+          line.className = "steps-collapse";
+          line.innerHTML = '<span class="steps-collapse-glyph">\u21B3</span> collapses ' + collapses + ' steps';
+          container.appendChild(line);
+        }
       });
 
       var takeaway = document.querySelector(".takeaway");

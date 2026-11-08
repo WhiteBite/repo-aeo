@@ -1,4 +1,3 @@
-import { chromium } from "playwright-core";
 import { pathToFileURL } from "node:url";
 import path from "node:path";
 import fs from "node:fs";
@@ -11,11 +10,41 @@ function arg(name, fallback) {
 
 const template = path.resolve(arg("template", "template.html"));
 const dataFile = path.resolve(arg("data", "sample-opencode.json"));
-const out = path.resolve(arg("out", "sample.png"));
+const outArg = arg("out", "");
+const out = path.resolve(outArg || "sample.png");
 const width = Number(arg("width", "1200"));
 const heightArg = arg("height", "auto");
 const scale = Number(arg("scale", "2"));
 const themeOverride = arg("theme", "");
+const prepareOnly = process.argv.includes("--prepare");
+
+const MIME = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+};
+
+function prepareData(data, dataDir) {
+  for (const pk of ["before", "after"]) {
+    const panel = data[pk];
+    if (!panel || typeof panel !== "object" || typeof panel.shot !== "string") continue;
+    const shotPath = path.resolve(dataDir, panel.shot);
+    if (!fs.existsSync(shotPath)) throw new Error(`shot not found: ${shotPath}`);
+    const buf = fs.readFileSync(shotPath);
+    const isPng = buf.length >= 24 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
+    if (isPng) {
+      panel.shotW = buf.readUInt32BE(16);
+      panel.shotH = buf.readUInt32BE(20);
+    } else if (typeof panel.shotW !== "number" || typeof panel.shotH !== "number") {
+      throw new Error(`shot ${panel.shot} is not a PNG; author shotW and shotH in the slot JSON`);
+    }
+    const mime = MIME[path.extname(shotPath).toLowerCase()] || "application/octet-stream";
+    panel.shot = `data:${mime};base64,${buf.toString("base64")}`;
+  }
+  return data;
+}
 
 function findChromium() {
   const roots = [
@@ -40,15 +69,42 @@ function findChromium() {
   return undefined;
 }
 
-for (const f of [template, dataFile]) {
-  if (!fs.existsSync(f)) {
-    console.error(`missing input: ${f}`);
-    process.exit(1);
-  }
+if (!fs.existsSync(dataFile)) {
+  console.error(`missing input: ${dataFile}`);
+  process.exit(1);
 }
 
 const data = JSON.parse(fs.readFileSync(dataFile, "utf8"));
 if (themeOverride) data.theme = themeOverride;
+try {
+  prepareData(data, path.dirname(dataFile));
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
+}
+
+const preparedOut = path.join(path.dirname(dataFile), path.basename(dataFile, ".json") + ".prepared.json");
+
+let chromium;
+try {
+  ({ chromium } = await import("playwright-core"));
+} catch {
+  chromium = null;
+}
+
+if (prepareOnly || !chromium) {
+  const target = outArg ? out : preparedOut;
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, JSON.stringify(data, null, 2));
+  console.log(`prepared ${path.basename(dataFile)} -> ${target}`);
+  if (!prepareOnly) console.log("playwright-core not found; rasterize with an on-demand renderer (see references/visual-assets.md)");
+  process.exit(0);
+}
+
+if (!fs.existsSync(template)) {
+  console.error(`missing input: ${template}`);
+  process.exit(1);
+}
 
 const executablePath = findChromium();
 const browser = await chromium.launch(executablePath ? { executablePath } : {});

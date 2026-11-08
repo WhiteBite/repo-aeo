@@ -59,11 +59,31 @@ First ask WHERE the difference between before and after manifests; the surface f
        { "type": "diff", "lines": [ { "type": "add", "text": "score: 92/100 (grade A)" } ] } ] } }
    ```
 
-4. In rendered UI (components, themes, visual tools) -> real screenshots of the product, never the template. Screenshot the real running page; if it cannot run headlessly, make no picture. Self-check: if the image shows the green arrow badge it is the template, not a UI.
+4. In rendered UI (components, themes, visual tools) -> real screenshots of the product, framed by the `shots` surface, never the template. Screenshot the real running page; if it cannot run headlessly, make no picture. Self-check: if the image shows the green arrow badge it is the template, not a UI.
 
 5. Only in numbers (time, tokens, cost, size) -> do not make a numbers-only picture; embed the numbers as payoff/status lines inside the surface chosen above.
 
 Theme derivation: theme = the harness the actor runs in; human or generic actor => shell; when both panels are files the theme is ignored, set shell.
+
+## Guide: numbers, matrices, topology, animation
+
+Not every before/after is a picture. Pick the native GitHub format first; a
+rendered image is the last resort, not the default.
+
+- **Numbers only** (time, tokens, cost, size) -> a **GitHub markdown table**
+  (native, dark-mode safe), plus a payoff line inside the chosen surface. Never
+  a numbers-only picture.
+- **Capability matrix** -> a **markdown table** with check/cross glyphs
+  (`✓` / `✗`), never an image card.
+- **Single topology diagram** -> a **GitHub-native Mermaid fence**. Do **not**
+  set `theme` in the `init` directive - it breaks auto dark mode. Mermaid cannot
+  sit in a table cell, so there is no side-by-side.
+- **Before/after topology** -> deferred: pre-render light + dark with
+  `mermaid-cli` and swap them via `<picture>`.
+- **Animated demo** -> a **GIF via [charmbracelet/vhs](https://github.com/charmbracelet/vhs)**
+  (MIT, deterministic tape -> GIF; needs `ttyd`, `ffmpeg` and fonts on `PATH`).
+  GIF is the only animated format that survives a committed README asset: raw
+  `<video>` and MP4 URLs are stripped by the GitHub sanitizer.
 
 ## Rendering an agent-terminal demo (the locked template)
 
@@ -72,15 +92,23 @@ the result cannot look crooked.
 
 ```bash
 # 1. write a slot JSON (see schema below), e.g. demo/stop-ai-slop.json
-# 2. render it (needs playwright-core; install on demand, never a repo dep)
-node <skill>/scripts/render-demo.mjs --data demo/stop-ai-slop.json --out assets/demo.png --width 900
+# 2. prepare it: resolve shots to data URIs, write a prepared JSON (zero-dep)
+node <skill>/scripts/render-demo.mjs --data demo/stop-ai-slop.json --prepare --out demo/stop-ai-slop.prepared.json
+# 3. rasterize the prepared JSON with an on-demand playwright renderer
+node <renderer>/render.mjs --template <skill>/scripts/demo-terminal.html \
+  --data demo/stop-ai-slop.prepared.json --out assets/demo.png --width 900 --scale 2
 ```
 
 `scripts/demo-terminal.html` is the locked look (two OpenCode-style panels, a
 green arrow between them, and a full-width takeaway banner below).
-`scripts/render-demo.mjs` fills it from JSON and screenshots to PNG via a cached
-Chromium (no browser download). If playwright is unavailable, fall back to your
-own screenshot capability on the same template.
+`scripts/render-demo.mjs` is a **preparer**: it fills the shot slots (reads each
+`shot` file, inlines it as a data URI, reads the PNG dimensions) and writes a
+prepared JSON. The template never touches the filesystem and the preparer carries
+no runtime dependency. Rasterization is a separate, on-demand step: any
+playwright-core renderer that loads the template and calls
+`window.fillTemplate(prepared)` works (the repo ships none). If `playwright-core`
+happens to be resolvable, `render-demo.mjs` rasterizes in one step and
+`--prepare` is unnecessary.
 
 ### Slot schema (v4)
 
@@ -93,15 +121,18 @@ one plain-language sentence rendered in the full-width banner below both panels)
 Per panel (`before`, `after`): `caption`, `sessionTitle`, `surface`, `blocks[]`.
 `usage`, `agentName`, `agentModel`, `inputAgent`, `inputModel` and
 `inputProvider` are ignored since v3.
-`surface` is `terminal` (default) or `files`: a `files` panel drops the traffic
-lights and the input box and renders the titlebar as neutral editor chrome, for
-demos whose essence is a config or repo artifact rather than an agent session.
+`surface` is `terminal` (default), `files` or `shots`. A `files` panel drops the
+traffic lights and the input box and renders the titlebar as neutral editor
+chrome, for demos whose essence is a config or repo artifact rather than an
+agent session. A `shots` panel drops the titlebar, the session title and the
+input box and frames a real screenshot instead (see "Shots surface" below).
 `blocks[]` is an ordered event stream:
 `{type:"user"|"prose"|"tool"|"status"|"done",text}`,
-`{type:"diff",lines:[...]}` or `{type:"file",path,lines:[...]}`. `tool` takes an
-optional `kind` (`call|read|write|search`) that picks the theme's glyph. A
-`file` block is a card with a muted mono `path` header and diff-style lines
-below, tinted by panel like `diff`. Text supports `` `code` `` and `**bold**`.
+`{type:"diff",lines:[...]}`, `{type:"file",path,lines:[...]}` or
+`{type:"steps",steps:[...]}`. `tool` takes an optional `kind`
+(`call|read|write|search`) that picks the theme's glyph. A `file` block is a card
+with a muted mono `path` header and diff-style lines below, tinted by panel like
+`diff`. Text supports `` `code` `` and `**bold**`.
 A diff line is either `{type:"add"|"del"|"ctx",text}` (a string line, kept
 verbatim) or `{type:"add"|"del"|"ctx",left,right}` (two aligned mono columns, so
 authors who forget manual padding still get table alignment). The `+`/`-`/space
@@ -124,10 +155,69 @@ Legibility rules (v4):
 - Traffic lights are honored per theme: `opencode` and `shell` show them,
   `claude-code` and `codex` do not.
 
+### Shots surface (real screenshots)
+
+A `shots` panel frames a real screenshot of the running product. It is the only
+honest surface for rendered UI: never fake a UI with terminal lines, and never
+embed the template itself.
+
+Per panel: `surface: "shots"`, `shot` (path to a PNG, resolved relative to the
+slot JSON's directory), `shotScale` (default 2), `shotCaption` (a strip under
+the image) and `annotations[]`. `caption` and `sessionTitle` are accepted, but
+the session title is hidden. **Blocks are forbidden on a shots panel** - a
+screenshot is self-contained evidence, and terminal lines around it would fake a
+session.
+
+`annotations[]` entries are `{x, y, w, h, label?, color?, dim?}` where `x/y/w/h`
+are fractions in `0..1` of the image box, so they land on the same region at any
+render scale. `color` is `red` (default) or `green`; `dim: true` darkens
+everything outside the rect; `label` is a chip on the rect's top-left corner.
+
+```json
+{ "theme": "shell", "takeaway": "The empty state now shows the next action",
+  "before": { "surface": "shots", "shot": "shots/before.png", "shotCaption": "before: blank panel",
+    "annotations": [ { "x": 0.08, "y": 0.62, "w": 0.5, "h": 0.16, "label": "no next step", "dim": true } ] },
+  "after": { "surface": "shots", "shot": "shots/after.png", "shotCaption": "after: guided",
+    "annotations": [ { "x": 0.08, "y": 0.62, "w": 0.5, "h": 0.16, "label": "next step", "color": "green" } ] } }
+```
+
+Rules:
+
+- **Capture at DPR 2.** `shotScale` defaults to 2 and `--shot-w` is
+  `shotW / shotScale`, so a 2x capture renders at its CSS size. A 1x capture
+  upscales soft.
+- **Legibility.** Capture the region that proves the point at **<= ~440 CSS px
+  wide**; never embed a full desktop window - it shrinks to unreadable mush at
+  README width.
+- **Letterbox, never crop.** The image is contained (`max-height: 420px`,
+  `max-width: 100%`); cropping a real screenshot can hide the UI that proves the
+  point.
+- **PNG only for auto-sizing.** The preparer reads the PNG IHDR for `shotW` /
+  `shotH`. A non-PNG shot must author `shotW` and `shotH` in the slot JSON or
+  the preparer errors out.
+
+### Steps block (a numbered run)
+
+`{type:"steps",steps:[{text,state}]}` renders a numbered list inside a
+`terminal` or `files` panel (it is a block, not a surface). `state` is `ok`
+(green check), `pain` (red cross) or `removed` (muted dash, struck-through
+text). At most **8** entries render; the rest collapse into a `... +N more
+steps` line. A per-panel integer `collapses` adds a green `collapses N steps`
+line after the blocks - use it on the after panel to show a long manual run
+reduced to one step.
+
+```json
+{ "type": "steps", "steps": [
+  { "text": "open the settings file", "state": "pain" },
+  { "text": "find the right key", "state": "pain" },
+  { "text": "run the helper", "state": "ok" } ] }
+```
+
 Validate a slot before rendering: `node scripts/check-slot.mjs demo/<name>.json`
 exits non-zero on any schema error (missing takeaway, more than 5 blocks per
-panel, a line over 50 characters, an unknown theme or surface) and prints
-warnings for an absent surface or an unknown block type.
+panel, a line over 50 characters, an unknown theme or surface, a `shots` panel
+without a `shot`) and prints warnings for an absent surface, an unknown block
+type, blocks on a `shots` panel, or a `steps` block with more than 8 entries.
 
 Minimal example:
 

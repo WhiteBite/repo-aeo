@@ -5,10 +5,11 @@
  */
 
 const THEMES = new Set(['opencode', 'claude-code', 'codex', 'shell']);
-const SURFACES = new Set(['terminal', 'files']);
-const BLOCK_TYPES = new Set(['user', 'prose', 'tool', 'status', 'done', 'diff', 'file']);
+const SURFACES = new Set(['terminal', 'files', 'shots']);
+const BLOCK_TYPES = new Set(['user', 'prose', 'tool', 'status', 'done', 'diff', 'file', 'steps']);
 const MAX_BLOCKS = 5;
 const MAX_LINE = 50;
+const MAX_STEPS = 8;
 
 function lineTexts(block) {
   const texts = [];
@@ -19,6 +20,11 @@ function lineTexts(block) {
       for (const key of ['text', 'left', 'right']) {
         if (typeof line[key] === 'string') texts.push(line[key]);
       }
+    }
+  }
+  if (Array.isArray(block.steps)) {
+    for (const step of block.steps) {
+      if (step && typeof step.text === 'string') texts.push(step.text);
     }
   }
   return texts;
@@ -50,9 +56,17 @@ export function validateSlot(obj) {
     if (surface === undefined) {
       warnings.push(`${panelName}: surface absent, defaults to terminal`);
     } else if (!SURFACES.has(surface)) {
-      errors.push(`${panelName}: surface must be terminal|files, got ${JSON.stringify(surface)}`);
+      errors.push(`${panelName}: surface must be terminal|files|shots, got ${JSON.stringify(surface)}`);
     }
     const blocks = Array.isArray(panel.blocks) ? panel.blocks : [];
+    if (surface === 'shots') {
+      if (typeof panel.shot !== 'string' || panel.shot.trim() === '') {
+        errors.push(`${panelName}: shots surface requires a non-empty shot`);
+      }
+      if (blocks.length > 0) {
+        warnings.push(`${panelName}: blocks are ignored on a shots panel`);
+      }
+    }
     if (blocks.length > MAX_BLOCKS) {
       errors.push(`${panelName}: ${blocks.length} blocks exceeds the ${MAX_BLOCKS}-block limit`);
     }
@@ -60,6 +74,9 @@ export function validateSlot(obj) {
       if (!block || typeof block !== 'object') continue;
       if (!BLOCK_TYPES.has(block.type)) {
         warnings.push(`${panelName}: unknown block type ${JSON.stringify(block.type)} (rendered as prose)`);
+      }
+      if (block.type === 'steps' && Array.isArray(block.steps) && block.steps.length > MAX_STEPS) {
+        warnings.push(`${panelName}: steps block has ${block.steps.length} entries; only ${MAX_STEPS} render`);
       }
       for (const text of lineTexts(block)) {
         if (text.length > MAX_LINE) {
