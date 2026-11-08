@@ -100,6 +100,9 @@ Minimal example:
   fragments.
 - Never embed a committed `.mp4` (GitHub strips `<video>`), an animated SVG
   (unreliable in README), or any `<iframe>`/`<script>` (stripped).
+- A catch-all `* text` / `* text eol=...` rule in `.gitattributes` strips CRLF
+  bytes out of committed PNG/GIF blobs, so README images render broken on
+  GitHub; add a `*.png binary` line after the catch-all and re-commit the asset.
 
 ## Safety rails
 

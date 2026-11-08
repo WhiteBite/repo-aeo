@@ -78,4 +78,5 @@ exists, docs only when a homepage/docs site is configured).
 | `hygiene.citation` | 6 | CITATION.cff |
 | `hygiene.issue_templates` | 5 | issue/PR templates |
 | `hygiene.gitattributes` | 4 | line-ending normalisation |
+| `hygiene.gitattributes_binaries` | 4 | a `*.png binary` line after any catch-all text rule |
 | `hygiene.ci` | 8 | a workflow under `.github/workflows/` |

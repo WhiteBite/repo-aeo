@@ -4,7 +4,7 @@
  * heuristic over the most recent commits.
  */
 import { check, finding, skip } from './_shared.js';
-import { exists, readTextIfExists } from '../../util/fs.js';
+import { exists, listFiles, readTextIfExists } from '../../util/fs.js';
 import { citationVersionDrift, citationRepositoryDrift, dependabotEcosystems } from '../../generate/index.js';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -18,6 +18,32 @@ const SECRET_PATTERNS = [
   { id: 'npm_token', re: /\bnpm_[A-Za-z0-9]{36}\b/, label: 'npm token' },
   { id: 'generic_secret', re: /\b(?:api[_-]?key|secret|token|password)\s*[:=]\s*['"][A-Za-z0-9/+_=-]{16,}['"]/i, label: 'hardcoded credential' },
 ];
+
+const BINARY_ASSET_RE = /\.(png|gif|jpe?g|webp|mp4)$/i;
+const CATCH_ALL_PATTERNS = new Set(['*', '**', '/*']);
+const BINARY_ATTRS = new Set(['binary', '-text', 'text=false']);
+
+function gitattributesRules(text) {
+  const rules = [];
+  const lines = String(text || '').split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index].trim();
+    if (line === '' || line.startsWith('#')) continue;
+    const [pattern, ...attrs] = line.split(/\s+/);
+    rules.push({ pattern, attrs, index });
+  }
+  return rules;
+}
+
+// text=auto and a bare `auto` spare binaries; only an explicit text/text=true forces them
+function forcesText(attrs) {
+  if (attrs.includes('auto') || attrs.includes('text=auto')) return false;
+  return attrs.includes('text') || attrs.includes('text=true');
+}
+
+function isBinaryException(rule) {
+  return BINARY_ASSET_RE.test(rule.pattern) && rule.attrs.some((attr) => BINARY_ATTRS.has(attr));
+}
 
 export const hygieneChecks = [
   check({
@@ -158,6 +184,34 @@ export const hygieneChecks = [
         return finding({ id: this.id, axis: this.axis, severity: 'info', title: 'No .gitattributes', why: this.why, fix: this.fix, effort: 'S' });
       }
       return null;
+    },
+  }),
+
+  check({
+    id: 'hygiene.gitattributes_binaries',
+    axis: 'hygiene',
+    weight: 4,
+    title: 'No catch-all text rule corrupts committed binary assets',
+    why: 'A catch-all `* text` rule makes git rewrite binary blobs at commit time (CRLF->LF), so committed PNG/GIF assets are corrupted and README images render broken on GitHub even though the worktree file is fine.',
+    fix: 'Add a `*.png binary` line (and one per other shipped binary extension) after the catch-all rule, then `git add` the assets to re-store them unnormalized.',
+    effort: 'S',
+    autoFixable: false,
+    patchId: null,
+    run(ctx) {
+      const path = join(ctx.cwd, '.gitattributes');
+      if (!exists(path)) return null;
+      const rules = gitattributesRules(readTextIfExists(path));
+      let lastForce = -1;
+      for (const rule of rules) {
+        if (CATCH_ALL_PATTERNS.has(rule.pattern) && forcesText(rule.attrs)) lastForce = rule.index;
+      }
+      if (lastForce === -1) return null;
+      if (rules.some((rule) => rule.index > lastForce && isBinaryException(rule))) return null;
+      const assets = listFiles(ctx.cwd, { recursive: true, maxDepth: 4 }).filter((file) => BINARY_ASSET_RE.test(file));
+      if (assets.length === 0) return null;
+      const extensions = [...new Set(assets.map((file) => file.slice(file.lastIndexOf('.')).toLowerCase()))];
+      const fix = `Add ${extensions.map((ext) => `\`*${ext} binary\``).join(', ')} after the catch-all rule, then \`git add\` the assets to re-store them unnormalized.`;
+      return finding({ id: this.id, axis: this.axis, severity: 'warn', title: this.title, why: this.why, fix, effort: this.effort });
     },
   }),
 

@@ -14,7 +14,7 @@ RDK измеряет discoverability вашего репозитория, чин
 автоматически, и не даёт показателю деградировать в CI. Это инструмент, который
 направляют на репо, которое *хорошее, но невидимое*.
 
-Аудит выполняет **46 проверок менее чем за 300 мс офлайн** на этом репозитории
+Аудит выполняет **47 проверок менее чем за 300 мс офлайн** на этом репозитории
 (замер через `rdk audit --format json`, поле `duration_ms`) и не имеет **ни одной
 рантайм-зависимости**, поэтому `npx` остаётся быстрым, а цепочка поставок — маленькой.
 
@@ -117,7 +117,7 @@ docker run -i repo-aeo-mcp serve
 
 ```bash
 $ npx repo-aeo audit            # measured on fixtures/demo-repo, offline
-score: 55/100 (grade D) · checks: 23/45 passed · findings: 9 error, 13 warn, 13 info (19 autofixable) · mode: offline (use --online for link + GitHub checks)
+score: 56/100 (grade D) · checks: 24/46 passed · findings: 9 error, 13 warn, 13 info (19 autofixable) · mode: offline (use --online for link + GitHub checks)
 ```
 
 ### 2. Починить то, что безопасно чинится
@@ -158,7 +158,7 @@ GitHub сам скачивает экшен, экшен сам тянет дви
 ```bash
 $ npx repo-aeo-mcp score
 Discoverability score: 100/100 (grade A)
-checks passed: 46/46 - errors 0 - warnings 0 - autofixable 0
+checks passed: 47/47 - errors 0 - warnings 0 - autofixable 0
 trend: no history yet
 ```
 
