@@ -179,6 +179,15 @@ test('validateSlot accepts palette light and rejects an unknown palette', () => 
   assert.ok(errors.some((error) => /palette/.test(error)), 'expected a palette error');
 });
 
+test('validateSlot warns on a delay below the 0.02s GIF floor and passes 0.03 clean', () => {
+  const base = { theme: 'shell', takeaway: 'ok', before: { blocks: [] }, after: { blocks: [] } };
+  const { errors, warnings } = validateSlot({ ...base, delay: 0.01 });
+  assert.deepEqual(errors, []);
+  assert.ok(warnings.some((warning) => /0\.02|floor|clamp/.test(warning)), 'expected a delay-floor warning');
+  const clean = validateSlot({ ...base, delay: 0.03 });
+  assert.ok(!clean.warnings.some((warning) => /delay/.test(warning)), 'expected no delay warning for 0.03');
+});
+
 test('render-demo --from-command prints the tool block, both output lines and an exit-0 done block', () => {
   const { status, blocks } = fromCommand(`node -e "console.log('hello'); console.error('warn line'); process.exit(0)"`);
   assert.equal(status, 0);

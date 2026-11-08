@@ -52,6 +52,9 @@ export function validateSlot(obj) {
   if (typeof obj.takeaway !== 'string' || obj.takeaway.trim() === '') {
     errors.push('takeaway is required and must be a non-empty string');
   }
+  if (typeof obj.delay === 'number' && obj.delay > 0 && obj.delay < 0.02) {
+    warnings.push(`delay ${obj.delay}s is below the 0.02s GIF floor; browsers clamp sub-20ms delays to 100ms`);
+  }
   for (const panelName of ['before', 'after']) {
     const panel = obj[panelName];
     if (!panel || typeof panel !== 'object' || Array.isArray(panel)) {

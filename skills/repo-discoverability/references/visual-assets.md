@@ -148,22 +148,35 @@ template hides the arrow and the other panel and renders one window at full
 stage width.
 
 **Typing / streaming.** A terminal that only swaps whole states reads as a
-slideshow. Two things stream, at different granularity:
+slideshow. Two kinds of line stream, at different granularity, because a real
+terminal types input and streams output:
 
-- **Commands and input** (tool calls, the user line) grow by **8-14 characters**
-  per frame - a keystroke run. Write the partial strings yourself; the template
-  does not animate. A command run is 2-3 frames ending on the complete line.
-- **Agent speech** (prose, `status`, `done`, plugin narration) grows by **2-4
-  words** per frame - a real session streams prose word by word, not character
-  by character. A speech run is 1-2 intermediates ending on the complete line.
+- **Typed lines** - what a human or the agent INPUTS: the `user` block text,
+  agent prose/decision lines, and tool-call command text. They grow by **2-3
+  characters** per frame at `delay` 0.03s - a keystroke run. Write the partial
+  strings yourself; the template does not animate. A typed run is several frames
+  ending on the complete line. This is the per-character model
+  [charmbracelet/vhs](https://github.com/charmbracelet/vhs) uses: its
+  `Set TypingSpeed` is seconds per key press, so 0.03s per key is ~33 chars/s -
+  fast terminal typing.
+- **Streamed lines** - system/tool OUTPUT: `status`, `done`, `diff` lines,
+  plugin messages (`[dejavu] REMINDER`/`CORRECTION`/`EVIDENCE`) and command
+  output. They are NOT typed; they arrive in **1-2 fast word chunks** at `delay`
+  0.06-0.08s, because a program writes output in buffered chunks, not
+  keystrokes. A streamed run is 1-2 intermediates ending on the complete line.
 
 The frame after a run is the beat hold that reveals the result.
 
 **Per-frame delays.** Give each frame a `delay` (seconds) in the frames JSON:
-command-typing frames are short (0.10-0.15s), speech-typing frames are 0.08-0.12s
-so the words land at reading speed, beat frames hold 0.9-1.2s so the eye reads
-the result, and the final frame holds 2.5-3s. The delay is read at assembly
-time, not by the template.
+typed frames are 0.03s, streamed frames are 0.06-0.08s, beat frames hold
+0.9-1.2s so the eye reads the result, and the final frame holds 3s. The delay is
+read at assembly time, not by the template.
+
+**GIF delay floor.** Never author a `delay` below 0.02s. GIF frame delays are
+stored in centiseconds, and Blink/WebKit/Gecko clamp any delay under 20ms up to
+100ms - so a 0.01s "fast typing" frame silently becomes a 10fps slideshow
+instead of the intended speed. 0.03s (3cs) is the fastest safe typed frame;
+`validateSlot` warns on a numeric `delay` in `(0, 0.02)`.
 
 **Height.** In `single` mode the window is a fixed height (520px) and the input
 box is pinned to the bottom, so every frame renders at the same canvas height
@@ -204,11 +217,15 @@ content (full error text, the correction sentence, evidence counts), not stubs.
    ```
 
    ```bash
-   ffmpeg -y -f concat -safe 0 -i list.txt -vf "split[a][b];[a]palettegen[p];[b][p]paletteuse" -loop 0 assets/<name>.gif
+   ffmpeg -y -f concat -safe 0 -i list.txt -vf "split[a][b];[a]palettegen[p];[b][p]paletteuse" -fps_mode passthrough -loop 0 assets/<name>.gif
    ```
 
-   Keep the palettegen/paletteuse quality rule. Budget <= ~1.5 MB; over budget
-   means width 800 or fewer typing steps, never a cheaper palette.
+   `-fps_mode passthrough` is required: the GIF encoder defaults to 25fps and
+   silently drops the 0.03s typed frames otherwise, skipping keystrokes.
+
+   Keep the palettegen/paletteuse quality rule. Budget <= ~1.5 MB; over budget,
+   in order: palettegen `max_colors=128`, then 3-char typed chunks, then width
+   800 - never a palette below 128 colors or dropped beats.
 5. Embed the GIF like any image. Keep a static PNG sibling only when the story
    also has an honest one-glance still; `check-slot.mjs` validates a frames
    file element by element.
