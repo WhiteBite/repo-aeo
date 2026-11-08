@@ -40,29 +40,46 @@ green arrow between them, and a full-width takeaway banner below).
 Chromium (no browser download). If playwright is unavailable, fall back to your
 own screenshot capability on the same template.
 
-### Slot schema (v3)
+### Slot schema (v4)
 
 Top-level: `theme` (`opencode` | `claude-code` | `codex`), `windowTitle` (the
 session part; the theme supplies the window prefix), `takeaway` (one
-plain-language sentence rendered in the full-width banner below both panels).
-`arrowCaption`, `statusLeft` and `statusRight` are ignored since v3.
-Per panel (`before`, `after`): `caption`, `sessionTitle`, `blocks[]`. `usage`,
-`agentName`, `agentModel`, `inputAgent`, `inputModel` and `inputProvider` are
-ignored since v3.
-`blocks[]` is an ordered event stream: `{type:"user"|"prose"|"tool"|"status"|"done",text}`
-or `{type:"diff",lines:[{type:"add"|"del"|"ctx",text}]}`. `tool` takes an
-optional `kind` (`call|read|write|search`) that picks the theme's glyph. Text
-supports `` `code` `` and `**bold**`.
+plain-language sentence rendered in the full-width banner below both panels;
+omit it and the banner is hidden). `arrowCaption`, `statusLeft` and
+`statusRight` are ignored since v3.
+Per panel (`before`, `after`): `caption`, `sessionTitle`, `surface`, `blocks[]`.
+`usage`, `agentName`, `agentModel`, `inputAgent`, `inputModel` and
+`inputProvider` are ignored since v3.
+`surface` is `terminal` (default) or `files`: a `files` panel drops the traffic
+lights and the input box and renders the titlebar as neutral editor chrome, for
+demos whose essence is a config or repo artifact rather than an agent session.
+`blocks[]` is an ordered event stream:
+`{type:"user"|"prose"|"tool"|"status"|"done",text}`,
+`{type:"diff",lines:[...]}` or `{type:"file",path,lines:[...]}`. `tool` takes an
+optional `kind` (`call|read|write|search`) that picks the theme's glyph. A
+`file` block is a card with a muted mono `path` header and diff-style lines
+below, tinted by panel like `diff`. Text supports `` `code` `` and `**bold**`.
+A diff line is either `{type:"add"|"del"|"ctx",text}` (a string line, kept
+verbatim) or `{type:"add"|"del"|"ctx",left,right}` (two aligned mono columns, so
+authors who forget manual padding still get table alignment). The `+`/`-`/space
+sign is added by CSS in both forms.
 
-Legibility rules (v3):
+Legibility rules (v4):
 
 - Keep each panel to **at most 5 blocks**: the user command, one or two short
   body lines, the red pain block (before) or green payoff block (after), and a
   done/status line.
 - Keep every body line to **~50 characters**; trim longer content in the slot
   JSON rather than letting it overflow the panel.
-- Design at **~900 CSS px** total width and render at `--scale 2` (PNG ~1800 px
-  wide), so the image stays legible when GitHub downscales it to ~800 px.
+- Design at **900 CSS px** total width (the stage is fixed at 900 px, so opening
+  the HTML directly cannot stretch it) and render at `--width 900 --scale 2`
+  (PNG 1800 px wide), so the image stays legible when GitHub downscales it to
+  ~800 px.
+- The two windows are equal height: the shorter panel stretches to the taller
+  one and both input boxes sit on the same bottom line, so asymmetric
+  before/after content stays aligned.
+- Traffic lights are honored per theme: `opencode` shows them, `claude-code`
+  and `codex` do not.
 
 Minimal example:
 
