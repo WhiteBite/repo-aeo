@@ -113,6 +113,11 @@ JSON with the project's real output, render with `scripts/render-demo.mjs`, then
 commit the asset + slot JSON and embed it in the README. Examples per surface:
 `references/visual-assets.md`.
 
+A quickstart shows the consumer's first successful action (install, import,
+run) — not the contributor's. Move `npm test`, `self-test` and build commands
+into a `Development` section; a reader who came to use the package should reach
+a runnable line before the first test command.
+
 Everything else (real examples, version bumps, exports redesign, claims with
 sources) is manual — write the smallest possible patch and keep the existing
 voice of the project.
