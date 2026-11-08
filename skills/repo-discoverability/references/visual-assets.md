@@ -29,6 +29,13 @@ Make no picture when the project has no observable before/after. If the project 
 
 If you cannot run the project and capture its real output, you cannot make an honest picture.
 
+Step 0 - before choosing a surface: list the product's value props from its own
+README/docs, pick the one no adjacent tool offers, and show THAT defining
+mechanism - not the value prop that is merely easiest to draw. If the defining
+mechanism is temporal (fail -> learn -> remind -> block -> heal; pipeline
+stages; retry loops), a static before/after loses the time axis: make an
+animated GIF with the frames mode below.
+
 First ask WHERE the difference between before and after manifests; the surface follows from that, never from habit:
 
 1. In the agent's conversation or tool flow (gates, reminders, behavior rules that change what the agent does) -> terminal surface with the theme of THAT harness. Examples: dejavu-gates (opencode), stop-ai-slop (claude-code).
@@ -124,6 +131,37 @@ it breaks GitHub's auto dark mode. Native Mermaid cannot sit in a table cell, so
 side-by-side before/after must be pre-rendered. A single topology stays a native
 fence.
 
+### Animated family-look demo (frames mode)
+
+When the defining mechanism unfolds in time (a gate that fires on the third
+recurrence, a pipeline that collapses), render the locked template once per
+moment and assemble a GIF. The frames file is a JSON **array** of complete slot
+JSONs (schema v4 each), 8-12 frames, one per beat of the story:
+
+1. Write `demo/<name>.frames.json`. Each frame repeats the scaffold and adds or
+   highlights the next beat; put `"hl": true` on the block or diff line the eye
+   must land on (the gate firing, the correction).
+2. Prepare all frames (zero-dep; resolves shots, writes `frame-NN.json`):
+
+   ```bash
+   node skills/repo-discoverability/scripts/render-demo.mjs --frames demo/<name>.frames.json --out-dir build/frames
+   ```
+
+3. Rasterize each prepared frame with the on-demand playwright renderer at
+   **scale 1**, width 900: a 2x GIF doubles bytes for no README gain.
+4. Assemble with ffmpeg (on demand, outside the repo):
+
+   ```bash
+   ffmpeg -y -framerate 1 -i build/frames/frame-%02d.png -vf "split[a][b];[a]palettegen[p];[b][p]paletteuse" assets/<name>.gif
+   ```
+
+   Hold the final beat by duplicating the last PNG 2-3 times before assembling.
+   Budget <= ~1.5 MB; over budget means fewer frames or width 800, never a
+   cheaper palette.
+5. Embed the GIF like any image. Keep a static PNG sibling only when the story
+   also has an honest one-glance still; `check-slot.mjs` validates a frames
+   file element by element.
+
 ## Rendering an agent-terminal demo (the locked template)
 
 Do not hand-draw the terminal. Use the locked template; you only fill slots, so
@@ -201,6 +239,8 @@ A diff line is either `{type:"add"|"del"|"ctx",text}` (a string line, kept
 verbatim) or `{type:"add"|"del"|"ctx",left,right}` (two aligned mono columns, so
 authors who forget manual padding still get table alignment). The `+`/`-`/space
 sign is added by CSS in both forms.
+Blocks and diff lines accept `hl: true` to spotlight one beat (amber tint plus a
+left bar) - the frame-mode eye anchor.
 
 Legibility rules (v4):
 

@@ -57,6 +57,20 @@
       "expected": { "surface": "terminal", "theme": "codex" },
       "essence": "The difference is in the agent conversation and tool flow of that harness.",
       "catches": ["shell theme", "files surface"]
+    },
+    {
+      "id": "temporal-gate-animation",
+      "prompt": "An OpenCode plugin that counts tool-call failures across sessions, promotes the recurring pattern into a gate on the third failure, teaches the agent with a correction and evidence, blocks a same-session repeat, and heals after three successes.",
+      "expected": { "surface": "terminal", "theme": "opencode", "format": "animated-gif" },
+      "essence": "The defining mechanism is temporal (fail -> learn -> remind -> block -> heal): a static before/after loses the time axis, so render the locked template once per beat and assemble a GIF.",
+      "catches": ["a static two-panel before/after", "showing an infra loop instead of the correction teach"]
+    },
+    {
+      "id": "multi-value-defining",
+      "prompt": "A CLI that formats code AND keeps a shared registry of formatting rules that every machine on the team reads, so rules never drift per machine.",
+      "expected": { "surface": "files", "theme": "shell", "format": "static" },
+      "essence": "Multiple value props: pick the defining one no adjacent tool offers - the shared registry killing per-machine drift - not the easiest to draw (the formatter run).",
+      "catches": ["showing a formatting run because a terminal is easy to draw", "numbers-only picture"]
     }
   ]
 }

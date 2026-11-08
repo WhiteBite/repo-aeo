@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -190,4 +190,50 @@ test('render-demo --from-command collapses earlier lines into one omitted status
   assert.ok(omitted, 'expected an omitted-lines status block');
   assert.equal(omitted.text, '... 7 earlier lines omitted');
   assert.equal(blocks.filter((block) => /^line \d+$/.test(block.text)).length, 5);
+});
+
+function withTempFrames(frames, run) {
+  const dir = mkdtempSync(join(tmpdir(), 'rdk-frames-'));
+  const file = join(dir, 'demo.frames.json');
+  writeFileSync(file, JSON.stringify(frames));
+  try {
+    return run(file, dir);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('render-demo --frames prepares each frame into the out-dir', () => {
+  const frame = (text) => ({ theme: 'shell', takeaway: 'ok', before: { blocks: [{ type: 'prose', text }] }, after: { blocks: [] } });
+  withTempFrames([frame('beat one'), frame('beat two')], (file, dir) => {
+    const out = join(dir, 'out');
+    const result = spawnSync(process.execPath, [RENDER_DEMO, '--frames', file, '--out-dir', out], { encoding: 'utf8' });
+    assert.equal(result.status, 0);
+    assert.ok(existsSync(join(out, 'frame-00.json')), 'expected frame-00.json');
+    assert.ok(existsSync(join(out, 'frame-01.json')), 'expected frame-01.json');
+    const first = JSON.parse(readFileSync(join(out, 'frame-00.json'), 'utf8'));
+    assert.equal(first.theme, 'shell');
+    assert.equal(first.before.blocks[0].text, 'beat one');
+  });
+});
+
+test('check-slot.mjs validates a frames array element by element', () => {
+  const good = { theme: 'shell', takeaway: 'ok', before: { blocks: [] }, after: { blocks: [] } };
+  const bad = { theme: 'shell', before: { blocks: [] }, after: { blocks: [] } };
+  withTempFrames([good, good], (file) => {
+    assert.equal(checkSlotExit([file]), 0);
+  });
+  withTempFrames([good, bad], (file) => {
+    const result = checkSlotResult([file]);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /\[1\]/);
+  });
+});
+
+test('render-demo --frames rejects a non-array frames file', () => {
+  withTempFrames({ theme: 'shell' }, (file, dir) => {
+    const result = spawnSync(process.execPath, [RENDER_DEMO, '--frames', file, '--out-dir', join(dir, 'out')], { encoding: 'utf8' });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /non-empty array/);
+  });
 });

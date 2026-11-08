@@ -103,6 +103,10 @@ before/after difference manifests, then read `references/visual-assets.md`:
 | command outcome, human or generic actor | terminal + shell |
 | rendered UI | a real screenshot framed by the shots surface, never faked |
 | numbers only | no picture: prose or a markdown table |
+| defining mechanism unfolds in time | animated GIF via frames mode |
+
+Before the table: list the product's value props from its own docs and show the
+one no adjacent tool offers - the defining mechanism, not the easiest to draw.
 
 Make no picture when the project has no observable before/after. Fill the slot
 JSON with the project's real output, render with `scripts/render-demo.mjs`, then

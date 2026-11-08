@@ -18,10 +18,21 @@ for (const file of files) {
     failed = true;
     continue;
   }
-  const { errors, warnings } = validateSlot(data);
-  for (const warning of warnings) console.error(`${file}: warning: ${warning}`);
-  for (const error of errors) console.error(`${file}: error: ${error}`);
-  if (errors.length > 0) failed = true;
+  const entries = Array.isArray(data) ? data : [data];
+  if (Array.isArray(data) && entries.length === 0) {
+    console.error(`${file}: error: frames file must be a non-empty array`);
+    failed = true;
+    continue;
+  }
+  let fileOk = true;
+  entries.forEach((entry, i) => {
+    const label = Array.isArray(data) ? `${file}[${i}]` : file;
+    const { errors, warnings } = validateSlot(entry);
+    for (const warning of warnings) console.error(`${label}: warning: ${warning}`);
+    for (const error of errors) console.error(`${label}: error: ${error}`);
+    if (errors.length > 0) fileOk = false;
+  });
+  if (!fileOk) failed = true;
   else console.log(`${file}: ok`);
 }
 

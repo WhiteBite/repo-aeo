@@ -49,6 +49,35 @@ if (fromCommand) {
   process.exit(0);
 }
 
+const framesFile = arg("frames", "");
+if (framesFile) {
+  const outDir = path.resolve(arg("out-dir", "build/frames"));
+  let frames;
+  try {
+    frames = JSON.parse(fs.readFileSync(path.resolve(framesFile), "utf8"));
+  } catch (error) {
+    console.error(error.message);
+    process.exit(1);
+  }
+  if (!Array.isArray(frames) || frames.length === 0) {
+    console.error("frames file must be a non-empty array of slot JSONs");
+    process.exit(1);
+  }
+  fs.mkdirSync(outDir, { recursive: true });
+  const framesDir = path.dirname(path.resolve(framesFile));
+  frames.forEach((frame, i) => {
+    try {
+      prepareData(frame, framesDir);
+    } catch (error) {
+      console.error(`frame ${i}: ${error.message}`);
+      process.exit(1);
+    }
+    fs.writeFileSync(path.join(outDir, `frame-${String(i).padStart(2, "0")}.json`), JSON.stringify(frame, null, 2));
+  });
+  console.log(`prepared ${frames.length} frames -> ${outDir}`);
+  process.exit(0);
+}
+
 const MIME = {
   ".png": "image/png",
   ".jpg": "image/jpeg",
