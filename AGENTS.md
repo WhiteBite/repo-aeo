@@ -45,6 +45,32 @@ every change.
 | `fixtures/demo-repo/` | the before/after demo repo used by tests and REPORT.md |
 | `.discoverability/project.yml` | source of truth for this repository's metadata |
 
+## Demo visuals (skill-owned subsystem)
+
+The before/after demo images and GIFs are produced by a skill-owned pipeline, not
+by the CLI. `skills/repo-discoverability/scripts/demo-terminal.html` is the locked
+template (surfaces `terminal`/`files`/`shots`/`single`, blocks incl. `gate`,
+`divider` and the `hud` strip); `render-demo.mjs` is the zero-dep preparer
+(`--prepare`, `--frames`, `--from-command`); `rasterize.mjs` is the on-demand
+rasterizer that needs a scratch `playwright-core`; `check-slot.mjs` plus
+`packages/rdk-cli/src/util/slot-validate.js` are the schema gate wired into
+`npm test`; `skills/repo-discoverability/evals/surface-choice.json` holds the
+surface-choice evals; `references/visual-assets.md` is the authoring contract.
+
+Invariants:
+
+- `rdk-cli` and `repo-aeo-mcp` keep zero runtime dependencies; `playwright-core`
+  is an on-demand scratch install outside the repo.
+- The repo never writes binary assets from `src/` — agents commit assets per
+  target repo.
+- GIF frame delay floor is 0.02s: browsers clamp sub-20ms delays to 100ms.
+- Asset budget ~1.5MB.
+- Typed lines grow 2-3 chars at 0.03s; streamed outputs arrive whole/word chunks.
+- Never invent tool output strings — silent store state goes in the `hud`
+  annotation.
+
+Authoring rules live in `references/visual-assets.md`, not here.
+
 ## Distribution tracking
 
 ```bash

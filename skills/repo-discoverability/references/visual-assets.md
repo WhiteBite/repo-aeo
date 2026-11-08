@@ -239,6 +239,38 @@ content (full error text, the correction sentence, evidence counts), not stubs.
    also has an honest one-glance still; `check-slot.mjs` validates a frames
    file element by element.
 
+### End-to-end pipeline
+
+One copy-pasteable run from a frames file to a committed GIF. Placeholders:
+`<repo>` is the repo-aeo checkout, `<scratch>` is a scratch dir outside the repo,
+`<name>` is the demo name.
+
+```bash
+# 1. scratch setup (on demand, outside the repo; never a repo dependency)
+mkdir demo-render && cd demo-render && npm i playwright-core
+
+# 2. prepare every frame (zero-dep; writes frame-NN.json + list.txt)
+node <repo>/skills/repo-discoverability/scripts/render-demo.mjs \
+  --frames demo/<name>.frames.json --out-dir build
+
+# 3. rasterize each prepared frame (scale 1, width 900)
+for f in build/frame-*.json; do
+  node <repo>/skills/repo-discoverability/scripts/rasterize.mjs \
+    --template <repo>/skills/repo-discoverability/scripts/demo-terminal.html \
+    --data "$f" --out "${f%.json}.png" --width 900 --scale 1 \
+    --playwright-dir <scratch>
+done
+
+# 4. assemble the GIF (ffmpeg on demand, outside the repo)
+ffmpeg -y -f concat -safe 0 -i build/list.txt \
+  -vf "split[a][b];[a]palettegen[p];[b][p]paletteuse" \
+  -fps_mode passthrough -loop 0 assets/<name>.gif
+```
+
+`rasterize.mjs` resolves `playwright-core` from `--playwright-dir` (or
+`$PLAYWRIGHT_DIR`, else a probed scratch root) and supersedes the historical
+temp-dir `render.mjs`, which was ephemeral and never reproducible from the repo.
+
 ## Rendering an agent-terminal demo (the locked template)
 
 Do not hand-draw the terminal. Use the locked template; you only fill slots, so
@@ -248,9 +280,10 @@ the result cannot look crooked.
 # 1. write a slot JSON (see schema below), e.g. demo/stop-ai-slop.json
 # 2. prepare it: resolve shots to data URIs, write a prepared JSON (zero-dep)
 node <skill>/scripts/render-demo.mjs --data demo/stop-ai-slop.json --prepare --out demo/stop-ai-slop.prepared.json
-# 3. rasterize the prepared JSON with an on-demand playwright renderer
-node <renderer>/render.mjs --template <skill>/scripts/demo-terminal.html \
-  --data demo/stop-ai-slop.prepared.json --out assets/demo.png --width 900 --scale 2
+# 3. rasterize the prepared JSON with the on-demand rasterizer
+node <skill>/scripts/rasterize.mjs --template <skill>/scripts/demo-terminal.html \
+  --data demo/stop-ai-slop.prepared.json --out assets/demo.png --width 900 --scale 2 \
+  --playwright-dir <scratch>
 ```
 
 `scripts/demo-terminal.html` is the locked look (two OpenCode-style panels, a
@@ -258,10 +291,11 @@ green arrow between them, and a full-width takeaway banner below).
 `scripts/render-demo.mjs` is a **preparer**: it fills the shot slots (reads each
 `shot` file, inlines it as a data URI, reads the PNG dimensions) and writes a
 prepared JSON. The template never touches the filesystem and the preparer carries
-no runtime dependency. Rasterization is a separate, on-demand step: any
-playwright-core renderer that loads the template and calls
-`window.fillTemplate(prepared)` works (the repo ships none). If `playwright-core`
-happens to be resolvable, `render-demo.mjs` rasterizes in one step and
+no runtime dependency. Rasterization is a separate, on-demand step:
+`scripts/rasterize.mjs` loads the template, calls `window.fillTemplate(prepared)`
+and screenshots it, resolving `playwright-core` from `--playwright-dir` (or
+`$PLAYWRIGHT_DIR`, else a probed scratch root). If `playwright-core` happens to be
+resolvable from the repo, `render-demo.mjs` rasterizes in one step and
 `--prepare` is unnecessary.
 
 ### Capture real output (`--from-command`)
