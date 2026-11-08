@@ -48,6 +48,20 @@ export const DEFAULT_CONFIG = {
     require_ack_for_publish: true,
     ack: null,
   },
+  funding: {
+    enabled: false,
+    github: [],
+    patreon: null,
+    open_collective: null,
+    ko_fi: null,
+    tidelift: null,
+    community_bridge: null,
+    liberapay: null,
+    issuehunt: null,
+    otechie: null,
+    lfx_crowdfunding: null,
+    custom: [],
+  },
 };
 
 const CATEGORIES = new Set([

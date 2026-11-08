@@ -35,6 +35,10 @@ import {
   mergeGenerated,
   repositoryUrl,
   deriveQuickstartCommands,
+  renderFundingYml,
+  packageFunding,
+  fundingLinks,
+  FUNDING_MARKER,
 } from '../generate/index.js';
 
 const GITIGNORE_DEFAULTS = ['node_modules/', 'dist/', 'build/', '*.log', '.DS_Store', '.env', '.omo/', '.opencode/', '.codegraph/', '.codenomad/', '.playwright-mcp/'];
@@ -680,6 +684,72 @@ export const PATCHES = [
       const drift = jsonldVersionDrift(ctx.cwd, ctx.pkg);
       if (!drift) return [];
       return [mutation(path, before, serializeJson({ ...drift.data, softwareVersion: drift.expected }, before))];
+    },
+  },
+
+  {
+    id: 'funding.github',
+    title: 'Create .github/FUNDING.yml',
+    description: 'Writes the Sponsor/Support button config from the funding section (opt-in via funding.enabled); a FUNDING.yml without the generated marker is left untouched.',
+    risk: 'safe',
+    applies(ctx) {
+      const body = renderFundingYml(ctx.config);
+      if (body === null) return false;
+      const path = join(ctx.cwd, '.github', 'FUNDING.yml');
+      if (!exists(path)) return true;
+      const current = readTextIfExists(path);
+      return current.startsWith(FUNDING_MARKER) && current !== body;
+    },
+    mutations(ctx) {
+      const body = renderFundingYml(ctx.config);
+      if (body === null) return [];
+      const path = join(ctx.cwd, '.github', 'FUNDING.yml');
+      const before = exists(path) ? readTextIfExists(path) : null;
+      if (before === body) return [];
+      if (before !== null && !before.startsWith(FUNDING_MARKER)) return [];
+      return [mutation(path, before, body)];
+    },
+  },
+
+  {
+    id: 'funding.package',
+    title: 'Add package.json funding',
+    description: 'Adds the npm funding field derived from the funding section; an existing funding field is never overwritten.',
+    risk: 'safe',
+    applies(ctx) {
+      const pkg = readPackageJson(ctx);
+      if (!pkg || pkg.parseError) return false;
+      if (pkg.json.funding !== undefined) return false;
+      return packageFunding(ctx.config) !== null;
+    },
+    mutations(ctx) {
+      const pkg = readPackageJson(ctx);
+      if (!pkg || pkg.parseError || pkg.json.funding !== undefined) return [];
+      const value = packageFunding(ctx.config);
+      if (value === null) return [];
+      return [mutation(pkg.path, pkg.text, serializeJson({ ...pkg.json, funding: value }, pkg.text))];
+    },
+  },
+
+  {
+    id: 'readme.support',
+    title: 'Add a Support section to the README',
+    description: 'Appends a Support section listing the funding links when funding.enabled is set.',
+    risk: 'safe',
+    applies(ctx) {
+      if (fundingLinks(ctx.config).length === 0) return false;
+      const { before } = readmeBase(ctx);
+      return !parseMarkdown(before).sections.has('support') && !rawHasHeading(before, 'Support');
+    },
+    mutations(ctx) {
+      const links = fundingLinks(ctx.config);
+      if (links.length === 0) return [];
+      const { path, before } = readmeBase(ctx);
+      if (parseMarkdown(before).sections.has('support') || rawHasHeading(before, 'Support')) return [];
+      const eol = dominantEol(before);
+      const lines = ['## Support', '', 'If this project is useful to you, you can support its development:', '', ...links.map((link) => `- [${link.label}](${link.url})`)];
+      const after = `${before.replace(/\s*$/, '')}${eol}${eol}${withEol(lines.join('\n'), eol)}${eol}`;
+      return [mutation(path, before, after)];
     },
   },
 ];

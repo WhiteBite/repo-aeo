@@ -75,6 +75,28 @@ presence, so the docs axis stays enabled.
 "Why this repo, not the alternatives." 2–4 bullets, ideally with numbers and
 named sources. Feeds the README "Why choose this" section.
 
+## `funding`
+
+Opt-in. When `enabled: true`, `rdk fix` writes `.github/FUNDING.yml` (the
+repository Sponsor/Support button) and a `funding` field in `package.json`
+(the npm Support link), and appends a `## Support` section to the README when it
+has none.
+
+| Field | Meaning |
+| --- | --- |
+| `enabled` | master switch; `false` (default) leaves every funding check and patch inert |
+| `github` | GitHub Sponsors usernames (list) |
+| `patreon` · `open_collective` · `ko_fi` · `liberapay` | username for the matching native `FUNDING.yml` key |
+| `tidelift` · `community_bridge` · `issuehunt` · `otechie` · `lfx_crowdfunding` | native `FUNDING.yml` keys passed through verbatim |
+| `custom` | any other donation URL (Boosty, CloudTips, YooMoney, crypto); `FUNDING.yml` keeps the first four |
+
+Funding is deliberately **not scored** — it is a sustainability lever, not a
+discoverability one — so the `hygiene.funding` check is informational. `rdk fix`
+never overwrites a hand-written `FUNDING.yml` (one without the generated marker)
+or an existing `package.json` `funding` field. See
+[`funding-playbook.md`](../skills/repo-discoverability/references/funding-playbook.md)
+for the payment-platform map.
+
 ## `safety`
 
 | Field | Default | Meaning |

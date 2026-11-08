@@ -14,7 +14,7 @@ RDK scores how discoverable your repository is, fixes the parts that can be fixe
 automatically, and keeps it from regressing in CI. It is the tool you point at a
 repo that is *good but invisible*.
 
-The audit runs **47 checks in under 300 ms offline** on this repository
+The audit runs **48 checks in under 300 ms offline** on this repository
 (measured with `rdk audit --format json`, `duration_ms` field) and carries **0
 runtime dependencies**, so `npx` stays fast and the supply chain stays small.
 
@@ -160,7 +160,7 @@ bot branch and opens a PR for review.
 ```bash
 $ npx repo-aeo-mcp score
 Discoverability score: 100/100 (grade A)
-checks passed: 47/47 - errors 0 - warnings 0 - autofixable 0
+checks passed: 48/48 - errors 0 - warnings 0 - autofixable 0
 trend: no history yet
 ```
 

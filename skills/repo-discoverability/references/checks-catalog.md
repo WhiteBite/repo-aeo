@@ -80,3 +80,4 @@ exists, docs only when a homepage/docs site is configured).
 | `hygiene.gitattributes` | 4 | line-ending normalisation |
 | `hygiene.gitattributes_binaries` | 4 | a `*.png binary` line after any catch-all text rule |
 | `hygiene.ci` | 8 | a workflow under `.github/workflows/` |
+| `hygiene.funding` | 3 | opt-in funding surface: `.github/FUNDING.yml` + npm `funding` (never scored) |

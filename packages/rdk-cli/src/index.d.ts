@@ -167,6 +167,20 @@ export interface RdkConfig {
     /** Non-empty string overrides the github-sync ACK constant; null keeps the default. */
     ack: string | null;
   };
+  funding: {
+    enabled: boolean;
+    github: string[];
+    patreon: string | null;
+    open_collective: string | null;
+    ko_fi: string | null;
+    tidelift: string | null;
+    community_bridge: string | null;
+    liberapay: string | null;
+    issuehunt: string | null;
+    otechie: string | null;
+    lfx_crowdfunding: string | null;
+    custom: string[];
+  };
 }
 
 export declare function loadConfig(cwd?: string): {
@@ -669,6 +683,10 @@ export declare const GENERATED_START: string;
 export declare const GENERATED_END: string;
 export declare function mergeGenerated(existing: string | null, generated: string): string | null;
 export declare function generatedDrift(cwd: string, config: RdkConfig, pkg: Record<string, unknown> | null): string[];
+
+export declare function renderFundingYml(config: RdkConfig): string | null;
+export declare function packageFunding(config: RdkConfig): { type: string; url: string } | Array<{ type: string; url: string }> | null;
+export declare function fundingLinks(config: RdkConfig): Array<{ label: string; url: string }>;
 
 export interface LlmsFreshness {
   exists: boolean;

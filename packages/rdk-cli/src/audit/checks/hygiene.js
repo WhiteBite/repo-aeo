@@ -5,7 +5,7 @@
  */
 import { check, finding, skip } from './_shared.js';
 import { exists, listFiles, readTextIfExists } from '../../util/fs.js';
-import { citationVersionDrift, citationRepositoryDrift, dependabotEcosystems } from '../../generate/index.js';
+import { citationVersionDrift, citationRepositoryDrift, dependabotEcosystems, renderFundingYml, FUNDING_MARKER } from '../../generate/index.js';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { recentCommits } from '../../util/git.js';
@@ -328,6 +328,33 @@ export const hygieneChecks = [
       }
       if (entries.some((entry) => entry.isFile() && /\.ya?ml$/.test(entry.name))) return null;
       return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'No CI workflow found', why: this.why, fix: this.fix, effort: 'S' });
+    },
+  }),
+
+  check({
+    id: 'hygiene.funding',
+    axis: 'hygiene',
+    weight: 3,
+    title: 'Funding surface matches the config',
+    why: 'An opt-in funding surface (FUNDING.yml plus the npm funding field) lets users support the project. Deliberately not scored: it is a sustainability lever, not a discoverability one.',
+    fix: 'Run `rdk fix` to write .github/FUNDING.yml and the package.json funding field from the funding section.',
+    effort: 'S',
+    autoFixable: true,
+    patchId: 'funding.github',
+    run(ctx) {
+      const funding = ctx.config.funding || {};
+      if (!funding.enabled) return null;
+      const expected = renderFundingYml(ctx.config);
+      if (expected === null) return null;
+      const path = join(ctx.cwd, '.github', 'FUNDING.yml');
+      if (!exists(path)) {
+        return finding({ id: this.id, axis: this.axis, severity: 'info', title: 'No .github/FUNDING.yml', why: this.why, fix: this.fix, effort: 'S' });
+      }
+      const current = readTextIfExists(path);
+      if (current.startsWith(FUNDING_MARKER) && current !== expected) {
+        return finding({ id: this.id, axis: this.axis, severity: 'info', title: 'FUNDING.yml is out of date with the config', why: 'The funding section changed after the file was generated, so the Sponsor button no longer reflects the config.', fix: this.fix, effort: 'S' });
+      }
+      return null;
     },
   }),
 ];

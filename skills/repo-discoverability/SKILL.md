@@ -200,5 +200,6 @@ procedure and pacing. `references/channels.md` is the channel matrix.
 - `references/distribution-playbook.md` — read before the first submission to any channel; it explains entry conventions, fork mechanics, per-mechanism procedure and submission tracking.
 - `references/channels.md` — read when choosing channels; the compact matrix of mechanism, artifact, applicability, gating and dedupe key.
 - `references/visual-assets.md` — read when a repo lacks a demo visual or the audit flags `readme.demo_visual`; the "Choose the surface" guide, the essence rule, per-type recipes and the slot schema.
+- `references/funding-playbook.md` — read when adding or reviewing a Sponsor/Support surface; it maps the FUNDING.yml lanes and the payment platforms that work for Russian recipients.
 - `scripts/render-demo.mjs` — run after filling a slot JSON to render the before/after demo PNG from the locked template; needs playwright-core on demand.
 - `scripts/audit.sh` — run if Node is not on PATH; a thin wrapper around the CLI.

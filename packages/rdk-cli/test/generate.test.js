@@ -34,6 +34,20 @@ const FULL_CONFIG = {
   artifacts: { has_npm_package: true, has_docs_site: false, npm_published: false },
   differentiators: ['because'],
   safety: { allow_autofix: false, require_ack_for_publish: true, ack: null },
+  funding: {
+    enabled: true,
+    github: ['octocat'],
+    patreon: null,
+    open_collective: null,
+    ko_fi: null,
+    tidelift: null,
+    community_bridge: null,
+    liberapay: null,
+    issuehunt: null,
+    otechie: null,
+    lfx_crowdfunding: null,
+    custom: ['https://boosty.to/octocat'],
+  },
 };
 
 function contextFor(dir) {

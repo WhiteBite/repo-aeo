@@ -23,6 +23,9 @@ const INIT_PATCHES = [
   'github.templates',
   'dependabot.stub',
   'jsonld.snippet',
+  'funding.github',
+  'funding.package',
+  'readme.support',
 ];
 
 export function initCommand({ cwd, options = {} }) {
