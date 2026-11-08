@@ -172,6 +172,10 @@ identical call line on every attempt and let the reaction (counter, gate card,
 hud) escalate beside it - counters appearing without their attempts read as
 magic.
 
+- **Never invent tool output lines.** Copy the tool's real message strings from
+  its source; state the tool keeps silently (counters, store state) belongs in
+  the hud annotation labeled as store state, not in the session stream.
+
 **Per-frame delays.** Give each frame a `delay` (seconds) in the frames JSON:
 typed frames are 0.03s, streamed frames are 0.06-0.08s, beat frames hold
 0.9-1.2s so the eye reads the result, and the final frame holds 3s. The delay is
