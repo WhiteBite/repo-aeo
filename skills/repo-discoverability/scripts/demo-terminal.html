@@ -407,6 +407,13 @@
     justify-content: center;
   }
 
+  /* single mode: one full-width window; fixed height keeps GIF frames aligned */
+  .compare.single { display: block; }
+  .compare.single .panel { width: 100%; }
+  .panel[data-surface="single"] .panel-caption { color: var(--muted); font-size: 13px; }
+  .panel[data-surface="single"] .window { height: 520px; }
+  .panel[data-surface="single"] .messages { overflow: hidden; }
+
   .shot-canvas {
     position: relative;
     display: inline-block;
@@ -775,6 +782,20 @@
         var win = panel.querySelector(".window");
         if (win && surfaceFor(pk) === "shots") win.classList.add("shot");
       });
+
+      var singleKey = null;
+      if (data.surface === "single") singleKey = "before";
+      else if (data.before && data.before.surface === "single") singleKey = "before";
+      else if (data.after && data.after.surface === "single") singleKey = "after";
+      if (singleKey) {
+        var compare = document.querySelector(".compare");
+        if (compare) compare.classList.add("single");
+        document.querySelectorAll("[data-panel]").forEach(function (panel) {
+          if (panel.getAttribute("data-panel") !== singleKey) panel.style.display = "none";
+        });
+        var arrow = document.querySelector(".arrow-col");
+        if (arrow) arrow.style.display = "none";
+      }
 
       document.querySelectorAll(".win-prefix").forEach(function (el) {
         var panel = el.closest("[data-panel]");

@@ -6,10 +6,12 @@
 
 const THEMES = new Set(['opencode', 'claude-code', 'codex', 'shell']);
 const PALETTES = new Set(['dark', 'light']);
-const SURFACES = new Set(['terminal', 'files', 'shots']);
+const SURFACES = new Set(['terminal', 'files', 'shots', 'single']);
 const BLOCK_TYPES = new Set(['user', 'prose', 'tool', 'status', 'done', 'diff', 'file', 'steps']);
 const MAX_BLOCKS = 5;
 const MAX_LINE = 50;
+const MAX_BLOCKS_SINGLE = 12;
+const MAX_LINE_SINGLE = 80;
 const MAX_STEPS = 8;
 
 function lineTexts(block) {
@@ -60,7 +62,7 @@ export function validateSlot(obj) {
     if (surface === undefined) {
       warnings.push(`${panelName}: surface absent, defaults to terminal`);
     } else if (!SURFACES.has(surface)) {
-      errors.push(`${panelName}: surface must be terminal|files|shots, got ${JSON.stringify(surface)}`);
+      errors.push(`${panelName}: surface must be terminal|files|shots|single, got ${JSON.stringify(surface)}`);
     }
     const blocks = Array.isArray(panel.blocks) ? panel.blocks : [];
     if (surface === 'shots') {
@@ -71,9 +73,14 @@ export function validateSlot(obj) {
         warnings.push(`${panelName}: blocks are ignored on a shots panel`);
       }
     }
-    if (blocks.length > MAX_BLOCKS) {
-      errors.push(`${panelName}: ${blocks.length} blocks exceeds the ${MAX_BLOCKS}-block limit`);
+    if (surface === 'single' && blocks.length === 0) {
+      errors.push(`${panelName}: single surface requires at least one block`);
     }
+    const maxBlocks = surface === 'single' ? MAX_BLOCKS_SINGLE : MAX_BLOCKS;
+    if (blocks.length > maxBlocks) {
+      errors.push(`${panelName}: ${blocks.length} blocks exceeds the ${maxBlocks}-block limit`);
+    }
+    const maxLine = surface === 'single' ? MAX_LINE_SINGLE : MAX_LINE;
     for (const block of blocks) {
       if (!block || typeof block !== 'object') continue;
       if (!BLOCK_TYPES.has(block.type)) {
@@ -83,8 +90,8 @@ export function validateSlot(obj) {
         warnings.push(`${panelName}: steps block has ${block.steps.length} entries; only ${MAX_STEPS} render`);
       }
       for (const text of lineTexts(block)) {
-        if (text.length > MAX_LINE) {
-          errors.push(`${panelName}: line exceeds ${MAX_LINE} chars: ${JSON.stringify(text.slice(0, 60))}`);
+        if (text.length > maxLine) {
+          errors.push(`${panelName}: line exceeds ${maxLine} chars: ${JSON.stringify(text.slice(0, 60))}`);
         }
       }
     }

@@ -148,6 +148,29 @@ test('validateSlot rejects an unknown surface', () => {
   assert.ok(errors.some((error) => /surface/.test(error)), 'expected a surface error');
 });
 
+test('validateSlot accepts a single surface with 12 blocks and an 80-char line', () => {
+  const blocks = Array.from({ length: 12 }, (_, index) => ({ type: 'prose', text: `line ${index}` }));
+  blocks[0] = { type: 'prose', text: 'x'.repeat(80) };
+  const { errors } = validateSlot({ theme: 'shell', takeaway: 'ok', before: { surface: 'single', blocks }, after: { blocks: [] } });
+  assert.deepEqual(errors, []);
+});
+
+test('validateSlot rejects a single surface with 13 blocks', () => {
+  const blocks = Array.from({ length: 13 }, (_, index) => ({ type: 'prose', text: `line ${index}` }));
+  const { errors } = validateSlot({ theme: 'shell', takeaway: 'ok', before: { surface: 'single', blocks }, after: { blocks: [] } });
+  assert.ok(errors.some((error) => /12/.test(error)), 'expected a 12-block limit error');
+});
+
+test('validateSlot rejects an 81-char line on a single surface', () => {
+  const { errors } = validateSlot({ theme: 'shell', takeaway: 'ok', before: { surface: 'single', blocks: [{ type: 'prose', text: 'x'.repeat(81) }] }, after: { blocks: [] } });
+  assert.ok(errors.some((error) => /80/.test(error)), 'expected an 80-char limit error');
+});
+
+test('validateSlot rejects a single surface with no blocks', () => {
+  const { errors } = validateSlot({ theme: 'shell', takeaway: 'ok', before: { surface: 'single', blocks: [] }, after: { blocks: [] } });
+  assert.ok(errors.some((error) => /single surface requires/.test(error)), 'expected an empty-blocks error');
+});
+
 test('validateSlot accepts palette light and rejects an unknown palette', () => {
   const base = { theme: 'shell', takeaway: 'ok', before: { blocks: [] }, after: { blocks: [] } };
   assert.deepEqual(validateSlot({ ...base, palette: 'light' }).errors, []);

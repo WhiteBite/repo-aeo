@@ -136,14 +136,35 @@ fence.
 When the defining mechanism unfolds in time (a gate that fires on the third
 recurrence, a pipeline that collapses), render the locked template once per
 moment and assemble a GIF. The frames file is a JSON **array** of complete slot
-JSONs (schema v4 each), 8-12 frames, one per beat of the story:
+JSONs (schema v4 each), one per beat of the story.
 
-Every frame must render at one identical canvas height: keep the SAME block
-skeleton in every frame (same block count per panel, same order, same line
-counts) so all frames come out the same height to the pixel - otherwise the
-takeaway banner jumps vertically between beats in the assembled GIF. Budget
-lines to ~44 characters, not the validator's 50: the ~366px text column at 13px
-mono wraps at ~44-48 chars, and a wrap silently breaks the shared skeleton.
+**Scaffold rule.** A temporal story uses the `single` surface: one full-width
+window the viewer watches unfold, beat by beat. The two-panel `compare` scaffold
+(before | arrow | after) is for **static** before/after cards only - forcing a
+temporal story into two half-width windows shrinks the text and turns "watch a
+session" into "compare two stills". Set `"surface": "single"` on the panel that
+carries the story (or at the top level, which uses the `before` panel); the
+template hides the arrow and the other panel and renders one window at full
+stage width.
+
+**Typing / streaming.** A terminal that only swaps whole states reads as a
+slideshow. Make it type: author consecutive frames where the **last line grows
+by ~8-14 characters** per frame (write the partial strings yourself - the
+template does not animate). A typing run is 2-3 frames ending on the complete
+line; the frame after it is the beat hold that reveals the output.
+
+**Per-frame delays.** Give each frame a `delay` (seconds) in the frames JSON:
+typing frames are short (0.10-0.15s) so the line appears to stream, beat frames
+hold long (0.9-1.2s) so the eye reads the result, and the final frame holds
+2.5-3s. The delay is read at assembly time, not by the template.
+
+**Height.** In `single` mode the window is a fixed height (520px) and the input
+box is pinned to the bottom, so every frame renders at the same canvas height
+regardless of how many blocks it carries - no banner jump. Keep the cumulative
+session to <= 12 blocks and drop the oldest output lines once it overflows:
+scroll-off is honest for a terminal. Lines may run to 80 chars in `single` mode
+(the inner column is ~810px, so 13px mono fits ~100) - use the room for real
+content (full error text, the correction sentence, evidence counts), not stubs.
 
 1. Write `demo/<name>.frames.json`. Each frame repeats the scaffold and adds or
    highlights the next beat; put `"hl": true` on the block or diff line the eye
@@ -156,15 +177,27 @@ mono wraps at ~44-48 chars, and a wrap silently breaks the shared skeleton.
 
 3. Rasterize each prepared frame with the on-demand playwright renderer at
    **scale 1**, width 900: a 2x GIF doubles bytes for no README gain.
-4. Assemble with ffmpeg (on demand, outside the repo):
+4. Assemble with ffmpeg (on demand, outside the repo) through the concat demuxer
+   so each frame keeps its own duration. Write `list.txt` with a `file` +
+   `duration` pair per frame, repeating the last file for the end hold:
 
-   ```bash
-   ffmpeg -y -framerate 1 -i build/frames/frame-%02d.png -vf "split[a][b];[a]palettegen[p];[b][p]paletteuse" assets/<name>.gif
+   ```text
+   file 'frame-00.png'
+   duration 1.0
+   file 'frame-01.png'
+   duration 0.12
+   ...
+   file 'frame-17.png'
+   duration 3.0
+   file 'frame-17.png'
    ```
 
-   Hold the final beat by duplicating the last PNG 2-3 times before assembling.
-   Budget <= ~1.5 MB; over budget means fewer frames or width 800, never a
-   cheaper palette.
+   ```bash
+   ffmpeg -y -f concat -safe 0 -i list.txt -vf "split[a][b];[a]palettegen[p];[b][p]paletteuse" -loop 0 assets/<name>.gif
+   ```
+
+   Keep the palettegen/paletteuse quality rule. Budget <= ~1.5 MB; over budget
+   means width 800 or fewer typing steps, never a cheaper palette.
 5. Embed the GIF like any image. Keep a static PNG sibling only when the story
    also has an honest one-glance still; `check-slot.mjs` validates a frames
    file element by element.
@@ -230,11 +263,15 @@ captions and annotation chips, steps glyphs, the takeaway banner) stays legible.
 Per panel (`before`, `after`): `caption`, `sessionTitle`, `surface`, `blocks[]`.
 `usage`, `agentName`, `agentModel`, `inputAgent`, `inputModel` and
 `inputProvider` are ignored since v3.
-`surface` is `terminal` (default), `files` or `shots`. A `files` panel drops the
-traffic lights and the input box and renders the titlebar as neutral editor
-chrome, for demos whose essence is a config or repo artifact rather than an
-agent session. A `shots` panel drops the titlebar, the session title and the
-input box and frames a real screenshot instead (see "Shots surface" below).
+`surface` is `terminal` (default), `files`, `shots` or `single`. A `files` panel
+drops the traffic lights and the input box and renders the titlebar as neutral
+editor chrome, for demos whose essence is a config or repo artifact rather than
+an agent session. A `shots` panel drops the titlebar, the session title and the
+input box and frames a real screenshot instead (see "Shots surface" below). A
+`single` panel is animation-only: it hides the arrow and the other panel and
+renders one full-width window (the `caption` becomes a muted beat label above
+it), for temporal stories that must be watched rather than compared - the
+two-panel `compare` scaffold stays for static before/after cards.
 `blocks[]` is an ordered event stream:
 `{type:"user"|"prose"|"tool"|"status"|"done",text}`,
 `{type:"diff",lines:[...]}`, `{type:"file",path,lines:[...]}` or
@@ -256,7 +293,8 @@ Legibility rules (v4):
 
 - Keep each panel to **at most 5 blocks**: the user command, one or two short
   body lines, the red pain block (before) or green payoff block (after), and a
-  done/status line.
+  done/status line. A `single` panel is the exception: up to **12 blocks** and
+  lines up to **80 characters**, because it owns the full stage width.
 - Keep every body line to **~50 characters**; trim longer content in the slot
   JSON rather than letting it overflow the panel.
 - Design at **900 CSS px** total width (the stage is fixed at 900 px, so opening
@@ -329,9 +367,10 @@ reduced to one step.
 
 Validate a slot before rendering: `node scripts/check-slot.mjs demo/<name>.json`
 exits non-zero on any schema error (missing takeaway, more than 5 blocks per
-panel, a line over 50 characters, an unknown theme or surface, a `shots` panel
-without a `shot`) and prints warnings for an absent surface, an unknown block
-type, blocks on a `shots` panel, or a `steps` block with more than 8 entries.
+panel - 12 on a `single` panel, a line over 50 characters - 80 on `single`, an
+empty `single` panel, an unknown theme or surface, a `shots` panel without a
+`shot`) and prints warnings for an absent surface, an unknown block type, blocks
+on a `shots` panel, or a `steps` block with more than 8 entries.
 
 Minimal example:
 
