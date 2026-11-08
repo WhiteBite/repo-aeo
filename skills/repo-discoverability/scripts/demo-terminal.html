@@ -23,6 +23,17 @@
     --tool-glyph:    var(--muted);
     --titlebar:      #161616;
 
+    --diff-del-border:   rgba(224, 108, 117, 0.28);
+    --diff-added-border: rgba(74, 222, 128, 0.28);
+    --code-bg:           rgba(255, 255, 255, 0.07);
+    --arrow-bg:          radial-gradient(circle at 50% 38%, rgba(74, 222, 128, 0.18), rgba(74, 222, 128, 0.02) 72%);
+    --arrow-border:      rgba(74, 222, 128, 0.35);
+    --arrow-shadow:      0 0 0 1px rgba(74, 222, 128, 0.06), 0 0 24px rgba(74, 222, 128, 0.18);
+    --takeaway-bg:       rgba(74, 222, 128, 0.09);
+    --takeaway-border:   rgba(74, 222, 128, 0.28);
+    --window-shadow:     0 18px 50px rgba(0, 0, 0, 0.6);
+    --anno-green-ink:    #06210f;
+
     --mono: ui-monospace, "Cascadia Mono", "Cascadia Code", "SF Mono", "JetBrains Mono",
             Menlo, Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace;
   }
@@ -67,6 +78,36 @@
     --diff-del-bg:   #2c1618;
     --tool-glyph:    var(--muted);
     --titlebar:      #101614;
+  }
+
+  /* ---------- palette: light (orthogonal to theme; overrides the scheme) ---------- */
+  body[data-palette="light"] {
+    --page:          #f4f4f2;
+    --bg:            #ffffff;
+    --panel:         #f1f1ef;
+    --border:        #d6d6d3;
+    --border-subtle: #e6e6e3;
+    --text:          #1b1b1b;
+    --muted:         #6a6a6a;
+    --green:         #15803d;
+    --red:           #b91c1c;
+    --yellow:        #b45309;
+    --diff-added:    #15803d;
+    --diff-added-bg: #e8f6ec;
+    --diff-del:      #b91c1c;
+    --diff-del-bg:   #fdecec;
+    --titlebar:      #ececea;
+
+    --diff-del-border:   rgba(185, 28, 28, 0.32);
+    --diff-added-border: rgba(21, 128, 61, 0.32);
+    --code-bg:           rgba(0, 0, 0, 0.05);
+    --arrow-bg:          radial-gradient(circle at 50% 38%, rgba(21, 128, 61, 0.14), rgba(21, 128, 61, 0.02) 72%);
+    --arrow-border:      rgba(21, 128, 61, 0.4);
+    --arrow-shadow:      0 0 0 1px rgba(21, 128, 61, 0.08), 0 0 24px rgba(21, 128, 61, 0.14);
+    --takeaway-bg:       rgba(21, 128, 61, 0.08);
+    --takeaway-border:   rgba(21, 128, 61, 0.3);
+    --window-shadow:     0 18px 50px rgba(0, 0, 0, 0.12);
+    --anno-green-ink:    #ffffff;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -137,7 +178,7 @@
     border: 1px solid var(--border);
     border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+    box-shadow: var(--window-shadow);
   }
 
   .titlebar {
@@ -244,11 +285,11 @@
   }
   .panel[data-panel="before"] .diff {
     background: var(--diff-del-bg);
-    border: 1px solid rgba(224, 108, 117, 0.28);
+    border: 1px solid var(--diff-del-border);
   }
   .panel[data-panel="after"] .diff {
     background: var(--diff-added-bg);
-    border: 1px solid rgba(74, 222, 128, 0.28);
+    border: 1px solid var(--diff-added-border);
   }
   .diff-line {
     line-height: 1.4;
@@ -287,11 +328,11 @@
   }
   .panel[data-panel="before"] .file {
     background: var(--diff-del-bg);
-    border: 1px solid rgba(224, 108, 117, 0.28);
+    border: 1px solid var(--diff-del-border);
   }
   .panel[data-panel="after"] .file {
     background: var(--diff-added-bg);
-    border: 1px solid rgba(74, 222, 128, 0.28);
+    border: 1px solid var(--diff-added-border);
   }
   .file-path {
     color: var(--muted);
@@ -326,7 +367,7 @@
   code {
     font-family: var(--mono);
     font-size: 0.92em;
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--code-bg);
     border: 1px solid var(--border-subtle);
     border-radius: 4px;
     padding: 0 4px;
@@ -396,7 +437,7 @@
     color: #ffffff;
     white-space: nowrap;
   }
-  .shot-anno.green .shot-anno-label { background: var(--green); color: #06210f; }
+  .shot-anno.green .shot-anno-label { background: var(--green); color: var(--anno-green-ink); }
   .shot-caption {
     align-self: stretch;
     width: 100%;
@@ -460,9 +501,9 @@
     display: grid;
     place-items: center;
     color: var(--green);
-    background: radial-gradient(circle at 50% 38%, rgba(74, 222, 128, 0.18), rgba(74, 222, 128, 0.02) 72%);
-    border: 1px solid rgba(74, 222, 128, 0.35);
-    box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.06), 0 0 24px rgba(74, 222, 128, 0.18);
+    background: var(--arrow-bg);
+    border: 1px solid var(--arrow-border);
+    box-shadow: var(--arrow-shadow);
   }
   .arrow-badge svg { width: 18px; height: 18px; }
 
@@ -474,8 +515,8 @@
     gap: 12px;
     padding: 15px 22px;
     border-radius: 10px;
-    background: rgba(74, 222, 128, 0.09);
-    border: 1px solid rgba(74, 222, 128, 0.28);
+    background: var(--takeaway-bg);
+    border: 1px solid var(--takeaway-border);
     font-size: 15px;
     line-height: 1.4;
     color: var(--text);
@@ -694,6 +735,7 @@
       var theme = data.theme || "opencode";
       var T = THEMES[theme] || THEMES.opencode;
       document.body.setAttribute("data-theme", theme);
+      document.body.setAttribute("data-palette", data.palette === "light" ? "light" : "dark");
 
       function resolve(el, key) {
         var panel = el.closest("[data-panel]");

@@ -78,12 +78,51 @@ rendered image is the last resort, not the default.
 - **Single topology diagram** -> a **GitHub-native Mermaid fence**. Do **not**
   set `theme` in the `init` directive - it breaks auto dark mode. Mermaid cannot
   sit in a table cell, so there is no side-by-side.
-- **Before/after topology** -> deferred: pre-render light + dark with
-  `mermaid-cli` and swap them via `<picture>`.
+- **Before/after topology** -> pre-render light + dark with `mermaid-cli` and
+  swap them via `<picture>` (recipe below).
 - **Animated demo** -> a **GIF via [charmbracelet/vhs](https://github.com/charmbracelet/vhs)**
   (MIT, deterministic tape -> GIF; needs `ttyd`, `ffmpeg` and fonts on `PATH`).
   GIF is the only animated format that survives a committed README asset: raw
   `<video>` and MP4 URLs are stripped by the GitHub sanitizer.
+
+### Before/after topology (pre-rendered Mermaid)
+
+A single topology stays a **native Mermaid fence** (auto dark mode, no asset). A
+before/after pair cannot: native Mermaid cannot sit in a table cell, so the two
+diagrams must be pre-rendered and placed side by side.
+
+1. Write the two sources, `before.mmd` and `after.mmd`.
+2. Render each with [`@mermaid-js/mermaid-cli`](https://github.com/mermaid-js/mermaid-cli)
+   (MIT, puppeteer-backed). Install it on demand **outside the repo** - it is a
+   guide tool, never a dependency of `rdk-cli` or `repo-aeo-mcp`:
+
+   ```bash
+   npx -y @mermaid-js/mermaid-cli -i before.mmd -o assets/before-diagram-dark.png -s 2
+   npx -y @mermaid-js/mermaid-cli -i after.mmd  -o assets/after-diagram-dark.png  -s 2
+   ```
+
+   `-s 2` renders at 2x so the PNG stays legible when GitHub downscales it.
+3. Render the light pass with a light `themeVariables` set that keeps contrast
+   (dark text, light fills, visible borders), e.g. a `light.json` config:
+
+   ```json
+   { "theme": "base",
+     "themeVariables": { "background": "#ffffff", "primaryColor": "#e8f6ec",
+       "primaryTextColor": "#1b1b1b", "primaryBorderColor": "#15803d",
+       "lineColor": "#6a6a6a", "fontFamily": "ui-monospace, monospace" } }
+   ```
+
+   ```bash
+   npx -y @mermaid-js/mermaid-cli -i before.mmd -o assets/before-diagram-light.png -s 2 -c light.json
+   npx -y @mermaid-js/mermaid-cli -i after.mmd  -o assets/after-diagram-light.png  -s 2 -c light.json
+   ```
+4. Embed each pair with the same `<picture>` snippet as the terminal demo (dark
+   file as the dark source, light file as the fallback).
+
+Warnings: never set `theme` in a `%%{init}%%` directive on a **native** fence -
+it breaks GitHub's auto dark mode. Native Mermaid cannot sit in a table cell, so
+side-by-side before/after must be pre-rendered. A single topology stays a native
+fence.
 
 ## Rendering an agent-terminal demo (the locked template)
 
@@ -110,12 +149,37 @@ playwright-core renderer that loads the template and calls
 happens to be resolvable, `render-demo.mjs` rasterizes in one step and
 `--prepare` is unnecessary.
 
+### Capture real output (`--from-command`)
+
+A demo is only honest if its lines are the project's real output. Capture first,
+review, then paste - never type the lines from memory:
+
+```bash
+node <skill>/scripts/render-demo.mjs --from-command "npx repo-aeo audit" --max-lines 8
+```
+
+The command runs through the shell (`--cwd <dir>` sets the working directory),
+stdout and stderr are merged, and the exit code is captured. The script prints a
+JSON array of slot blocks to stdout and **writes no file**: the first block is
+the `tool` call, the last up-to-`--max-lines` output lines follow as `status`
+blocks (a single `... N earlier lines omitted` status replaces the dropped
+prefix), and a final `done` (`exit 0`) or `status` (`exit <code>`) block closes
+the run. Lines over 50 characters are tail-truncated with an ellipsis, so the
+array passes `check-slot.mjs` unchanged. Review it, then paste it into the
+panel's `blocks[]` in the slot JSON. This is the mechanism that makes "real
+output" provable: the lines came from the command, not from the author.
+
 ### Slot schema (v4)
 
 Top-level: `schema` (optional; must be `4` when present, and an absent key means
 4), `theme` (`opencode` | `claude-code` | `codex` | `shell`), `windowTitle` (the
 session part; the theme supplies the window prefix), `takeaway` (**required**:
 one plain-language sentence rendered in the full-width banner below both panels).
+`palette` (`dark` default | `light`) is orthogonal to `theme`: `theme` is the
+harness chrome identity (prefix, glyphs, traffic lights), `palette` is the color
+scheme. `light` swaps the whole scheme to a paper-ish page, white windows, dark
+text and light red/green diff tints; every surface (terminal, files, shots
+captions and annotation chips, steps glyphs, the takeaway banner) stays legible.
 `arrowCaption`, `statusLeft` and
 `statusRight` are ignored since v3.
 Per panel (`before`, `after`): `caption`, `sessionTitle`, `surface`, `blocks[]`.
@@ -262,8 +326,21 @@ Minimal example:
   truth; re-render with `render-demo.mjs` to refresh, never hand-edit the PNG.
 - Embed with **markdown** so the relative path is validated by
   `readme.local_links`: `![demo](assets/demo.png)` near the top of the README.
-- Dark/light variants via the `#gh-dark-mode-only` / `#gh-light-mode-only`
-  fragments.
+- Ship both schemes with a `<picture>` element: the dark render is the
+  `prefers-color-scheme: dark` source, the light render is the `<img>` fallback.
+  GitHub documents this pattern and its sanitizer keeps `<picture>` and
+  `<source>`:
+
+  ```html
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/x.png">
+    <img alt="..." src="assets/x-light.png">
+  </picture>
+  ```
+
+  Render the same slot JSON twice (palette absent or `dark`, then `palette:
+  "light"`) and commit both PNGs. Shipping a single dark variant remains
+  acceptable - the `<picture>` pair is an upgrade, not a requirement.
 - Never embed a committed `.mp4` (GitHub strips `<video>`), an animated SVG
   (unreliable in README), or any `<iframe>`/`<script>` (stripped).
 - A catch-all `* text` / `* text eol=...` rule in `.gitattributes` strips CRLF

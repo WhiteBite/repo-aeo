@@ -5,6 +5,7 @@
  */
 
 const THEMES = new Set(['opencode', 'claude-code', 'codex', 'shell']);
+const PALETTES = new Set(['dark', 'light']);
 const SURFACES = new Set(['terminal', 'files', 'shots']);
 const BLOCK_TYPES = new Set(['user', 'prose', 'tool', 'status', 'done', 'diff', 'file', 'steps']);
 const MAX_BLOCKS = 5;
@@ -42,6 +43,9 @@ export function validateSlot(obj) {
   }
   if (!THEMES.has(obj.theme)) {
     errors.push(`theme must be one of opencode|claude-code|codex|shell, got ${JSON.stringify(obj.theme)}`);
+  }
+  if (obj.palette !== undefined && !PALETTES.has(obj.palette)) {
+    errors.push(`palette must be one of dark|light, got ${JSON.stringify(obj.palette)}`);
   }
   if (typeof obj.takeaway !== 'string' || obj.takeaway.trim() === '') {
     errors.push('takeaway is required and must be a non-empty string');

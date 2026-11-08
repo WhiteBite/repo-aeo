@@ -1,4 +1,5 @@
 import { pathToFileURL } from "node:url";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
@@ -6,6 +7,13 @@ import os from "node:os";
 function arg(name, fallback) {
   const i = process.argv.indexOf(`--${name}`);
   return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
+}
+
+const MAX_LINE = 50;
+
+function clip(text) {
+  const s = String(text);
+  return s.length > MAX_LINE ? `${s.slice(0, MAX_LINE - 1)}\u2026` : s;
 }
 
 const template = path.resolve(arg("template", "template.html"));
@@ -17,6 +25,29 @@ const heightArg = arg("height", "auto");
 const scale = Number(arg("scale", "2"));
 const themeOverride = arg("theme", "");
 const prepareOnly = process.argv.includes("--prepare");
+const fromCommand = arg("from-command", "");
+
+if (fromCommand) {
+  const cwd = arg("cwd", process.cwd());
+  const maxLines = Math.max(1, Number(arg("max-lines", "8")) || 8);
+  const result = spawnSync(fromCommand, { shell: true, cwd, encoding: "utf8" });
+  if (result.error) {
+    console.error(result.error.message);
+    process.exit(1);
+  }
+  const exit = typeof result.status === "number" ? result.status : 1;
+  const lines = `${result.stdout || ""}${result.stderr || ""}`
+    .split(/\r?\n/)
+    .filter((line) => line.trim() !== "");
+  const blocks = [{ type: "tool", kind: "call", text: clip(fromCommand) }];
+  if (lines.length > maxLines) {
+    blocks.push({ type: "status", text: clip(`... ${lines.length - maxLines} earlier lines omitted`) });
+  }
+  for (const line of lines.slice(-maxLines)) blocks.push({ type: "status", text: clip(line) });
+  blocks.push(exit === 0 ? { type: "done", text: "exit 0" } : { type: "status", text: `exit ${exit}` });
+  console.log(JSON.stringify(blocks, null, 2));
+  process.exit(0);
+}
 
 const MIME = {
   ".png": "image/png",

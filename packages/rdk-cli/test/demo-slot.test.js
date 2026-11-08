@@ -9,7 +9,13 @@ import { validateSlot } from '../src/util/slot-validate.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const CHECK_SLOT = join(ROOT, 'skills', 'repo-discoverability', 'scripts', 'check-slot.mjs');
+const RENDER_DEMO = join(ROOT, 'skills', 'repo-discoverability', 'scripts', 'render-demo.mjs');
 const DEMO = join(ROOT, 'demo', 'rdk-audit.json');
+
+function fromCommand(cmd, extra = []) {
+  const result = spawnSync(process.execPath, [RENDER_DEMO, '--from-command', cmd, ...extra], { encoding: 'utf8' });
+  return { status: result.status, blocks: JSON.parse(result.stdout), stderr: result.stderr || '' };
+}
 
 function checkSlotExit(files) {
   try {
@@ -140,4 +146,48 @@ test('check-slot.mjs exits 0 with a warning for a ten-step block', () => {
 test('validateSlot rejects an unknown surface', () => {
   const { errors } = validateSlot({ theme: 'shell', takeaway: 'ok', before: { surface: 'canvas', blocks: [] }, after: { blocks: [] } });
   assert.ok(errors.some((error) => /surface/.test(error)), 'expected a surface error');
+});
+
+test('validateSlot accepts palette light and rejects an unknown palette', () => {
+  const base = { theme: 'shell', takeaway: 'ok', before: { blocks: [] }, after: { blocks: [] } };
+  assert.deepEqual(validateSlot({ ...base, palette: 'light' }).errors, []);
+  assert.deepEqual(validateSlot({ ...base, palette: 'dark' }).errors, []);
+  const { errors } = validateSlot({ ...base, palette: 'neon' });
+  assert.ok(errors.some((error) => /palette/.test(error)), 'expected a palette error');
+});
+
+test('render-demo --from-command prints the tool block, both output lines and an exit-0 done block', () => {
+  const { status, blocks } = fromCommand(`node -e "console.log('hello'); console.error('warn line'); process.exit(0)"`);
+  assert.equal(status, 0);
+  assert.equal(blocks[0].type, 'tool');
+  assert.equal(blocks[0].kind, 'call');
+  const texts = blocks.map((block) => block.text);
+  assert.ok(texts.includes('hello'), 'expected the stdout line');
+  assert.ok(texts.includes('warn line'), 'expected the stderr line');
+  const last = blocks[blocks.length - 1];
+  assert.equal(last.type, 'done');
+  assert.equal(last.text, 'exit 0');
+});
+
+test('render-demo --from-command reports a non-zero exit as a status block', () => {
+  const { status, blocks } = fromCommand(`node -e "process.exit(3)"`);
+  assert.equal(status, 0);
+  const last = blocks[blocks.length - 1];
+  assert.equal(last.type, 'status');
+  assert.equal(last.text, 'exit 3');
+});
+
+test('render-demo --from-command truncates an output line to 50 chars', () => {
+  const { blocks } = fromCommand(`node -e "console.log('x'.repeat(80))"`);
+  const line = blocks.find((block) => block.type === 'status' && block.text.startsWith('x'));
+  assert.ok(line, 'expected the long output line');
+  assert.ok(line.text.length <= 50, `expected <=50 chars, got ${line.text.length}`);
+});
+
+test('render-demo --from-command collapses earlier lines into one omitted status block', () => {
+  const { blocks } = fromCommand(`node -e "for(let i=1;i<=12;i++)console.log('line '+i)"`, ['--max-lines', '5']);
+  const omitted = blocks.find((block) => /earlier lines omitted/.test(block.text));
+  assert.ok(omitted, 'expected an omitted-lines status block');
+  assert.equal(omitted.text, '... 7 earlier lines omitted');
+  assert.equal(blocks.filter((block) => /^line \d+$/.test(block.text)).length, 5);
 });
