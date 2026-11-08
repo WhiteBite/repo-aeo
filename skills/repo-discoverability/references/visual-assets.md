@@ -167,6 +167,11 @@ terminal types input and streams output:
 
 The frame after a run is the beat hold that reveals the result.
 
+If the product reacts to recurrence, show the recurrence itself: repeat the
+identical call line on every attempt and let the reaction (counter, gate card,
+hud) escalate beside it - counters appearing without their attempts read as
+magic.
+
 **Per-frame delays.** Give each frame a `delay` (seconds) in the frames JSON:
 typed frames are 0.03s, streamed frames are 0.06-0.08s, beat frames hold
 0.9-1.2s so the eye reads the result, and the final frame holds 3s. The delay is
