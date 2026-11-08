@@ -25,6 +25,49 @@ const REQUIRED_SECTIONS = [
 
 const STATUS_ALIASES = ['status', 'status roadmap', 'roadmap'];
 
+const BADGE_HOST_RE = /(shields\.io|badge\.fury\.io|badgen\.net|codecov|coveralls|travis|sonarcloud|snyk|codeclimate|deepsource|libraries\.io|nodeico|packagephobia|bundlephobia|isitmaintained|opencollective)/i;
+const CI_BADGE_RE = /\/(?:actions\/)?workflows\/[^)\s]*badge\.svg/i;
+const NON_DEMO_NAME_RE = /(logo|icon|badge|social|banner|cover|favicon)/i;
+const ANIMATED_RE = /\.(gif|webm|mp4)(?:[?#].*)?$/i;
+const USER_ATTACH_RE = /github\.com\/user-attachments\//i;
+const DEMO_HEADING_RE = /(demo|usage|example|quickstart|preview|showcase|in action|see it)/;
+const DEMO_ALT_RE = /(demo|example|usage|preview|before|after|screenshot)/i;
+
+function imageCandidates(text, doc) {
+  const urls = new Set(doc.links.map((link) => link.url));
+  for (const match of text.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)) urls.add(match[1]);
+  for (const match of text.matchAll(/<source[^>]+srcset=["']([^"']+)["']/gi)) urls.add(match[1].split(/[ ,]/)[0]);
+  return [...urls];
+}
+
+function escapeRe(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function imageAlt(text, url) {
+  const esc = escapeRe(url);
+  const markdown = new RegExp(`!\\[([^\\]]*)\\]\\(${esc}\\)`).exec(text);
+  if (markdown) return markdown[1];
+  const img = new RegExp(`<img[^>]*\\bsrc=["']${esc}["'][^>]*\\balt=["']([^"']*)["']`, 'i').exec(text)
+    || new RegExp(`<img[^>]*\\balt=["']([^"']*)["'][^>]*\\bsrc=["']${esc}["']`, 'i').exec(text);
+  return img ? img[1] : '';
+}
+
+function hasDemoVisual(text, doc) {
+  const demoBodies = [];
+  for (const [key, section] of doc.sections) {
+    if (DEMO_HEADING_RE.test(key)) demoBodies.push(section.body);
+  }
+  return imageCandidates(text, doc).some((url) => {
+    if (!url || BADGE_HOST_RE.test(url) || CI_BADGE_RE.test(url)) return false;
+    const basename = url.split(/[?#]/)[0].split('/').pop() || '';
+    if (NON_DEMO_NAME_RE.test(basename)) return false;
+    if (ANIMATED_RE.test(url) || USER_ATTACH_RE.test(url)) return true;
+    if (demoBodies.some((body) => body.includes(url))) return true;
+    return DEMO_ALT_RE.test(imageAlt(text, url));
+  });
+}
+
 export const readmeChecks = [
   check({
     id: 'readme.exists',
@@ -220,6 +263,25 @@ export const readmeChecks = [
         return finding({ id: this.id, axis: this.axis, severity: 'warn', title: `${broken.length} broken relative link(s) in README`, why: this.why, fix: `Broken: ${[...new Set(broken)].slice(0, 5).join(', ')}`, effort: 'S' });
       }
       return null;
+    },
+  }),
+
+  check({
+    id: 'readme.demo_visual',
+    axis: 'readme',
+    weight: 5,
+    title: 'README shows a demo visual (GIF, screenshot or before/after)',
+    why: 'A visual is the fastest way for a human or an agent to understand what a project does; a text-only README makes the reader work for it.',
+    fix: 'Add one demo asset under assets/ and embed it near the top with a relative image. Load the repo-discoverability skill reference references/visual-assets.md and render the before/after with scripts/render-demo.mjs.',
+    effort: 'M',
+    autoFixable: false,
+    patchId: null,
+    run(ctx) {
+      const text = readmeText(ctx);
+      if (text === null) return skip('README.md is missing');
+      const doc = readmeDoc(ctx, text);
+      if (hasDemoVisual(text, doc)) return null;
+      return finding({ id: this.id, axis: this.axis, severity: 'warn', title: this.title, why: this.why, fix: this.fix, effort: this.effort });
     },
   }),
 ];

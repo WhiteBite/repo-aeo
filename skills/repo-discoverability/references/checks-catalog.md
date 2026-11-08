@@ -24,6 +24,7 @@ exists, docs only when a homepage/docs site is configured).
 | `readme.heading_structure` | 6 | one H1, ≥4 H2s |
 | `readme.verifiable_claims` | 6 | numbers with named sources |
 | `readme.local_links` | 4 | relative links must resolve |
+| `readme.demo_visual` | 5 | a demo GIF / screenshot / before-after embedded in the README |
 
 ## Agent readiness (weight 15)
 

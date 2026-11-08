@@ -16,6 +16,8 @@ This is the concatenated documentation intended for LLM grounding. Regenerate wi
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Node >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
 
+![repo-aeo demo: discoverability audit before and after](assets/rdk-audit.png)
+
 Make any repository, npm package and docs site **findable and recommendable** for
 humans, AI agents and search engines.
 
@@ -23,7 +25,7 @@ RDK scores how discoverable your repository is, fixes the parts that can be fixe
 automatically, and keeps it from regressing in CI. It is the tool you point at a
 repo that is *good but invisible*.
 
-The audit runs **45 checks in under 300 ms offline** on this repository
+The audit runs **46 checks in under 300 ms offline** on this repository
 (measured with `rdk audit --format json`, `duration_ms` field) and carries **0
 runtime dependencies**, so `npx` stays fast and the supply chain stays small.
 
@@ -111,6 +113,7 @@ npx repo-aeo npm-surface   # package.json publish surface + npm pack --dry-run
 npx repo-aeo github-sync   # push description/homepage/topics (needs --apply --ack --reason --plan-digest)
 npx repo-aeo channels      # list every distribution channel, applicability and next action (read-only)
 npx repo-aeo submit        # submit to a distribution channel: --channel <id> (needs --apply --ack --reason --plan-digest)
+npx repo-aeo share         # print a ready-to-post message for a community channel (--channel <id> | --list)
 npx repo-aeo track         # campaign dashboard: live status, adopt existing PRs, sync the ledger
 npx repo-aeo skill install # link the agent skill into OpenCode/Claude/Codex skill dirs
 
@@ -128,7 +131,7 @@ offline; `--online` adds link checks and live GitHub metadata.
 
 ```bash
 $ npx repo-aeo audit            # measured on fixtures/demo-repo, offline
-score: 56/100 (grade D) · checks: 23/44 passed · findings: 9 error, 12 warn, 13 info (19 autofixable) · mode: offline (use --online for link + GitHub checks)
+score: 55/100 (grade D) · checks: 23/45 passed · findings: 9 error, 13 warn, 13 info (19 autofixable) · mode: offline (use --online for link + GitHub checks)
 ```
 
 ### 2. Fix what is safe to fix
@@ -168,7 +171,7 @@ bot branch and opens a PR for review.
 ```bash
 $ npx repo-aeo-mcp score
 Discoverability score: 100/100 (grade A)
-checks passed: 45/45 - errors 0 - warnings 0 - autofixable 0
+checks passed: 46/46 - errors 0 - warnings 0 - autofixable 0
 trend: no history yet
 ```
 

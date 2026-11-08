@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>OpenCode TUI — before / after template</title>
+<style>
+  :root {
+    /* Palette: OpenCode TUI (packages/tui theme) tuned to the reference stills. */
+    --page:          #000000;
+    --bg:            #0d0d0d; /* terminal body            */
+    --panel:         #1a1a1a; /* header / user / input /   */
+    --border:        #2a2a2a; /* window hairline           */
+    --border-subtle: #1e1e1e;
+    --text:          #d0d0d0; /* agent prose + UI text     */
+    --muted:         #888888; /* tool lines, meta, status  */
+    --blue:          #3b82f6; /* accent left-bars, agent   */
+    --green:         #4ade80; /* success + arrow           */
+    --red:           #e06c75;
+    --yellow:        #f5a742;
+    --diff-added:    #7ee787; /* green added line text     */
+    --diff-added-bg: #10231a; /* green added line fill     */
+    --diff-del:      #ff8f8f;
+    --diff-del-bg:   #2c1618;
+
+    --mono: ui-monospace, "Cascadia Mono", "Cascadia Code", "SF Mono", "JetBrains Mono",
+            Menlo, Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body { height: 100%; }
+
+  body {
+    background: var(--page);
+    color: var(--text);
+    font-family: var(--mono);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+    padding: 22px 24px;
+  }
+
+  /* ---------- comparison scaffold ---------- */
+  .compare {
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    height: 100%;
+  }
+
+  .panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .panel-caption {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-left: 2px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+  }
+  .panel-caption::before {
+    content: "";
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+    flex: 0 0 auto;
+  }
+  .panel[data-panel="before"] .panel-caption { color: var(--red); }
+  .panel[data-panel="after"]  .panel-caption { color: var(--green); }
+
+  /* ---------- terminal window ---------- */
+  .window {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+  }
+
+  .titlebar {
+    height: 40px;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 16px;
+    background: #161616;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .dots { display: flex; gap: 8px; flex: 0 0 auto; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot.red    { background: #ff5f56; }
+  .dot.yellow { background: #ffbd2e; }
+  .dot.green  { background: #27c93f; }
+
+  .window-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .win-icon {
+    width: 13px; height: 13px;
+    border-radius: 3px;
+    background: var(--blue);
+    flex: 0 0 auto;
+  }
+
+  /* ---------- session body ---------- */
+  .body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 12px 16px 10px;
+  }
+
+  .messages {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow: hidden;
+  }
+
+  .pinned {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding-top: 10px;
+  }
+
+  .header-panel {
+    background: var(--panel);
+    border-radius: 6px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    flex: 0 0 auto;
+  }
+  .session-title {
+    font-size: 14px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .usage {
+    font-size: 13px;
+    color: var(--muted);
+    white-space: nowrap;
+    flex: 0 0 auto;
+  }
+
+  .user-msg {
+    background: var(--panel);
+    border-left: 3px solid var(--blue);
+    border-radius: 0 6px 6px 0;
+    padding: 10px 14px;
+    font-size: 14px;
+    color: var(--text);
+    line-height: 1.45;
+    flex: 0 0 auto;
+  }
+
+  .prose { display: flex; flex-direction: column; gap: 7px; flex: 0 0 auto; }
+  .prose-line {
+    font-size: 13.5px;
+    color: var(--text);
+    line-height: 1.5;
+  }
+
+  .tools { display: flex; flex-direction: column; gap: 3px; padding-left: 14px; flex: 0 0 auto; }
+  .tool-line {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.45;
+    white-space: pre-wrap;
+  }
+
+  /* ---------- diff block ---------- */
+  .diff {
+    border-radius: 5px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;
+  }
+  .diff-line {
+    font-size: 12px;
+    line-height: 1.34;
+    padding: 1px 10px 1px 8px;
+    white-space: pre;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .diff-line.add { background: var(--diff-added-bg); color: var(--diff-added); }
+  .diff-line.add::before { content: "+ "; }
+  .diff-line.del { background: var(--diff-del-bg); color: var(--diff-del); }
+  .diff-line.del::before { content: "- "; }
+  .diff-line.ctx { background: var(--panel); color: var(--muted); }
+  .diff-line.ctx::before { content: "  "; }
+
+  .status {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.4;
+    flex: 0 0 auto;
+  }
+
+  .agent-line {
+    font-size: 13px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex: 0 0 auto;
+  }
+  .agent-line .glyph { color: var(--blue); font-size: 11px; }
+  .agent-line .agent-name { color: var(--blue); }
+
+  /* ---------- input box ---------- */
+  .input-box {
+    background: var(--panel);
+    border-left: 3px solid var(--blue);
+    border-radius: 0 6px 6px 0;
+    padding: 12px 14px;
+    min-height: 46px;
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+  }
+  .cursor {
+    display: inline-block;
+    width: 8px;
+    height: 17px;
+    background: var(--text);
+  }
+
+  .input-meta {
+    font-size: 13px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-left: 3px;
+  }
+  .input-meta .agent-name { color: var(--blue); }
+
+  .statusbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .statusbar .keys { display: flex; gap: 20px; }
+
+  /* ---------- arrow column ---------- */
+  .arrow-col {
+    flex: 0 0 150px;
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 0 12px;
+  }
+  .arrow {
+    font-size: 44px;
+    line-height: 1;
+    color: var(--green);
+    font-family: var(--mono);
+  }
+  .arrow-caption {
+    font-size: 12px;
+    color: var(--green);
+    text-align: center;
+    line-height: 1.4;
+  }
+</style>
+</head>
+<body>
+  <div class="compare">
+
+    <!-- ============ BEFORE PANEL ============ -->
+    <div class="panel" data-panel="before">
+      <div class="panel-caption" data-slot="caption">without plugin</div>
+      <div class="window">
+        <div class="titlebar">
+          <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+          <div class="window-title"><span class="win-icon"></span><span data-slot="windowTitle">OC | session</span></div>
+        </div>
+        <div class="body">
+          <div class="messages">
+            <div class="header-panel">
+              <div class="session-title" data-slot="sessionTitle"># session</div>
+              <div class="usage" data-slot="usage">0  0%  ($0.00)</div>
+            </div>
+            <div class="user-msg" data-slot="userMessage">user message</div>
+            <div class="prose" data-repeat="prose"></div>
+            <div class="tools" data-repeat="tools"></div>
+            <div class="diff" data-repeat="diff"></div>
+            <div class="status" data-slot="status">~ working...</div>
+            <div class="agent-line">
+              <span class="glyph">▣</span>
+              <span class="agent-name" data-slot="agentName">Build</span>
+              <span data-slot="agentModel">· claude-opus-4-5</span>
+            </div>
+          </div>
+          <div class="pinned">
+            <div class="input-box"><span class="cursor"></span></div>
+            <div class="input-meta">
+              <span class="agent-name" data-slot="inputAgent">Build</span>
+              <span data-slot="inputModel">Claude Opus 4.5</span>
+              <span data-slot="inputProvider">OpenCode Zen</span>
+            </div>
+            <div class="statusbar">
+              <span data-slot="statusLeft">esc interrupt</span>
+              <span class="keys" data-slot="statusRight">ctrl+t variants  tab agents  ctrl+p commands</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ ARROW ============ -->
+    <div class="arrow-col">
+      <div class="arrow">→</div>
+      <div class="arrow-caption" data-slot="arrowCaption">plugin</div>
+    </div>
+
+    <!-- ============ AFTER PANEL ============ -->
+    <div class="panel" data-panel="after">
+      <div class="panel-caption" data-slot="caption">with plugin</div>
+      <div class="window">
+        <div class="titlebar">
+          <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+          <div class="window-title"><span class="win-icon"></span><span data-slot="windowTitle">OC | session</span></div>
+        </div>
+        <div class="body">
+          <div class="messages">
+            <div class="header-panel">
+              <div class="session-title" data-slot="sessionTitle"># session</div>
+              <div class="usage" data-slot="usage">0  0%  ($0.00)</div>
+            </div>
+            <div class="user-msg" data-slot="userMessage">user message</div>
+            <div class="prose" data-repeat="prose"></div>
+            <div class="tools" data-repeat="tools"></div>
+            <div class="diff" data-repeat="diff"></div>
+            <div class="status" data-slot="status">~ working...</div>
+            <div class="agent-line">
+              <span class="glyph">▣</span>
+              <span class="agent-name" data-slot="agentName">Build</span>
+              <span data-slot="agentModel">· claude-opus-4-5</span>
+            </div>
+          </div>
+          <div class="pinned">
+            <div class="input-box"><span class="cursor"></span></div>
+            <div class="input-meta">
+              <span class="agent-name" data-slot="inputAgent">Build</span>
+              <span data-slot="inputModel">Claude Opus 4.5</span>
+              <span data-slot="inputProvider">OpenCode Zen</span>
+            </div>
+            <div class="statusbar">
+              <span data-slot="statusLeft">esc interrupt</span>
+              <span class="keys" data-slot="statusRight">ctrl+t variants  tab agents  ctrl+p commands</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============ REPEAT TEMPLATES ============ -->
+  <template data-template="prose"><p class="prose-line"></p></template>
+  <template data-template="tools"><div class="tool-line"></div></template>
+  <template data-template="diff"><div class="diff-line"></div></template>
+
+  <script>
+    // Slot filler. Scalar slots: [data-slot="key"] -> text.
+    // Repeat slots: [data-repeat="key"] -> clone <template data-template="key"> per item.
+    // Panel-scoped keys resolve from data[panelName] first, then top-level data.
+    window.fillTemplate = function (data) {
+      function resolve(el, key) {
+        var panel = el.closest("[data-panel]");
+        var panelKey = panel ? panel.getAttribute("data-panel") : null;
+        if (panelKey && data[panelKey] && key in data[panelKey]) return data[panelKey][key];
+        if (key in data) return data[key];
+        return undefined;
+      }
+
+      document.querySelectorAll("[data-slot]").forEach(function (el) {
+        var value = resolve(el, el.getAttribute("data-slot"));
+        if (value !== undefined && value !== null) el.textContent = value;
+      });
+
+      document.querySelectorAll("[data-repeat]").forEach(function (container) {
+        var key = container.getAttribute("data-repeat");
+        var items = resolve(container, key) || [];
+        var tpl = document.querySelector('template[data-template="' + key + '"]');
+        if (!tpl) return;
+        container.innerHTML = "";
+        items.forEach(function (item) {
+          var node = tpl.content.cloneNode(true);
+          var root = node.firstElementChild;
+          if (typeof item === "string") {
+            root.textContent = item;
+          } else {
+            if (item.type) root.classList.add(item.type);
+            var textEl = root.querySelector("[data-text]") || root;
+            textEl.textContent = item.text != null ? item.text : "";
+          }
+          container.appendChild(node);
+        });
+      });
+    };
+  </script>
+</body>
+</html>

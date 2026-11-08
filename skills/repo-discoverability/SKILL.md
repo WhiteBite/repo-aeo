@@ -93,6 +93,11 @@ node packages/rdk-cli/bin/rdk.js npm-surface       # publish-surface report
 node packages/rdk-cli/bin/rdk.js github-sync       # preview is the default; writes need --apply --ack --reason --plan-digest
 ```
 
+When the audit reports `readme.demo_visual`, produce the demo asset before
+touching prose: read `references/visual-assets.md`, fill the slot JSON with the
+project's real before/after, render with `scripts/render-demo.mjs`, then commit
+the asset + slot JSON and embed it in the README.
+
 Everything else (real examples, version bumps, exports redesign, claims with
 sources) is manual — write the smallest possible patch and keep the existing
 voice of the project.
@@ -161,9 +166,9 @@ procedure and pacing. `references/channels.md` is the channel matrix.
 
 ## What "good" looks like (checklist)
 
-- **README**: install/run in the first 60 lines, 2–5 short examples, sections
-  "Who is it for", "Use cases", "Why choose this", "Status/roadmap", claims with
-  numbers and named sources.
+- **README**: install/run in the first 60 lines, a demo visual near the top,
+  2–5 short examples, sections "Who is it for", "Use cases", "Why choose this",
+  "Status/roadmap", claims with numbers and named sources.
 - **GitHub**: 1–2 sentence description, at least 3 lowercase hyphenated topics,
   homepage URL.
 - **npm**: `description`, `keywords` (5–15), `repository`, `homepage`, `bugs`,
@@ -192,4 +197,6 @@ procedure and pacing. `references/channels.md` is the channel matrix.
 - `references/geo-playbook.md` — read before writing positioning or discovery copy; it explains why these moves work.
 - `references/distribution-playbook.md` — read before the first submission to any channel; it explains entry conventions, fork mechanics, per-mechanism procedure and submission tracking.
 - `references/channels.md` — read when choosing channels; the compact matrix of mechanism, artifact, applicability, gating and dedupe key.
+- `references/visual-assets.md` — read when a repo lacks a demo visual or the audit flags `readme.demo_visual`; the essence rule, per-type recipes and the slot schema.
+- `scripts/render-demo.mjs` — run after filling a slot JSON to render the before/after demo PNG from the locked template; needs playwright-core on demand.
 - `scripts/audit.sh` — run if Node is not on PATH; a thin wrapper around the CLI.
