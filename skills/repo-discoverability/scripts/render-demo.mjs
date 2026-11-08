@@ -65,6 +65,8 @@ if (framesFile) {
   }
   fs.mkdirSync(outDir, { recursive: true });
   const framesDir = path.dirname(path.resolve(framesFile));
+  const pngName = (i) => `frame-${String(i).padStart(2, "0")}.png`;
+  const listLines = [];
   frames.forEach((frame, i) => {
     try {
       prepareData(frame, framesDir);
@@ -73,8 +75,14 @@ if (framesFile) {
       process.exit(1);
     }
     fs.writeFileSync(path.join(outDir, `frame-${String(i).padStart(2, "0")}.json`), JSON.stringify(frame, null, 2));
+    const delay = typeof frame.delay === "number" && frame.delay >= 0 ? frame.delay : 1.0;
+    listLines.push(`file '${pngName(i)}'`, `duration ${delay}`);
   });
+  listLines.push(`file '${pngName(frames.length - 1)}'`, "duration 3.0");
+  const listPath = path.join(outDir, "list.txt");
+  fs.writeFileSync(listPath, `${listLines.join("\n")}\n`);
   console.log(`prepared ${frames.length} frames -> ${outDir}`);
+  console.log(`wrote ${listPath}`);
   process.exit(0);
 }
 

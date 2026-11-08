@@ -148,15 +148,22 @@ template hides the arrow and the other panel and renders one window at full
 stage width.
 
 **Typing / streaming.** A terminal that only swaps whole states reads as a
-slideshow. Make it type: author consecutive frames where the **last line grows
-by ~8-14 characters** per frame (write the partial strings yourself - the
-template does not animate). A typing run is 2-3 frames ending on the complete
-line; the frame after it is the beat hold that reveals the output.
+slideshow. Two things stream, at different granularity:
+
+- **Commands and input** (tool calls, the user line) grow by **8-14 characters**
+  per frame - a keystroke run. Write the partial strings yourself; the template
+  does not animate. A command run is 2-3 frames ending on the complete line.
+- **Agent speech** (prose, `status`, `done`, plugin narration) grows by **2-4
+  words** per frame - a real session streams prose word by word, not character
+  by character. A speech run is 1-2 intermediates ending on the complete line.
+
+The frame after a run is the beat hold that reveals the result.
 
 **Per-frame delays.** Give each frame a `delay` (seconds) in the frames JSON:
-typing frames are short (0.10-0.15s) so the line appears to stream, beat frames
-hold long (0.9-1.2s) so the eye reads the result, and the final frame holds
-2.5-3s. The delay is read at assembly time, not by the template.
+command-typing frames are short (0.10-0.15s), speech-typing frames are 0.08-0.12s
+so the words land at reading speed, beat frames hold 0.9-1.2s so the eye reads
+the result, and the final frame holds 2.5-3s. The delay is read at assembly
+time, not by the template.
 
 **Height.** In `single` mode the window is a fixed height (520px) and the input
 box is pinned to the bottom, so every frame renders at the same canvas height
@@ -169,7 +176,8 @@ content (full error text, the correction sentence, evidence counts), not stubs.
 1. Write `demo/<name>.frames.json`. Each frame repeats the scaffold and adds or
    highlights the next beat; put `"hl": true` on the block or diff line the eye
    must land on (the gate firing, the correction).
-2. Prepare all frames (zero-dep; resolves shots, writes `frame-NN.json`):
+2. Prepare all frames (zero-dep; resolves shots, writes `frame-NN.json` and the
+   ffmpeg `list.txt`):
 
    ```bash
    node skills/repo-discoverability/scripts/render-demo.mjs --frames demo/<name>.frames.json --out-dir build/frames
@@ -178,18 +186,21 @@ content (full error text, the correction sentence, evidence counts), not stubs.
 3. Rasterize each prepared frame with the on-demand playwright renderer at
    **scale 1**, width 900: a 2x GIF doubles bytes for no README gain.
 4. Assemble with ffmpeg (on demand, outside the repo) through the concat demuxer
-   so each frame keeps its own duration. Write `list.txt` with a `file` +
-   `duration` pair per frame, repeating the last file for the end hold:
+   so each frame keeps its own duration. The renderer already wrote
+   `<out-dir>/list.txt` - a `file` + `duration` pair per frame, then the last
+   frame repeated with `duration 3.0` for the end hold - so you never hand-build
+   it:
 
    ```text
    file 'frame-00.png'
-   duration 1.0
+   duration 1
    file 'frame-01.png'
    duration 0.12
    ...
-   file 'frame-17.png'
+   file 'frame-30.png'
+   duration 1.2
+   file 'frame-30.png'
    duration 3.0
-   file 'frame-17.png'
    ```
 
    ```bash

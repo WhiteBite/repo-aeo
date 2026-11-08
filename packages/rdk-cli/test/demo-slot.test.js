@@ -240,6 +240,19 @@ test('render-demo --frames prepares each frame into the out-dir', () => {
   });
 });
 
+test('render-demo --frames writes list.txt with per-frame durations and the end hold', () => {
+  const frame = (text, delay) => ({ theme: 'shell', takeaway: 'ok', delay, before: { blocks: [{ type: 'prose', text }] }, after: { blocks: [] } });
+  withTempFrames([frame('beat one', 0.5), frame('beat two', 0.1)], (file, dir) => {
+    const out = join(dir, 'out');
+    const result = spawnSync(process.execPath, [RENDER_DEMO, '--frames', file, '--out-dir', out], { encoding: 'utf8' });
+    assert.equal(result.status, 0);
+    const list = readFileSync(join(out, 'list.txt'), 'utf8');
+    assert.match(list, /^duration 0\.5$/m);
+    assert.match(list, /^duration 0\.1$/m);
+    assert.match(list, /file 'frame-01\.png'\nduration 3\.0/);
+  });
+});
+
 test('check-slot.mjs validates a frames array element by element', () => {
   const good = { theme: 'shell', takeaway: 'ok', before: { blocks: [] }, after: { blocks: [] } };
   const bad = { theme: 'shell', before: { blocks: [] }, after: { blocks: [] } };
