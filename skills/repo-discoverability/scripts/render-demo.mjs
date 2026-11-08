@@ -179,9 +179,9 @@ try {
   if (!height) {
     height = await page.evaluate(() => Math.ceil(document.documentElement.getBoundingClientRect().height));
     height = Math.max(height, 200);
-    await page.setViewportSize({ width, height });
-    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   }
+  await page.setViewportSize({ width, height });
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
 
   fs.mkdirSync(path.dirname(out), { recursive: true });
   await page.screenshot({ path: out, fullPage: false });

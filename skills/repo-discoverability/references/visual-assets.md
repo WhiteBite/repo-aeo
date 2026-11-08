@@ -138,6 +138,13 @@ recurrence, a pipeline that collapses), render the locked template once per
 moment and assemble a GIF. The frames file is a JSON **array** of complete slot
 JSONs (schema v4 each), 8-12 frames, one per beat of the story:
 
+Every frame must render at one identical canvas height: keep the SAME block
+skeleton in every frame (same block count per panel, same order, same line
+counts) so all frames come out the same height to the pixel - otherwise the
+takeaway banner jumps vertically between beats in the assembled GIF. Budget
+lines to ~44 characters, not the validator's 50: the ~366px text column at 13px
+mono wraps at ~44-48 chars, and a wrap silently breaks the shared skeleton.
+
 1. Write `demo/<name>.frames.json`. Each frame repeats the scaffold and adds or
    highlights the next beat; put `"hl": true` on the block or diff line the eye
    must land on (the gate firing, the correction).
@@ -241,6 +248,9 @@ authors who forget manual padding still get table alignment). The `+`/`-`/space
 sign is added by CSS in both forms.
 Blocks and diff lines accept `hl: true` to spotlight one beat (amber tint plus a
 left bar) - the frame-mode eye anchor.
+On an after panel every diff line is tinted green and on a before panel red,
+regardless of add/del/ctx - put narration you do not want tint-shifted into a
+status or prose block instead.
 
 Legibility rules (v4):
 
@@ -384,8 +394,11 @@ Minimal example:
 - Never embed a committed `.mp4` (GitHub strips `<video>`), an animated SVG
   (unreliable in README), or any `<iframe>`/`<script>` (stripped).
 - A catch-all `* text` / `* text eol=...` rule in `.gitattributes` strips CRLF
-  bytes out of committed PNG/GIF blobs, so README images render broken on
-  GitHub; add a `*.png binary` line after the catch-all and re-commit the asset.
+  bytes out of committed binary assets, so README images render broken on
+  GitHub; add lines for every binary you ship (`*.png`, `*.gif`, `*.jpg`,
+  `*.jpeg`, `*.webp`, `*.mp4`) after the catch-all and re-commit the asset.
+  Without a catch-all rule git usually auto-detects binaries by NUL bytes, but
+  do not rely on that.
 
 ## Safety rails
 
