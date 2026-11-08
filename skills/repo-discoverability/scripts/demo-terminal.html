@@ -480,6 +480,12 @@
         agentGlyph: "\u258C",
         dots: false,
         glyphs: { call: "\u2022", read: "\u203A", write: "\u2022", search: "\u2022", status: "\u2026", done: "\u2713" }
+      },
+      shell: {
+        prefix: "$",
+        dots: true,
+        userGlyph: "$",
+        glyphs: { call: "$", read: "$", write: "$", search: "$", status: "~", done: "\u2713" }
       }
     };
 
@@ -520,7 +526,7 @@
       if (b.type === "user") {
         el = document.createElement("div");
         el.className = "user-msg";
-        el.innerHTML = '<span class="user-glyph">&gt;</span>' +
+        el.innerHTML = '<span class="user-glyph">' + esc(T.userGlyph || ">") + '</span>' +
           '<span class="user-text">' + md(b.text) + "</span>";
       } else if (b.type === "prose") {
         el = document.createElement("p");

@@ -42,7 +42,7 @@ own screenshot capability on the same template.
 
 ### Slot schema (v4)
 
-Top-level: `theme` (`opencode` | `claude-code` | `codex`), `windowTitle` (the
+Top-level: `theme` (`opencode` | `claude-code` | `codex` | `shell`), `windowTitle` (the
 session part; the theme supplies the window prefix), `takeaway` (one
 plain-language sentence rendered in the full-width banner below both panels;
 omit it and the banner is hidden). `arrowCaption`, `statusLeft` and
@@ -78,8 +78,8 @@ Legibility rules (v4):
 - The two windows are equal height: the shorter panel stretches to the taller
   one and both input boxes sit on the same bottom line, so asymmetric
   before/after content stays aligned.
-- Traffic lights are honored per theme: `opencode` shows them, `claude-code`
-  and `codex` do not.
+- Traffic lights are honored per theme: `opencode` and `shell` show them,
+  `claude-code` and `codex` do not.
 
 Minimal example:
 
@@ -116,6 +116,31 @@ Minimal example:
   }
 }
 ```
+
+## Choose the surface: what picture for what
+
+First ask WHERE the difference between before and after manifests; the surface
+follows from that, never from habit:
+
+1. In the agent's conversation or tool flow (gates, reminders, behavior rules
+   that change what the agent does) -> terminal surface with the theme of THAT
+   harness. Examples: dejavu-gates (opencode), stop-ai-slop (claude-code).
+2. In file contents or shape (registries, codemods, scaffolders, config
+   mergers) -> files surface. Example: harness-kit (three drifting configs vs
+   one registry + merge call).
+3. In a command's outcome while the actor is a human or harness-irrelevant
+   (CLIs, remote runners, bridges) -> terminal surface with the `shell` theme.
+   Examples: repo-aeo audit, remote-devbox-mcp bridge.
+4. In rendered UI (components, themes, visual tools) -> real screenshots of the
+   product, never the template; the template must not fake a UI it cannot run.
+5. Only in numbers (time, tokens, cost, size) -> do not make a numbers-only
+   picture; embed the numbers as payoff/status lines inside the surface chosen
+   above.
+
+Theme honesty rule: the theme is the harness chrome you are mimicking; never
+borrow another harness's chrome for a different actor (no OC titlebar on a
+human CLI session, no claude chrome on a codex run). When the actor is generic
+or human, use `shell`.
 
 ## Storing and embedding
 

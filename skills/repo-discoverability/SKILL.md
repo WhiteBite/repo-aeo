@@ -94,9 +94,11 @@ node packages/rdk-cli/bin/rdk.js github-sync       # preview is the default; wri
 ```
 
 When the audit reports `readme.demo_visual`, produce the demo asset before
-touching prose: read `references/visual-assets.md`, fill the slot JSON with the
-project's real before/after, render with `scripts/render-demo.mjs`, then commit
-the asset + slot JSON and embed it in the README.
+touching prose: read `references/visual-assets.md`, pick the surface by where
+the difference between before and after manifests (the "Choose the surface"
+section), fill the slot JSON with the project's real before/after, render with
+`scripts/render-demo.mjs`, then commit the asset + slot JSON and embed it in the
+README.
 
 Everything else (real examples, version bumps, exports redesign, claims with
 sources) is manual — write the smallest possible patch and keep the existing
@@ -197,6 +199,6 @@ procedure and pacing. `references/channels.md` is the channel matrix.
 - `references/geo-playbook.md` — read before writing positioning or discovery copy; it explains why these moves work.
 - `references/distribution-playbook.md` — read before the first submission to any channel; it explains entry conventions, fork mechanics, per-mechanism procedure and submission tracking.
 - `references/channels.md` — read when choosing channels; the compact matrix of mechanism, artifact, applicability, gating and dedupe key.
-- `references/visual-assets.md` — read when a repo lacks a demo visual or the audit flags `readme.demo_visual`; the essence rule, per-type recipes and the slot schema.
+- `references/visual-assets.md` — read when a repo lacks a demo visual or the audit flags `readme.demo_visual`; the "Choose the surface" guide, the essence rule, per-type recipes and the slot schema.
 - `scripts/render-demo.mjs` — run after filling a slot JSON to render the before/after demo PNG from the locked template; needs playwright-core on demand.
 - `scripts/audit.sh` — run if Node is not on PATH; a thin wrapper around the CLI.
