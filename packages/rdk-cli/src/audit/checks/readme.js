@@ -330,7 +330,14 @@ export const readmeChecks = [
       const demoDir = join(ctx.cwd, 'demo');
       const files = listFiles(demoDir, { recursive: false }).filter((file) => file.endsWith('.json'));
       for (const file of files) {
-        const { errors } = validateSlot(readJsonIfExists(file));
+        const parsed = readJsonIfExists(file);
+        const entries = Array.isArray(parsed) ? parsed : [parsed];
+        const errors = [];
+        entries.forEach((entry, index) => {
+          for (const error of validateSlot(entry).errors) {
+            errors.push(Array.isArray(parsed) ? `frame ${index}: ${error}` : error);
+          }
+        });
         if (errors.length > 0) {
           return finding({ id: this.id, axis: this.axis, severity: 'warn', title: `Invalid demo slot JSON: ${basename(file)}`, why: this.why, fix: errors[0], effort: 'S' });
         }

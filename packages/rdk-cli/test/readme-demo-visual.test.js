@@ -65,3 +65,34 @@ test('a readme without any image triggers readme.demo_visual', async () => {
   assert.ok(finding, 'expected a readme.demo_visual finding');
   assert.equal(finding.severity, 'warn');
 });
+
+async function demoAssetFinding(files) {
+  const dir = makeRepo({ 'package.json': JSON.stringify(PKG), ...files });
+  try {
+    const report = await audit(dir, { online: false });
+    return report.findings.find((f) => f.id === 'readme.demo_asset') || null;
+  } finally {
+    removeRepo(dir);
+  }
+}
+
+const FRAME = { theme: 'shell', takeaway: 'ok', before: { blocks: [{ type: 'prose', text: 'beat' }] }, after: { blocks: [] } };
+
+test('a valid frames array in demo/ passes readme.demo_asset', async () => {
+  const finding = await demoAssetFinding({
+    'README.md': `${BASE_README}\n![demo](assets/demo.gif)\n`,
+    'demo/frames.json': JSON.stringify([FRAME, FRAME]),
+  });
+  assert.equal(finding, null);
+});
+
+test('an invalid frame in a frames array triggers readme.demo_asset', async () => {
+  const broken = { ...FRAME };
+  delete broken.takeaway;
+  const finding = await demoAssetFinding({
+    'README.md': `${BASE_README}\n![demo](assets/demo.gif)\n`,
+    'demo/frames.json': JSON.stringify([FRAME, broken]),
+  });
+  assert.ok(finding, 'expected a readme.demo_asset finding');
+  assert.match(finding.fix, /frame 1/);
+});
