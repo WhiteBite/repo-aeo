@@ -38,10 +38,17 @@
       "catches": ["the template faking a UI", "terminal surface"]
     },
     {
+      "id": "mcp-remote-topology",
+      "prompt": "An MCP server that runs Gradle on a devbox over a bridge: the orchestrator has no toolchain and the user's machine does the build.",
+      "expected": { "surface": "topology", "theme": null },
+      "essence": "A bridge whose defining mechanism is WHERE the work runs (orchestrator vs the user's machine): the command outcome is a consequence, so show the topology as a native Mermaid fence, not a terminal card.",
+      "catches": ["terminal before/after of the command result", "files surface", "agent-session theme"]
+    },
+    {
       "id": "mcp-remote-effect-shell",
-      "prompt": "An MCP server that runs Gradle on a devbox over a bridge.",
+      "prompt": "A local MCP tool server whose effect is a single command result a human reads.",
       "expected": { "surface": "terminal", "theme": "shell" },
-      "essence": "A bridge/MCP command outcome: the effect is the command result, not an agent session.",
+      "essence": "A plain MCP command outcome with no topology to explain: the effect is the command result, not an agent session.",
       "catches": ["agent-session theme", "files surface"]
     },
     {

@@ -17,7 +17,7 @@ consistent.
    | Agent tool (plugin / CLI for coding agents) | the **agent terminal** (OpenCode / Claude Code look) | stop-ai-slop, dejavu-gates |
    | Web / UI app | a real **screenshot** of the page | Domain-Hunter |
    | Library / config tool (no runnable surface) | **before/after of the artifact** it manages | harness-kit |
-   | MCP server / bridge | the **command outcome** in a shell terminal | remote-devbox-mcp |
+   | MCP server / bridge | the **topology** when the essence is *where* the work runs, else the **command outcome** in a shell terminal | remote-devbox-mcp (topology) |
 
 4. **For agent tools:** left panel = the session **without** the tool (the
    problem), right panel = the same session **with** the tool (solved).
@@ -56,7 +56,7 @@ First ask WHERE the difference between before and after manifests; the surface f
      "after": { "surface": "files", "blocks": [ { "type": "file", "path": "config/index.js", "lines": [ { "type": "add", "text": "export const rules = { semi: 2 }" } ] } ] } }
    ```
 
-3. In a command's outcome while the actor is a human or harness-irrelevant (CLIs, remote runners, bridges) -> terminal surface with the `shell` theme. Examples: repo-aeo audit, remote-devbox-mcp bridge.
+3. In a command's outcome while the actor is a human or harness-irrelevant (CLIs, remote runners) -> terminal surface with the `shell` theme. Example: repo-aeo audit.
 
    ```json
    { "theme": "shell", "takeaway": "One audit command lists every gap",
@@ -66,9 +66,18 @@ First ask WHERE the difference between before and after manifests; the surface f
        { "type": "diff", "lines": [ { "type": "add", "text": "score: 92/100 (grade A)" } ] } ] } }
    ```
 
-4. In rendered UI (components, themes, visual tools) -> real screenshots of the product, framed by the `shots` surface, never the template. Screenshot the real running page; if it cannot run headlessly, make no picture. Self-check: if the image shows the green arrow badge it is the template, not a UI.
+4. In WHERE the work runs, or which machine/actor performs it (a bridge, proxy or remote runner that offloads work to another host - the orchestrator has no hardware, the user's machine does) -> a **single topology diagram as a native Mermaid fence**; the command outcome is the consequence, not the essence. Example: remote-devbox-mcp.
 
-5. Only in numbers (time, tokens, cost, size) -> do not make a numbers-only picture; embed the numbers as payoff/status lines inside the surface chosen above.
+   ```mermaid
+   flowchart LR
+     A["cloud sandbox<br/>agent (LLM)<br/>no toolchain"]
+     C["your machine<br/>JDK · Gradle · your project"]
+     A <== "tool calls -> outbound tunnel" ==> C
+   ```
+
+5. In rendered UI (components, themes, visual tools) -> real screenshots of the product, framed by the `shots` surface, never the template. Screenshot the real running page; if it cannot run headlessly, make no picture. Self-check: if the image shows the green arrow badge it is the template, not a UI.
+
+6. Only in numbers (time, tokens, cost, size) -> do not make a numbers-only picture; embed the numbers as payoff/status lines inside the surface chosen above.
 
 Theme derivation: theme = the harness the actor runs in; human or generic actor => shell; when both panels are files the theme is ignored, set shell.
 

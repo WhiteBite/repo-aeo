@@ -54,7 +54,7 @@ function imageAlt(text, url) {
   return img ? img[1] : '';
 }
 
-function hasDemoVisual(text, doc) {
+function hasImageVisual(text, doc) {
   const demoBodies = [];
   for (const [key, section] of doc.sections) {
     if (DEMO_HEADING_RE.test(key)) demoBodies.push(section.body);
@@ -67,6 +67,14 @@ function hasDemoVisual(text, doc) {
     if (demoBodies.some((body) => body.includes(url))) return true;
     return DEMO_ALT_RE.test(imageAlt(text, url));
   });
+}
+
+function hasMermaidVisual(text) {
+  return /^\s*```mermaid\b/m.test(text);
+}
+
+function hasDemoVisual(text, doc) {
+  return hasMermaidVisual(text) || hasImageVisual(text, doc);
 }
 
 const UI_DEPS = ['react', 'vue', 'svelte', 'solid-js', 'preact', 'next', 'nuxt', 'astro'];
@@ -343,7 +351,7 @@ export const readmeChecks = [
         }
       }
       const doc = readmeDoc(ctx, text);
-      if (hasDemoVisual(text, doc) && files.length === 0) {
+      if (hasImageVisual(text, doc) && files.length === 0) {
         return finding({ id: this.id, axis: this.axis, severity: 'warn', title: 'Demo image without source slot JSON', why: this.why, fix: this.fix, effort: 'S' });
       }
       return null;

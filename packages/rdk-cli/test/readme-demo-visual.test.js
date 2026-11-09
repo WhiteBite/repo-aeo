@@ -66,6 +66,16 @@ test('a readme without any image triggers readme.demo_visual', async () => {
   assert.equal(finding.severity, 'warn');
 });
 
+test('a mermaid fence satisfies readme.demo_visual', async () => {
+  const finding = await demoVisualFinding({ 'README.md': `${BASE_README}\n\`\`\`mermaid\nflowchart LR\n  A --> B\n\`\`\`\n` });
+  assert.equal(finding, null);
+});
+
+test('a mermaid-only readme does not demand a slot JSON', async () => {
+  const finding = await demoAssetFinding({ 'README.md': `${BASE_README}\n\`\`\`mermaid\nflowchart LR\n  A --> B\n\`\`\`\n` });
+  assert.equal(finding, null);
+});
+
 async function demoAssetFinding(files) {
   const dir = makeRepo({ 'package.json': JSON.stringify(PKG), ...files });
   try {

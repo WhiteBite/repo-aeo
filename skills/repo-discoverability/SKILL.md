@@ -102,6 +102,7 @@ before/after difference manifests, then read `references/visual-assets.md`:
 | file contents / shape | files + shell |
 | command outcome, human or generic actor | terminal + shell |
 | rendered UI | a real screenshot framed by the shots surface, never faked |
+| where the work runs (bridge / remote runner offloads to another host) | single topology: a native Mermaid fence |
 | numbers only | no picture: prose or a markdown table |
 | defining mechanism unfolds in time | animated GIF via frames mode |
 
