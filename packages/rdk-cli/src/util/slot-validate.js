@@ -53,7 +53,8 @@ function validateHud(hud, label, errors) {
   }
 }
 
-const HERO_MODES = new Set(['split', 'title-only']);
+const HERO_MODES = new Set(['split', 'title-only', 'strip', 'wall']);
+const HERO_MIN_CARDS = new Set(['strip', 'wall']);
 const HERO_MOTIFS = new Set(['none', 'grid', 'rule']);
 const HERO_TONES = new Set(['accent1', 'accent2', 'accent3']);
 const HERO_HEX_RE = /^#[0-9a-f]{6}$/i;
@@ -101,7 +102,7 @@ export function validateHero(obj) {
   }
   const mode = obj.mode === undefined ? 'split' : obj.mode;
   if (!HERO_MODES.has(mode)) {
-    errors.push(`mode must be one of split|title-only, got ${JSON.stringify(obj.mode)}`);
+    errors.push(`mode must be one of split|title-only|strip|wall, got ${JSON.stringify(obj.mode)}`);
   }
   if (obj.motif !== undefined && !HERO_MOTIFS.has(obj.motif)) {
     errors.push(`motif must be one of none|grid|rule, got ${JSON.stringify(obj.motif)}`);
@@ -142,6 +143,9 @@ export function validateHero(obj) {
         warnings.push('mode is title-only; cards are ignored');
       }
     }
+  }
+  if (HERO_MIN_CARDS.has(mode) && (!Array.isArray(obj.cards) || obj.cards.length < 3)) {
+    errors.push(`mode ${mode} requires at least 3 cards`);
   }
   return { errors, warnings };
 }

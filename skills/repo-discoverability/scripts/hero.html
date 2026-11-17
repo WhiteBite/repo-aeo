@@ -138,6 +138,18 @@
   body[data-mode="title-only"] .hero-cards { display: none; }
   body[data-mode="title-only"] .hero-grid { grid-template-columns: 1fr; }
   body[data-mode="title-only"] .hero-copy { text-align: center; max-width: 720px; margin: 0 auto; }
+
+  body[data-mode="strip"] .hero-grid { grid-template-columns: 1fr; }
+  body[data-mode="strip"] .hero-cards { flex-direction: row; align-items: stretch; gap: 18px; }
+  body[data-mode="strip"] .hero-card { flex: 1 1 0; min-width: 0; }
+  body[data-mode="strip"] .hero-card + .hero-card { margin-top: 0; }
+  body[data-mode="strip"] .hero-copy { margin-bottom: 32px; }
+
+  body[data-mode="wall"] .hero-grid { grid-template-columns: 1fr; }
+  body[data-mode="wall"] .hero-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  body[data-mode="wall"] .hero-card:last-child:nth-child(odd) { grid-column: span 2; }
+  body[data-mode="wall"] .hero-card + .hero-card { margin-top: 0; }
+  body[data-mode="wall"] .hero-copy { margin-bottom: 32px; }
 </style>
 </head>
 <body data-mode="split">
@@ -162,7 +174,8 @@
     window.fillTemplate = function (data) {
       data = data || {};
       document.body.setAttribute("data-palette", data.palette === "light" ? "light" : "dark");
-      document.body.setAttribute("data-mode", typeof data.mode === "string" && data.mode !== "" ? data.mode : "split");
+      var mode = typeof data.mode === "string" && data.mode !== "" ? data.mode : "split";
+      document.body.setAttribute("data-mode", mode);
 
       if (typeof data.accent === "string" && /^#[0-9a-fA-F]{6}$/.test(data.accent)) {
         document.documentElement.style.setProperty("--accent1", data.accent);
@@ -195,7 +208,7 @@
           card.className = "hero-card";
           card.setAttribute("data-tone", entry.tone === "accent2" || entry.tone === "accent3" ? entry.tone : "accent1");
           var rotate = Number(entry.rotate);
-          if (Number.isFinite(rotate) && rotate !== 0) {
+          if (mode === "split" && Number.isFinite(rotate) && rotate !== 0) {
             card.style.transform = "rotate(" + Math.max(-6, Math.min(6, rotate)) + "deg)";
           }
           var heading = document.createElement("div");

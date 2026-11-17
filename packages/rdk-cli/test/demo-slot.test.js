@@ -395,7 +395,7 @@ test('validateHero rejects a missing title, a long subtitle, five cards, a big r
   assert.ok(doc({ cards: fiveCards }).some((error) => /4/.test(error)), 'expected a card-limit error');
   assert.ok(doc({ cards: [{ heading: 'h', body: 'b', rotate: 9 }] }).some((error) => /rotate/.test(error)), 'expected a rotate error');
   assert.ok(doc({ accent: 'abc' }).some((error) => /accent/.test(error)), 'expected an accent error');
-  assert.ok(doc({ mode: 'strip' }).some((error) => /mode/.test(error) && /split\|title-only/.test(error)), 'expected a mode error');
+  assert.ok(doc({ mode: 'mesh' }).some((error) => /mode/.test(error) && /split\|title-only/.test(error)), 'expected a mode error');
 });
 
 test('validateHero warns on title-only mode with cards and on a lowercase eyebrow', () => {
@@ -404,6 +404,56 @@ test('validateHero warns on title-only mode with cards and on a lowercase eyebro
   assert.ok(withCards.warnings.some((warning) => /ignored/.test(warning)), 'expected an ignored-cards warning');
   const withLower = validateHero(heroDoc({ eyebrow: 'Discoverability Kit' }));
   assert.ok(withLower.warnings.some((warning) => /lowercase/.test(warning)), 'expected a lowercase-eyebrow warning');
+});
+
+test('validateHero accepts strip and wall modes with 3 cards', () => {
+  const cards = [
+    { heading: 'Audit', body: '49 checks, 6 axes, 0 runtime deps' },
+    { heading: 'Fix', body: 'Idempotent autofixes: run twice, no diff' },
+    { heading: 'Gate', body: 'A GitHub Action gates every PR' },
+  ];
+  assert.deepEqual(validateHero(heroDoc({ mode: 'strip', cards })).errors, []);
+  assert.deepEqual(validateHero(heroDoc({ mode: 'wall', cards })).errors, []);
+});
+
+test('validateHero rejects strip and wall modes with fewer than 3 cards', () => {
+  const cards = [
+    { heading: 'Audit', body: '49 checks' },
+    { heading: 'Fix', body: 'run twice, no diff' },
+  ];
+  const strip = validateHero(heroDoc({ mode: 'strip', cards }));
+  assert.ok(strip.errors.some((error) => /mode strip requires at least 3 cards/.test(error)), 'expected a strip minimum error');
+  const wall = validateHero(heroDoc({ mode: 'wall', cards }));
+  assert.ok(wall.errors.some((error) => /mode wall requires at least 3 cards/.test(error)), 'expected a wall minimum error');
+  const noCards = validateHero(heroDoc({ mode: 'wall' }));
+  assert.ok(noCards.errors.some((error) => /mode wall requires at least 3 cards/.test(error)), 'expected a wall minimum error without cards');
+});
+
+test('validateHero rejects an unknown mode by listing all four modes', () => {
+  const { errors } = validateHero(heroDoc({ mode: 'mesh' }));
+  assert.ok(errors.some((error) => /mode/.test(error) && /split\|title-only\|strip\|wall/.test(error)), 'expected a mode enum error');
+});
+
+test('validateHero keeps title-only cards as a warning, not an error', () => {
+  const { errors, warnings } = validateHero(heroDoc({ mode: 'title-only', cards: [{ heading: 'h', body: 'b' }] }));
+  assert.deepEqual(errors, []);
+  assert.ok(warnings.some((warning) => /ignored/.test(warning)), 'expected an ignored-cards warning');
+});
+
+test('check-slot.mjs accepts strip and wall hero docs with 3 cards', () => {
+  const cards = [
+    { heading: 'h1', body: 'b1' },
+    { heading: 'h2', body: 'b2' },
+    { heading: 'h3', body: 'b3' },
+  ];
+  for (const mode of ['strip', 'wall']) {
+    const exit = withTempSlot(heroDoc({ mode, cards }), (file) => checkSlotExit([file]));
+    assert.equal(exit, 0, `expected check-slot to accept mode ${mode}`);
+  }
+});
+
+test('check-slot.mjs still accepts the committed hero demo in split mode', () => {
+  assert.equal(checkSlotExit([HERO_DEMO]), 0);
 });
 
 test('validateSlot on a hero document points at validateHero', () => {

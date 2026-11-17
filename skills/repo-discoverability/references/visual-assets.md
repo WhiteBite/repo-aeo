@@ -569,11 +569,41 @@ same `check-slot.mjs`.
   lines, no decorative grids or patterns: the accent dot next to the eyebrow is
   the only decoration.
 
+### Composition modes
+
+`mode` picks the composition, and the composition follows the material — never
+habit. A single split layout stamped on every repository is exactly the
+templated look this kit exists to beat, and a family must not reuse the same
+mode plus palette for every repository.
+
+- `split` (default): the 58/42 grid above — copy left, rotated card stack
+  right.
+- `title-only`: no cards; the copy centers and typography carries it.
+- `strip`: the copy spans the full width above one row of equal-width cards;
+  rotations do not apply.
+- `wall`: the copy spans the full width above a two-column card grid, equal
+  card heights per row; rotations do not apply.
+
+| `project.category` | Default mode | Why |
+| --- | --- | --- |
+| `tool` | `split` | command rhythm plus proof cards |
+| `mcp-server` | `split` | command rhythm plus proof cards |
+| `library` | `title-only` | no honest visual proof, typography carries it |
+| `app` | `wall` | real screenshots/outputs as a grid |
+| `research` | `strip` | method or evidence sequence |
+| `dataset` | `strip` | method or evidence sequence |
+| `template` | `split` | scaffold shape plus proof cards |
+
+Card minimums per mode: `strip` and `wall` require at least 3 cards (4 max, as
+everywhere); `title-only` takes none (cards present are ignored with a
+warning); `split` allows 0..4.
+
 Hero JSON schema: `kind: "hero"` (required, exact), `title` (required, <= 40
 chars; `\n` breaks the display line), `subtitle` (required, <= 90), `palette`
 (required, `dark` | `light`), `eyebrow` (optional, <= 40, author it uppercase),
-`meta` (optional, <= 60), `mode` (optional, `split` | `title-only`, default
-`split`), `motif` (optional, `none` | `grid` | `rule`; only `none` renders),
+`meta` (optional, <= 60), `mode` (optional, `split` | `title-only` | `strip`
+| `wall`, default `split`), `motif` (optional, `none` | `grid` | `rule`; only
+`none` renders),
 `accent` (optional `#rrggbb`, overrides `--accent1`) and `cards` (optional, max
 4; each card has `heading` <= 30, `body` <= 90, `rotate` in -6..6 and `tone`
 `accent1` | `accent2` | `accent3`, default `accent1`). All injected text lands
