@@ -1,0 +1,10 @@
+{
+  "kind": "hero",
+  "palette": "dark",
+  "mode": "copy-only",
+
+  "eyebrow": "DISCOVERABILITY KIT",
+  "title": "Make your repo\nfindable by agents",
+  "subtitle": "Audit, fix and gate the metadata that decides whether agents recommend your repo.",
+  "meta": "score 58 → 87 on fixtures/demo-repo"
+}

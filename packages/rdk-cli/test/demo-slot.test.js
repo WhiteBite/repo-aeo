@@ -471,6 +471,17 @@ test('check-slot.mjs accepts both committed demo documents in one run', () => {
   assert.equal(checkSlotExit([DEMO, HERO_DEMO]), 0);
 });
 
+test('check-slot.mjs accepts the committed mode gallery and each file states its own mode', () => {
+  const dir = join(ROOT, 'demo', 'hero-modes');
+  const files = readdirSync(dir).filter((name) => name.endsWith('.json')).sort();
+  assert.deepEqual(files, ['copy-only.json', 'strip.json', 'wall.json']);
+  for (const name of files) {
+    const doc = JSON.parse(readFileSync(join(dir, name), 'utf8'));
+    assert.equal(doc.mode, name.replace(/\.json$/, ''), `${name} must declare its own mode`);
+    assert.equal(checkSlotExit([join(dir, name)]), 0, `expected check-slot to accept ${name}`);
+  }
+});
+
 test('readme.demo_asset accepts a fixture repo whose demo/ contains the hero doc', async () => {
   const readme = [
     '# Hero repo',

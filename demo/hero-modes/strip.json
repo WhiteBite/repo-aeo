@@ -1,0 +1,16 @@
+{
+  "kind": "hero",
+  "palette": "dark",
+  "mode": "strip",
+
+  "eyebrow": "DISCOVERABILITY KIT",
+  "title": "Make your repo\nfindable by agents",
+  "subtitle": "Audit, fix and gate the metadata that decides whether agents recommend your repo.",
+  "meta": "score 58 → 87 on fixtures/demo-repo",
+
+  "cards": [
+    { "heading": "Audit", "body": "49 checks · 6 axes", "tone": "accent1" },
+    { "heading": "Fix", "body": "Run twice, no diff", "tone": "accent2" },
+    { "heading": "Gate", "body": "Gates every PR", "tone": "accent3" }
+  ]
+}

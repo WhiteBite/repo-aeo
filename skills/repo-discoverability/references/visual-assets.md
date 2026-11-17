@@ -598,6 +598,20 @@ Card minimums per mode: `strip` and `wall` require at least 3 cards (4 max, as
 everywhere); `copy-only` takes none (cards present are ignored with a
 warning); `split` allows 0..4.
 
+### Mode gallery
+
+Committed references, same copy and palette, so only the composition differs:
+
+| Mode | Reference |
+| --- | --- |
+| `split` | [`assets/rdk-hero.png`](../../../assets/rdk-hero.png) — the shipped hero |
+| `copy-only` | [`assets/hero-modes/copy-only.png`](../../../assets/hero-modes/copy-only.png) |
+| `strip` | [`assets/hero-modes/strip.png`](../../../assets/hero-modes/strip.png) |
+| `wall` | [`assets/hero-modes/wall.png`](../../../assets/hero-modes/wall.png) |
+
+Sources live in `demo/hero-modes/`; regenerate with the command below, passing
+`--data demo/hero-modes/<mode>.json --out assets/hero-modes/<mode>.png`.
+
 Hero JSON schema: `kind: "hero"` (required, exact), `title` (required, <= 40
 chars; `\n` breaks the display line), `subtitle` (required, <= 90), `palette`
 (required, `dark` | `light`), `eyebrow` (optional, <= 40, author it uppercase),
