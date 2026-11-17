@@ -559,7 +559,10 @@ same `check-slot.mjs`.
   gate covers the hero selectors and errors on any unmapped selector.
 - **Exactly 6 palette roles.** `--bg`, `--fg`, `--muted`, `--card`, `--line` plus
   the accent role (`--accent1`/`--accent2`/`--accent3`). No extra hues.
-  `palette: "light"` swaps the five neutral roles; the accents stay.
+  `palette: "light"` swaps the five neutral roles; the accents stay. `rail` mode
+  adds exactly two semantic roles — `--warn` and `--danger` — and uses them only
+  to encode escalation: amber for a reminder, red for enforcement. They are
+  state, not decoration, so a card never borrows them for variety.
 - **Depth from offset duplicate-shape shadows, never filters or gradients:**
   `box-shadow: 8px 10px 0 rgba(0,0,0,0.38)` on dark, `rgba(23,32,51,0.12)` on
   light. Cards overlap slightly (negative margin) so the stack reads as a fan;
@@ -583,11 +586,17 @@ mode plus palette for every repository.
   rotations do not apply.
 - `wall`: the copy spans the full width above a two-column card grid, equal
   card heights per row; rotations do not apply.
+- `rail`: the copy spans the full width above a session rail — two or three
+  nodes on one line, each with a count, ending in the gate card. The last
+  node's left edge is a single accent spine that runs unbroken through every
+  message part. Use it when the repository has real output worth quoting: the
+  quoted message is the proof, and the rail is what makes the escalation
+  visible instead of asserted.
 
 | `project.category` | Default mode | Why |
 | --- | --- | --- |
-| `tool` | `split` | command rhythm plus proof cards |
-| `mcp-server` | `split` | command rhythm plus proof cards |
+| `tool` | `rail` | the failure sequence plus the real message it produced |
+| `mcp-server` | `rail` | the same sequence, one host away |
 | `library` | `copy-only` | no honest visual proof, typography carries it |
 | `app` | `wall` | real screenshots/outputs as a grid |
 | `research` | `strip` | method or evidence sequence |
@@ -613,15 +622,26 @@ Sources live in `demo/hero-modes/`; regenerate with the command below, passing
 `--data demo/hero-modes/<mode>.json --out assets/hero-modes/<mode>.png`.
 
 Hero JSON schema: `kind: "hero"` (required, exact), `title` (required, <= 40
-chars; `\n` breaks the display line), `subtitle` (required, <= 90), `palette`
-(required, `dark` | `light`), `eyebrow` (optional, <= 40, author it uppercase),
-`meta` (optional, <= 60), `mode` (optional, `split` | `copy-only` | `strip`
-| `wall`, default `split`), `motif` (optional, `none` | `grid` | `rule`; only
-`none` renders),
-`accent` (optional `#rrggbb`, overrides `--accent1`) and `cards` (optional, max
-4; each card has `heading` <= 30, `body` <= 90, `rotate` in -6..6 and `tone`
-`accent1` | `accent2` | `accent3`, default `accent1`). All injected text lands
-via `textContent` — repo metadata can never inject markup.
+chars; `\n` breaks the display line), `subtitle` (required, <= 90; `\n` breaks
+the line), `palette` (required, `dark` | `light`), `eyebrow` (optional, <= 40,
+author it uppercase), `meta` (optional, <= 60), `accentWord` (optional, <= 24; a
+substring of `title` painted in the danger role), `mode` (optional, `split` |
+`copy-only` | `strip` | `wall` | `rail`, default `split`), `motif` (optional,
+`none` | `grid` | `rule`; only `none` renders), `accent` (optional `#rrggbb`,
+overrides `--accent1`) and `cards` (optional, max 4; each card has `heading` <=
+30, `body` <= 90, `rotate` in -6..6 and `tone` `accent1` | `accent2` |
+`accent3`, default `accent1`).
+
+`rail` mode adds two required arrays: `steps` (2 or 3 entries, each `label` <=
+24, optional `count` <= 6, `unit` <= 24, `note` <= 28) and `artifact` (1 or 2
+entries, each `title` <= 24 and `lines` of at most 2 strings, 44 chars each).
+Steps render in order; the last one is the gate and carries the artifact. The
+artifact is the only place real output appears, so quote the tool verbatim — if
+it does not fit in 44 characters, cut the phrase rather than paraphrase it. Both
+arrays are ignored outside `rail` mode, with a warning.
+
+All injected text lands via `textContent` — repo metadata can never inject
+markup.
 
 Render and check:
 

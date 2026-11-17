@@ -53,7 +53,7 @@ function validateHud(hud, label, errors) {
   }
 }
 
-const HERO_MODES = new Set(['split', 'copy-only', 'strip', 'wall']);
+const HERO_MODES = new Set(['split', 'copy-only', 'strip', 'wall', 'rail']);
 const HERO_MIN_CARDS = new Set(['strip', 'wall']);
 const HERO_MOTIFS = new Set(['none', 'grid', 'rule']);
 const HERO_TONES = new Set(['accent1', 'accent2', 'accent3']);
@@ -87,6 +87,15 @@ export function validateHero(obj) {
       if (/[a-z]/.test(obj.eyebrow)) warnings.push('eyebrow contains lowercase letters; author it uppercase (the template uppercases rendering only)');
     }
   }
+  if (obj.accentWord !== undefined) {
+    if (typeof obj.accentWord !== 'string') {
+      errors.push('accentWord must be a string when present');
+    } else if (obj.accentWord.length > 24) {
+      errors.push(`accentWord is ${obj.accentWord.length} chars; the hero limit is 24`);
+    } else if (typeof obj.title === 'string' && obj.title.indexOf(obj.accentWord) === -1) {
+      warnings.push('accentWord does not appear in title; nothing is accented');
+    }
+  }
   if (obj.palette !== 'dark' && obj.palette !== 'light') {
     errors.push(`palette is required and must be one of dark|light, got ${JSON.stringify(obj.palette)}`);
   }
@@ -102,7 +111,7 @@ export function validateHero(obj) {
   }
   const mode = obj.mode === undefined ? 'split' : obj.mode;
   if (!HERO_MODES.has(mode)) {
-    errors.push(`mode must be one of split|copy-only|strip|wall, got ${JSON.stringify(obj.mode)}`);
+    errors.push(`mode must be one of split|copy-only|strip|wall|rail, got ${JSON.stringify(obj.mode)}`);
   }
   if (obj.motif !== undefined && !HERO_MOTIFS.has(obj.motif)) {
     errors.push(`motif must be one of none|grid|rule, got ${JSON.stringify(obj.motif)}`);
@@ -146,6 +155,80 @@ export function validateHero(obj) {
   }
   if (HERO_MIN_CARDS.has(mode) && (!Array.isArray(obj.cards) || obj.cards.length < 3)) {
     errors.push(`mode ${mode} requires at least 3 cards`);
+  }
+  if (obj.steps !== undefined) {
+    if (!Array.isArray(obj.steps)) {
+      errors.push('steps must be an array when present');
+    } else {
+      if (obj.steps.length < 2 || obj.steps.length > 3) {
+        errors.push(`steps has ${obj.steps.length} entries; the rail takes 2 or 3`);
+      }
+      obj.steps.forEach((step, index) => {
+        const label = `steps[${index}]`;
+        if (!step || typeof step !== 'object' || Array.isArray(step)) {
+          errors.push(`${label} must be an object`);
+          return;
+        }
+        if (typeof step.label !== 'string' || step.label.trim() === '') {
+          errors.push(`${label}.label is required and must be a non-empty string`);
+        } else if (step.label.length > 24) {
+          errors.push(`${label}.label is ${step.label.length} chars; the rail limit is 24`);
+        }
+        for (const [field, limit] of [['count', 6], ['unit', 24], ['note', 28]]) {
+          if (step[field] === undefined) continue;
+          if (typeof step[field] !== 'string') {
+            errors.push(`${label}.${field} must be a string when present`);
+          } else if (step[field].length > limit) {
+            errors.push(`${label}.${field} is ${step[field].length} chars; the rail limit is ${limit}`);
+          }
+        }
+      });
+    }
+  }
+  if (obj.artifact !== undefined) {
+    if (!Array.isArray(obj.artifact)) {
+      errors.push('artifact must be an array when present');
+    } else {
+      if (obj.artifact.length < 1 || obj.artifact.length > 2) {
+        errors.push(`artifact has ${obj.artifact.length} entries; the rail takes 1 or 2`);
+      }
+      obj.artifact.forEach((item, index) => {
+        const label = `artifact[${index}]`;
+        if (!item || typeof item !== 'object' || Array.isArray(item)) {
+          errors.push(`${label} must be an object`);
+          return;
+        }
+        if (typeof item.title !== 'string' || item.title.trim() === '') {
+          errors.push(`${label}.title is required and must be a non-empty string`);
+        } else if (item.title.length > 24) {
+          errors.push(`${label}.title is ${item.title.length} chars; the rail limit is 24`);
+        }
+        if (!Array.isArray(item.lines) || item.lines.length === 0) {
+          errors.push(`${label}.lines is required and must be a non-empty array`);
+          return;
+        }
+        if (item.lines.length > 2) {
+          errors.push(`${label}.lines has ${item.lines.length} entries; the rail takes at most 2`);
+        }
+        item.lines.forEach((line, lineIndex) => {
+          if (typeof line !== 'string' || line.trim() === '') {
+            errors.push(`${label}.lines[${lineIndex}] must be a non-empty string`);
+          } else if (line.length > 44) {
+            errors.push(`${label}.lines[${lineIndex}] is ${line.length} chars; the gate card fits 44`);
+          }
+        });
+      });
+    }
+  }
+  if (mode === 'rail') {
+    if (!Array.isArray(obj.steps) || obj.steps.length < 2) errors.push('rail mode requires 2 or 3 steps');
+    if (!Array.isArray(obj.artifact) || obj.artifact.length < 1) errors.push('rail mode requires 1 or 2 artifact messages');
+  }
+  if (mode !== 'rail' && Array.isArray(obj.steps) && obj.steps.length > 0) {
+    warnings.push(`mode ${mode} ignores steps; they render only in rail mode`);
+  }
+  if (mode !== 'rail' && Array.isArray(obj.artifact) && obj.artifact.length > 0) {
+    warnings.push(`mode ${mode} ignores artifact; it renders only in rail mode`);
   }
   return { errors, warnings };
 }

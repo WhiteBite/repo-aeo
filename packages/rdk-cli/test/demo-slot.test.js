@@ -387,6 +387,51 @@ test('validateHero accepts a valid hero document', () => {
   assert.deepEqual(errors, []);
 });
 
+function railDoc(overrides = {}) {
+  return heroDoc({
+    mode: 'rail',
+    title: 'Remind first, block on repeat',
+    subtitle: 'Tool-call failures that recur across sessions become enforced gates',
+    accentWord: 'block',
+    steps: [
+      { label: 'SESSION 1', count: '×2', unit: 'failed calls', note: 'no gate yet' },
+      { label: 'SESSION 2', count: '×3', unit: 'same calls', note: 'reminder fired' },
+      { label: 'GATE FIRED' },
+    ],
+    artifact: [
+      { title: '[dejavu] REMINDER', lines: ['CORRECTION: use --environment, not --env'] },
+      { title: '[dejavu] BLOCKED', lines: ['the reminder was ignored once this session'] },
+    ],
+    ...overrides,
+  });
+}
+
+test('validateHero accepts a rail document with three steps and two artifact messages', () => {
+  const { errors, warnings } = validateHero(railDoc());
+  assert.deepEqual(errors, []);
+  assert.deepEqual(warnings, []);
+});
+
+test('validateHero rejects a rail without steps, with one step, or with an oversized artifact line', () => {
+  assert.ok(validateHero(railDoc({ steps: undefined })).errors.some((error) => /rail mode requires 2 or 3 steps/.test(error)));
+  assert.ok(validateHero(railDoc({ steps: [{ label: 'ONLY' }] })).errors.some((error) => /the rail takes 2 or 3/.test(error)));
+  const longLine = 'x'.repeat(45);
+  const tooWide = validateHero(railDoc({ artifact: [{ title: 'GATE', lines: [longLine] }] }));
+  assert.ok(tooWide.errors.some((error) => /the gate card fits 44/.test(error)));
+});
+
+test('validateHero warns when steps or artifact appear outside rail mode', () => {
+  const { warnings } = validateHero(heroDoc({ mode: 'split', steps: railDoc().steps, artifact: railDoc().artifact }));
+  assert.ok(warnings.some((warning) => /ignores steps/.test(warning)));
+  assert.ok(warnings.some((warning) => /ignores artifact/.test(warning)));
+});
+
+test('validateHero warns when accentWord is not present in the title', () => {
+  const { errors, warnings } = validateHero(heroDoc({ accentWord: 'invisible' }));
+  assert.deepEqual(errors, []);
+  assert.ok(warnings.some((warning) => /does not appear in title/.test(warning)));
+});
+
 test('validateHero rejects a missing title, a long subtitle, five cards, a big rotate, a bad accent and an unknown mode', () => {
   const doc = (overrides) => validateHero(heroDoc(overrides)).errors;
   assert.ok(doc({ title: undefined }).some((error) => /title/.test(error)), 'expected a title error');
