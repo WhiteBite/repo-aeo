@@ -16,6 +16,8 @@ This is the concatenated documentation intended for LLM grounding. Regenerate wi
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Node >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
 
+<p align="center"><img src="./assets/rdk-hero.png" width="100%" alt="repo-aeo preview: a repository scored 0-100 across six discoverability axes"></p>
+
 ![repo-aeo demo: discoverability audit before and after](assets/rdk-audit.png)
 
 Make any repository, npm package and docs site **findable and recommendable** for

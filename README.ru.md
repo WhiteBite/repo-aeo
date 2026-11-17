@@ -5,6 +5,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Node >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
 
+<p align="center"><img src="./assets/rdk-hero.png" width="100%" alt="превью repo-aeo: репозиторий с оценкой 0-100 по шести осям discoverability"></p>
+
 ![демо repo-aeo: аудит discoverability до и после](assets/rdk-audit.png)
 
 Делает любой репозиторий, npm-пакет и docs-сайт **находимым и рекомендуемым**
