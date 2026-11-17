@@ -70,7 +70,7 @@ test('validateSlot flags an unknown theme, a missing takeaway and a long line', 
   });
   assert.ok(errors.some((error) => /theme/.test(error)), 'expected a theme error');
   assert.ok(errors.some((error) => /takeaway/.test(error)), 'expected a takeaway error');
-  assert.ok(errors.some((error) => /50/.test(error)), 'expected a line-length error');
+  assert.ok(errors.some((error) => /37/.test(error)), 'expected a line-length error');
 });
 
 test('validateSlot warns on an absent surface and an unknown block type', () => {
@@ -209,11 +209,11 @@ test('render-demo --from-command reports a non-zero exit as a status block', () 
   assert.equal(last.text, 'exit 3');
 });
 
-test('render-demo --from-command truncates an output line to 50 chars', () => {
+test('render-demo --from-command truncates an output line to 37 chars', () => {
   const { blocks } = fromCommand(`node -e "console.log('x'.repeat(80))"`);
   const line = blocks.find((block) => block.type === 'status' && block.text.startsWith('x'));
   assert.ok(line, 'expected the long output line');
-  assert.ok(line.text.length <= 50, `expected <=50 chars, got ${line.text.length}`);
+  assert.ok(line.text.length <= 37, `expected <=37 chars, got ${line.text.length}`);
 });
 
 test('render-demo --from-command collapses earlier lines into one omitted status block', () => {

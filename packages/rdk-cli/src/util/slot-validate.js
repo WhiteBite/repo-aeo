@@ -10,7 +10,7 @@ const SURFACES = new Set(['terminal', 'files', 'shots', 'single']);
 const BLOCK_TYPES = new Set(['user', 'prose', 'tool', 'status', 'done', 'diff', 'file', 'steps', 'gate', 'divider']);
 const HUD_TONES = new Set(['muted', 'learn', 'block', 'heal']);
 const MAX_BLOCKS = 5;
-const MAX_LINE = 50;
+const MAX_LINE = 37;
 const MAX_BLOCKS_SINGLE = 12;
 const MAX_LINE_SINGLE = 80;
 const MAX_STEPS = 8;
@@ -126,6 +126,9 @@ export function validateSlot(obj) {
         errors.push(`${panelName}: divider block requires a non-empty text`);
       }
       for (const text of lineTexts(block)) {
+        if (block.type === 'gate' && text.length > 35) {
+          warnings.push(`${panelName}: gate line is ${text.length} chars; the gate card is the narrowest container (35)`);
+        }
         if (text.length > maxLine) {
           errors.push(`${panelName}: line exceeds ${maxLine} chars: ${JSON.stringify(text.slice(0, 60))}`);
         }

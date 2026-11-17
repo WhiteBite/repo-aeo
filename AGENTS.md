@@ -54,7 +54,9 @@ template (surfaces `terminal`/`files`/`shots`/`single`, blocks incl. `gate`,
 (`--prepare`, `--frames`, `--from-command`); `rasterize.mjs` is the on-demand
 rasterizer that needs a scratch `playwright-core`; `check-slot.mjs` plus
 `packages/rdk-cli/src/util/slot-validate.js` are the schema gate wired into
-`npm test`; `skills/repo-discoverability/evals/surface-choice.json` holds the
+`npm test`; `check-typography.mjs` enforces display >=48 / text >=15 / micro
+>=13 in the same suite; `skills/repo-discoverability/evals/surface-choice.json`
+holds the
 surface-choice evals; `references/visual-assets.md` is the authoring contract.
 
 Invariants:
@@ -65,6 +67,8 @@ Invariants:
   target repo.
 - GIF frame delay floor is 0.02s: browsers clamp sub-20ms delays to 100ms.
 - Asset budget ~1.5MB.
+- Body text in a locked template is >= 15px, micro text >= 13px;
+  `check-typography.mjs` fails the suite otherwise.
 - Typed lines grow 2-3 chars at 0.03s; streamed outputs arrive whole/word chunks.
 - Never invent tool output strings — silent store state goes in the `hud`
   annotation.

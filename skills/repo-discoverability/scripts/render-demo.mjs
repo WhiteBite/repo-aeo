@@ -8,7 +8,7 @@ function arg(name, fallback) {
   return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
 }
 
-const MAX_LINE = 50;
+const MAX_LINE = 37;
 
 function clip(text) {
   const s = String(text);

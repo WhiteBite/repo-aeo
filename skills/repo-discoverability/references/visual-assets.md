@@ -322,7 +322,7 @@ JSON array of slot blocks to stdout and **writes no file**: the first block is
 the `tool` call, the last up-to-`--max-lines` output lines follow as `status`
 blocks (a single `... N earlier lines omitted` status replaces the dropped
 prefix), and a final `done` (`exit 0`) or `status` (`exit <code>`) block closes
-the run. Lines over 50 characters are tail-truncated with an ellipsis, so the
+the run. Lines over 37 characters are tail-truncated with an ellipsis, so the
 array passes `check-slot.mjs` unchanged. Review it, then paste it into the
 panel's `blocks[]` in the slot JSON. This is the mechanism that makes "real
 output" provable: the lines came from the command, not from the author.
@@ -390,8 +390,10 @@ Legibility rules (v4):
   body lines, the red pain block (before) or green payoff block (after), and a
   done/status line. A `single` panel is the exception: up to **12 blocks** and
   lines up to **80 characters**, because it owns the full stage width.
-- Keep every body line to **~50 characters**; trim longer content in the slot
-  JSON rather than letting it overflow the panel.
+- Keep every body line to **37 characters**; trim longer content in the slot
+  JSON rather than letting it overflow the panel. At 15px mono (0.6em advance)
+  only about 37 characters fit the 340px diff card, and gate cards are narrower
+  still (35).
 - Design at **900 CSS px** total width (the stage is fixed at 900 px, so opening
   the HTML directly cannot stretch it) and render at `--width 900 --scale 2`
   (PNG 1800 px wide), so the image stays legible when GitHub downscales it to
@@ -401,6 +403,34 @@ Legibility rules (v4):
   before/after content stays aligned.
 - Traffic lights are honored per theme: `opencode` and `shell` show them,
   `claude-code` and `codex` do not.
+
+### Typography norms (locked)
+
+Font sizes in a locked template are a gated property, not a per-render choice.
+The stage is **900 CSS px** wide and every template must declare `width: 900px`.
+
+| Role | Floor | Selectors |
+| --- | --- | --- |
+| display | >= 48px | `.hero-title` (hero template only) |
+| text | >= 15px | `.panel-caption`, `.session-title`, `.takeaway`, `.window-title`, `.user-msg`, `.prose-line`, `.tool-line`, `.diff`, `.file`, `.status`, `.done`, `.steps`, `.steps-collapse`, `.gate` |
+| micro | >= 13px | `.file-path`, `.steps-more`, `.shot-anno-label`, `.shot-caption`, `.hud`, `.divider` |
+
+Run the offline gate on a template:
+
+```bash
+node skills/repo-discoverability/scripts/check-typography.mjs skills/repo-discoverability/scripts/demo-terminal.html
+```
+
+It fails when a font-size is declared in em/rem/%/pt/vw/vh, when a selector
+carries a font-size but is absent from the role map (the map must not silently
+rot), when a size falls below its role floor, when the template loads a remote
+resource (`@import`, `@font-face`, `<script src=`, a remote `<link>`, `url(http`)
+or when it does not declare the 900px stage.
+
+Effective size: GitHub displays the asset at ~800px, so the 900px stage scales
+by 0.89. A 15px text line renders at ~13.3px and a 13px micro line at ~11.6px.
+At a 360px mobile viewport the image shrinks further, so the point of the image
+must also live in Markdown prose and in the alt text.
 
 ### Shots surface (real screenshots)
 
@@ -462,7 +492,7 @@ reduced to one step.
 
 Validate a slot before rendering: `node scripts/check-slot.mjs demo/<name>.json`
 exits non-zero on any schema error (missing takeaway, more than 5 blocks per
-panel - 12 on a `single` panel, a line over 50 characters - 80 on `single`, an
+panel - 12 on a `single` panel, a line over 37 characters - 80 on `single`, an
 empty `single` panel, an unknown theme or surface, a `shots` panel without a
 `shot`) and prints warnings for an absent surface, an unknown block type, blocks
 on a `shots` panel, or a `steps` block with more than 8 entries.
@@ -505,7 +535,7 @@ Minimal example:
 
 ## Storing and embedding
 
-- Commit the asset under `assets/` (family convention). Budget **2-5 MB**.
+- Commit the asset under `assets/` (family convention). Budget ~1.5 MB per committed asset.
 - Commit the **slot JSON next to it** (`demo/<name>.json`) — it is the source of
   truth; re-render with `render-demo.mjs` to refresh, never hand-edit the PNG.
 - Embed with **markdown** so the relative path is validated by

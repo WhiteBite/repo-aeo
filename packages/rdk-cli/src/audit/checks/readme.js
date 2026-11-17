@@ -328,7 +328,7 @@ export const readmeChecks = [
     weight: 3,
     title: 'Demo assets have a valid source slot JSON',
     why: 'A demo image is only trustworthy when its source slot JSON is committed next to it: the JSON is the reviewable source of truth and the renderer can regenerate the PNG from it. An image with no source, or a slot JSON that breaks the schema, cannot be verified or refreshed.',
-    fix: 'Commit the slot JSON under demo/ next to the asset and keep it valid: theme, takeaway, and at most 5 blocks per panel with lines under 50 characters. Check it with `node skills/repo-discoverability/scripts/check-slot.mjs demo/<name>.json`.',
+    fix: 'Commit the slot JSON under demo/ next to the asset and keep it valid: theme, takeaway, and at most 5 blocks per panel with lines under 37 characters. Check it with `node skills/repo-discoverability/scripts/check-slot.mjs demo/<name>.json`.',
     effort: 'S',
     autoFixable: false,
     patchId: null,
