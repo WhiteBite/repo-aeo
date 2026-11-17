@@ -5,12 +5,15 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateSlot } from '../src/util/slot-validate.js';
+import { validateHero, validateSlot } from '../src/util/slot-validate.js';
+import { audit } from '../src/audit/index.js';
+import { makeRepo, removeRepo } from './helpers.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const CHECK_SLOT = join(ROOT, 'skills', 'repo-discoverability', 'scripts', 'check-slot.mjs');
 const RENDER_DEMO = join(ROOT, 'skills', 'repo-discoverability', 'scripts', 'render-demo.mjs');
 const DEMO = join(ROOT, 'demo', 'rdk-audit.json');
+const HERO_DEMO = join(ROOT, 'demo', 'rdk-hero.json');
 
 function fromCommand(cmd, extra = []) {
   const result = spawnSync(process.execPath, [RENDER_DEMO, '--from-command', cmd, ...extra], { encoding: 'utf8' });
@@ -365,4 +368,82 @@ test('check-slot.mjs accepts a frames file using hud, gate and divider', () => {
   withTempFrames([frame], (file) => {
     assert.equal(checkSlotExit([file]), 0);
   });
+});
+
+function heroDoc(overrides = {}) {
+  return { kind: 'hero', title: 'Make your repo findable', subtitle: 'Audit and fix repo discoverability', palette: 'dark', ...overrides };
+}
+
+test('validateHero accepts a valid hero document', () => {
+  const doc = heroDoc({
+    eyebrow: 'DISCOVERABILITY KIT',
+    meta: 'npm · cli',
+    mode: 'split',
+    motif: 'none',
+    accent: '#FF7458',
+    cards: [{ heading: 'Audit', body: '49 checks, 6 axes, 0 runtime deps', rotate: 1, tone: 'accent2' }],
+  });
+  const { errors } = validateHero(doc);
+  assert.deepEqual(errors, []);
+});
+
+test('validateHero rejects a missing title, a long subtitle, five cards, a big rotate, a bad accent and an unknown mode', () => {
+  const doc = (overrides) => validateHero(heroDoc(overrides)).errors;
+  assert.ok(doc({ title: undefined }).some((error) => /title/.test(error)), 'expected a title error');
+  assert.ok(doc({ subtitle: 'x'.repeat(91) }).some((error) => /subtitle/.test(error)), 'expected a subtitle error');
+  const fiveCards = Array.from({ length: 5 }, () => ({ heading: 'h', body: 'b' }));
+  assert.ok(doc({ cards: fiveCards }).some((error) => /4/.test(error)), 'expected a card-limit error');
+  assert.ok(doc({ cards: [{ heading: 'h', body: 'b', rotate: 9 }] }).some((error) => /rotate/.test(error)), 'expected a rotate error');
+  assert.ok(doc({ accent: 'abc' }).some((error) => /accent/.test(error)), 'expected an accent error');
+  assert.ok(doc({ mode: 'strip' }).some((error) => /mode/.test(error) && /split\|title-only/.test(error)), 'expected a mode error');
+});
+
+test('validateHero warns on title-only mode with cards and on a lowercase eyebrow', () => {
+  const withCards = validateHero(heroDoc({ mode: 'title-only', cards: [{ heading: 'h', body: 'b' }] }));
+  assert.deepEqual(withCards.errors, []);
+  assert.ok(withCards.warnings.some((warning) => /ignored/.test(warning)), 'expected an ignored-cards warning');
+  const withLower = validateHero(heroDoc({ eyebrow: 'Discoverability Kit' }));
+  assert.ok(withLower.warnings.some((warning) => /lowercase/.test(warning)), 'expected a lowercase-eyebrow warning');
+});
+
+test('validateSlot on a hero document points at validateHero', () => {
+  const { errors } = validateSlot(heroDoc());
+  assert.ok(errors.some((error) => /use validateHero/.test(error)), 'expected the validateHero redirect error');
+});
+
+test('check-slot.mjs accepts the committed hero demo JSON and prints ok', () => {
+  const result = spawnSync(process.execPath, [CHECK_SLOT, HERO_DEMO], { encoding: 'utf8' });
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /rdk-hero\.json: ok/);
+});
+
+test('check-slot.mjs accepts both committed demo documents in one run', () => {
+  assert.equal(checkSlotExit([DEMO, HERO_DEMO]), 0);
+});
+
+test('readme.demo_asset accepts a fixture repo whose demo/ contains the hero doc', async () => {
+  const readme = [
+    '# Hero repo',
+    '',
+    'A readme body long enough to count as a real readme for the audit tallies,',
+    'so the demo-asset gate can be exercised in isolation from readme.exists.',
+    '',
+    '## Quickstart',
+    '',
+    '```bash',
+    'npm install hero-repo',
+    '```',
+    '',
+    '![demo](assets/hero.png)',
+    '',
+  ].join('\n');
+  const pkg = { name: 'hero-repo', version: '1.0.0', description: 'hero demo asset gate package', bin: { 'hero-repo': 'cli.js' } };
+  const dir = makeRepo({ 'package.json': JSON.stringify(pkg), 'README.md': readme, 'demo/rdk-hero.json': readFileSync(HERO_DEMO, 'utf8') });
+  try {
+    const report = await audit(dir, { online: false });
+    const finding = report.findings.find((f) => f.id === 'readme.demo_asset') || null;
+    assert.equal(finding, null);
+  } finally {
+    removeRepo(dir);
+  }
 });

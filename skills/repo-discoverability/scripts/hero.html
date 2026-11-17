@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Hero banner template</title>
+<style>
+  :root {
+    --bg: #121827;
+    --fg: #F7F2E8;
+    --muted: #8F9AAF;
+    --accent1: #FF7458;
+    --accent2: #63D3BE;
+    --accent3: #6A62D9;
+    --card: #232D42;
+    --line: #3E4B66;
+    --card-shadow: 5px 6px 0 rgba(0, 0, 0, 0.28);
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  body[data-palette="light"] {
+    --bg: #F5F1E9;
+    --fg: #172033;
+    --muted: #747B86;
+    --card: #FDFCF8;
+    --line: #CFC7B6;
+    --card-shadow: 5px 6px 0 rgba(23, 32, 51, 0.10);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+  }
+
+  .stage {
+    width: 900px;
+    padding: 48px;
+  }
+
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 58fr 42fr;
+    column-gap: 40px;
+    align-items: start;
+  }
+  .hero-grid.no-cards { grid-template-columns: 1fr; }
+
+  .hero-eyebrow {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .hero-eyebrow::before {
+    content: "";
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    background: var(--accent1);
+    margin-right: 12px;
+    vertical-align: 1px;
+  }
+
+  .hero-title {
+    font-size: 52px;
+    font-weight: 700;
+    letter-spacing: -0.045em;
+    line-height: 1.05;
+    color: var(--fg);
+    white-space: pre-line;
+    margin-top: 22px;
+  }
+
+  .hero-subtitle {
+    font-size: 20px;
+    line-height: 1.45;
+    color: var(--muted);
+    margin-top: 22px;
+    text-wrap: balance;
+  }
+
+  .hero-meta {
+    font-size: 16px;
+    letter-spacing: 0.02em;
+    color: var(--fg);
+    opacity: 0.85;
+    margin-top: 32px;
+  }
+
+  .hero-cards {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .hero-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 20px;
+    box-shadow: var(--card-shadow);
+  }
+  .hero-card + .hero-card { margin-top: 18px; }
+  .hero-card[data-tone="accent2"] { --tone: var(--accent2); }
+  .hero-card[data-tone="accent3"] { --tone: var(--accent3); }
+
+  .hero-card-heading {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--fg);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .hero-card-heading::before {
+    content: "";
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+    background: var(--tone, var(--accent1));
+    flex: 0 0 auto;
+  }
+
+  .hero-card-body {
+    font-size: 17px;
+    line-height: 1.45;
+    color: var(--muted);
+    margin-top: 10px;
+    text-wrap: balance;
+  }
+
+  body[data-mode="title-only"] .hero-cards { display: none; }
+  body[data-mode="title-only"] .hero-grid { grid-template-columns: 1fr; }
+  body[data-mode="title-only"] .hero-copy { text-align: center; max-width: 720px; margin: 0 auto; }
+</style>
+</head>
+<body data-mode="split">
+  <div class="stage">
+    <div class="hero-grid">
+      <div class="hero-copy">
+        <div class="hero-eyebrow" data-hero="eyebrow">Repo discoverability kit</div>
+        <h1 class="hero-title" data-hero="title">Project title</h1>
+        <p class="hero-subtitle" data-hero="subtitle">One sentence that says what the project does.</p>
+        <div class="hero-meta" data-hero="meta">npm · cli</div>
+      </div>
+      <div class="hero-cards" data-hero-cards>
+        <div class="hero-card" data-tone="accent1">
+          <div class="hero-card-heading">Card</div>
+          <div class="hero-card-body">One true, checkable fact from the repository.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.fillTemplate = function (data) {
+      data = data || {};
+      document.body.setAttribute("data-palette", data.palette === "light" ? "light" : "dark");
+      document.body.setAttribute("data-mode", typeof data.mode === "string" && data.mode !== "" ? data.mode : "split");
+
+      if (typeof data.accent === "string" && /^#[0-9a-fA-F]{6}$/.test(data.accent)) {
+        document.documentElement.style.setProperty("--accent1", data.accent);
+      }
+
+      function fill(name, value) {
+        var el = document.querySelector('[data-hero="' + name + '"]');
+        if (!el) return;
+        if (typeof value === "string" && value.trim() !== "") {
+          el.textContent = value;
+          el.style.display = "";
+        } else {
+          el.style.display = "none";
+        }
+      }
+
+      fill("eyebrow", data.eyebrow);
+      fill("title", data.title);
+      fill("subtitle", data.subtitle);
+      fill("meta", data.meta);
+
+      var stack = document.querySelector("[data-hero-cards]");
+      var grid = document.querySelector(".hero-grid");
+      var cards = Array.isArray(data.cards) ? data.cards.slice(0, 4) : [];
+      if (stack) {
+        stack.replaceChildren();
+        cards.forEach(function (entry) {
+          if (!entry || typeof entry !== "object") return;
+          var card = document.createElement("div");
+          card.className = "hero-card";
+          card.setAttribute("data-tone", entry.tone === "accent2" || entry.tone === "accent3" ? entry.tone : "accent1");
+          var rotate = Number(entry.rotate);
+          if (Number.isFinite(rotate) && rotate !== 0) {
+            card.style.transform = "rotate(" + Math.max(-6, Math.min(6, rotate)) + "deg)";
+          }
+          var heading = document.createElement("div");
+          heading.className = "hero-card-heading";
+          heading.textContent = typeof entry.heading === "string" ? entry.heading : "";
+          var body = document.createElement("div");
+          body.className = "hero-card-body";
+          body.textContent = typeof entry.body === "string" ? entry.body : "";
+          card.appendChild(heading);
+          card.appendChild(body);
+          stack.appendChild(card);
+        });
+        stack.style.display = cards.length > 0 ? "" : "none";
+      }
+      if (grid) grid.classList.toggle("no-cards", cards.length === 0);
+    };
+  </script>
+</body>
+</html>

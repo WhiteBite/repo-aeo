@@ -53,11 +53,108 @@ function validateHud(hud, label, errors) {
   }
 }
 
+const HERO_MODES = new Set(['split', 'title-only']);
+const HERO_MOTIFS = new Set(['none', 'grid', 'rule']);
+const HERO_TONES = new Set(['accent1', 'accent2', 'accent3']);
+const HERO_HEX_RE = /^#[0-9a-f]{6}$/i;
+
+export function validateHero(obj) {
+  const errors = [];
+  const warnings = [];
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
+    errors.push('hero JSON must be an object');
+    return { errors, warnings };
+  }
+  if (obj.kind !== 'hero') {
+    errors.push(`kind must be 'hero', got ${JSON.stringify(obj.kind)}`);
+  }
+  if (typeof obj.title !== 'string' || obj.title.trim() === '') {
+    errors.push('title is required and must be a non-empty string');
+  } else if (obj.title.length > 40) {
+    errors.push(`title is ${obj.title.length} chars; the hero limit is 40`);
+  }
+  if (typeof obj.subtitle !== 'string' || obj.subtitle.trim() === '') {
+    errors.push('subtitle is required and must be a non-empty string');
+  } else if (obj.subtitle.length > 90) {
+    errors.push(`subtitle is ${obj.subtitle.length} chars; the hero limit is 90`);
+  }
+  if (obj.eyebrow !== undefined) {
+    if (typeof obj.eyebrow !== 'string') {
+      errors.push('eyebrow must be a string when present');
+    } else {
+      if (obj.eyebrow.length > 40) errors.push(`eyebrow is ${obj.eyebrow.length} chars; the hero limit is 40`);
+      if (/[a-z]/.test(obj.eyebrow)) warnings.push('eyebrow contains lowercase letters; author it uppercase (the template uppercases rendering only)');
+    }
+  }
+  if (obj.palette !== 'dark' && obj.palette !== 'light') {
+    errors.push(`palette is required and must be one of dark|light, got ${JSON.stringify(obj.palette)}`);
+  }
+  if (obj.accent !== undefined && (typeof obj.accent !== 'string' || !HERO_HEX_RE.test(obj.accent))) {
+    errors.push(`accent must match #rrggbb, got ${JSON.stringify(obj.accent)}`);
+  }
+  if (obj.meta !== undefined) {
+    if (typeof obj.meta !== 'string') {
+      errors.push('meta must be a string when present');
+    } else if (obj.meta.length > 60) {
+      errors.push(`meta is ${obj.meta.length} chars; the hero limit is 60`);
+    }
+  }
+  const mode = obj.mode === undefined ? 'split' : obj.mode;
+  if (!HERO_MODES.has(mode)) {
+    errors.push(`mode must be one of split|title-only, got ${JSON.stringify(obj.mode)}`);
+  }
+  if (obj.motif !== undefined && !HERO_MOTIFS.has(obj.motif)) {
+    errors.push(`motif must be one of none|grid|rule, got ${JSON.stringify(obj.motif)}`);
+  }
+  if (obj.cards !== undefined) {
+    if (!Array.isArray(obj.cards)) {
+      errors.push('cards must be an array when present');
+    } else {
+      if (obj.cards.length > 4) errors.push(`cards has ${obj.cards.length} entries; the hero limit is 4`);
+      obj.cards.forEach((card, index) => {
+        const label = `cards[${index}]`;
+        if (!card || typeof card !== 'object' || Array.isArray(card)) {
+          errors.push(`${label} must be an object`);
+          return;
+        }
+        if (typeof card.heading !== 'string' || card.heading.trim() === '') {
+          errors.push(`${label}.heading is required and must be a non-empty string`);
+        } else if (card.heading.length > 30) {
+          errors.push(`${label}.heading is ${card.heading.length} chars; the limit is 30`);
+        }
+        if (typeof card.body !== 'string' || card.body.trim() === '') {
+          errors.push(`${label}.body is required and must be a non-empty string`);
+        } else if (card.body.length > 90) {
+          errors.push(`${label}.body is ${card.body.length} chars; the limit is 90`);
+        }
+        if (card.rotate !== undefined) {
+          if (typeof card.rotate !== 'number' || !Number.isFinite(card.rotate)) {
+            errors.push(`${label}.rotate must be a number when present`);
+          } else if (card.rotate < -6 || card.rotate > 6) {
+            errors.push(`${label}.rotate ${card.rotate} is outside the -6..6 range`);
+          }
+        }
+        if (card.tone !== undefined && !HERO_TONES.has(card.tone)) {
+          errors.push(`${label}.tone must be one of accent1|accent2|accent3, got ${JSON.stringify(card.tone)}`);
+        }
+      });
+      if (mode === 'title-only' && obj.cards.length > 0) {
+        warnings.push('mode is title-only; cards are ignored');
+      }
+    }
+  }
+  return { errors, warnings };
+}
+
 export function validateSlot(obj) {
   const errors = [];
   const warnings = [];
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
     errors.push('slot JSON must be an object');
+    return { errors, warnings };
+  }
+  if (obj.kind === 'hero') {
+    errors.push('hero document: use validateHero instead of validateSlot');
     return { errors, warnings };
   }
   if (obj.schema !== undefined && obj.schema !== 4) {

@@ -4,7 +4,7 @@
  */
 import { check, finding, skip, parseMarkdown, hasFirstSuccessPath, countQuantifiedClaims, normalizeHeading } from './_shared.js';
 import { exists, readTextIfExists, readJsonIfExists, listFiles } from '../../util/fs.js';
-import { validateSlot } from '../../util/slot-validate.js';
+import { validateHero, validateSlot } from '../../util/slot-validate.js';
 import { basename, join } from 'node:path';
 
 const README_PATH_KEY = 'README.md';
@@ -328,7 +328,7 @@ export const readmeChecks = [
     weight: 3,
     title: 'Demo assets have a valid source slot JSON',
     why: 'A demo image is only trustworthy when its source slot JSON is committed next to it: the JSON is the reviewable source of truth and the renderer can regenerate the PNG from it. An image with no source, or a slot JSON that breaks the schema, cannot be verified or refreshed.',
-    fix: 'Commit the slot JSON under demo/ next to the asset and keep it valid: theme, takeaway, and at most 5 blocks per panel with lines under 37 characters. Check it with `node skills/repo-discoverability/scripts/check-slot.mjs demo/<name>.json`.',
+    fix: 'Commit the demo source JSON under demo/ next to the asset and keep it valid: slot JSONs need theme, takeaway and at most 5 blocks per panel; hero documents need kind, title, subtitle and palette. Check it with `node skills/repo-discoverability/scripts/check-slot.mjs demo/<name>.json`.',
     effort: 'S',
     autoFixable: false,
     patchId: null,
@@ -342,7 +342,8 @@ export const readmeChecks = [
         const entries = Array.isArray(parsed) ? parsed : [parsed];
         const errors = [];
         entries.forEach((entry, index) => {
-          for (const error of validateSlot(entry).errors) {
+          const isHero = entry !== null && typeof entry === 'object' && !Array.isArray(entry) && entry.kind === 'hero';
+          for (const error of (isHero ? validateHero(entry) : validateSlot(entry)).errors) {
             errors.push(Array.isArray(parsed) ? `frame ${index}: ${error}` : error);
           }
         });

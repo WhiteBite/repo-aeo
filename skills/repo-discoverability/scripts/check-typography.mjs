@@ -5,6 +5,11 @@ const ROLE_FLOORS = { display: 48, text: 15, micro: 13 };
 
 const SELECTOR_ROLES = new Map([
   ['.hero-title', 'display'],
+  ['.hero-subtitle', 'text'],
+  ['.hero-card-heading', 'text'],
+  ['.hero-card-body', 'text'],
+  ['.hero-eyebrow', 'micro'],
+  ['.hero-meta', 'micro'],
   ['.panel-caption', 'text'],
   ['.session-title', 'text'],
   ['.takeaway', 'text'],

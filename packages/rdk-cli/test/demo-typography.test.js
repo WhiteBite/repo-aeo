@@ -10,10 +10,11 @@ import { validateSlot } from '../src/util/slot-validate.js';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const SCRIPT = join(ROOT, 'skills', 'repo-discoverability', 'scripts', 'check-typography.mjs');
 const TEMPLATE = join(ROOT, 'skills', 'repo-discoverability', 'scripts', 'demo-terminal.html');
+const HERO_TEMPLATE = join(ROOT, 'skills', 'repo-discoverability', 'scripts', 'hero.html');
 const SOURCE = readFileSync(TEMPLATE, 'utf8');
 
-function run(file) {
-  const result = spawnSync(process.execPath, [SCRIPT, file], { encoding: 'utf8' });
+function run(...files) {
+  const result = spawnSync(process.execPath, [SCRIPT, ...files], { encoding: 'utf8' });
   return { status: result.status, stdout: result.stdout || '', stderr: result.stderr || '' };
 }
 
@@ -38,6 +39,13 @@ test('check-typography.mjs accepts the locked demo template', () => {
   const result = run(TEMPLATE);
   assert.equal(result.status, 0);
   assert.match(result.stdout, /ok/);
+});
+
+test('check-typography.mjs accepts the locked hero template', () => {
+  const result = run(TEMPLATE, HERO_TEMPLATE);
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /demo-terminal\.html: ok/);
+  assert.match(result.stdout, /hero\.html: ok/);
 });
 
 test('check-typography.mjs rejects a body line below the text floor', () => {

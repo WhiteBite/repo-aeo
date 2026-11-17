@@ -412,13 +412,13 @@ The stage is **900 CSS px** wide and every template must declare `width: 900px`.
 | Role | Floor | Selectors |
 | --- | --- | --- |
 | display | >= 48px | `.hero-title` (hero template only) |
-| text | >= 15px | `.panel-caption`, `.session-title`, `.takeaway`, `.window-title`, `.user-msg`, `.prose-line`, `.tool-line`, `.diff`, `.file`, `.status`, `.done`, `.steps`, `.steps-collapse`, `.gate` |
-| micro | >= 13px | `.file-path`, `.steps-more`, `.shot-anno-label`, `.shot-caption`, `.hud`, `.divider` |
+| text | >= 15px | `.panel-caption`, `.session-title`, `.takeaway`, `.window-title`, `.user-msg`, `.prose-line`, `.tool-line`, `.diff`, `.file`, `.status`, `.done`, `.steps`, `.steps-collapse`, `.gate`, `.hero-subtitle`, `.hero-card-heading`, `.hero-card-body` |
+| micro | >= 13px | `.file-path`, `.steps-more`, `.shot-anno-label`, `.shot-caption`, `.hud`, `.divider`, `.hero-eyebrow`, `.hero-meta` |
 
 Run the offline gate on a template:
 
 ```bash
-node skills/repo-discoverability/scripts/check-typography.mjs skills/repo-discoverability/scripts/demo-terminal.html
+node skills/repo-discoverability/scripts/check-typography.mjs skills/repo-discoverability/scripts/demo-terminal.html skills/repo-discoverability/scripts/hero.html
 ```
 
 It fails when a font-size is declared in em/rem/%/pt/vw/vh, when a selector
@@ -532,6 +532,67 @@ Minimal example:
   }
 }
 ```
+
+## Hero (project-native banner)
+
+A hero is the repository's own banner: one static PNG stating what the project is
+and proving it with the repo's verifiable numbers. It is a cover, not a
+before/after — no session, no panels, no tool output.
+
+Make one **only when the repository has honest material to state**: real counts
+(checks, axes, tools, dependency counts), real commands, real surfaces. Never as
+decoration, and never with invented adoption numbers, benchmarks or testimonials
+— every card must state something true and checkable in the repo, or the hero is
+not made.
+
+The locked template is `skills/repo-discoverability/scripts/hero.html`; the
+source of truth is a hero JSON in `demo/` validated by `validateHero` through the
+same `check-slot.mjs`.
+
+- **58/42 split.** A 900 CSS px stage with **48px minimum edge padding**; the
+  default `split` mode is a two-column grid — 58% carries the eyebrow, title,
+  subtitle and meta, 42% carries the card stack (up to 4). `mode: "title-only"`
+  hides the cards and centers the copy.
+- **Bimodal type scale, no middle sizes.** Display `>= 48px` (the template ships
+  56px), body text `>= 15px` (17-20px), micro `>= 13px`. Never 30-40px: the
+  display/body contrast is what reads as quality. The same `check-typography.mjs`
+  gate covers the hero selectors and errors on any unmapped selector.
+- **Exactly 6 palette roles.** `--bg`, `--fg`, `--muted`, `--card`, `--line` plus
+  the accent role (`--accent1`/`--accent2`/`--accent3`). No extra hues.
+  `palette: "light"` swaps the five neutral roles; the accents stay.
+- **Depth from offset duplicate-shape shadows, never filters or gradients:**
+  `box-shadow: 8px 10px 0 rgba(0,0,0,0.38)` on dark, `rgba(23,32,51,0.12)` on
+  light. Cards overlap slightly (negative margin) so the stack reads as a fan;
+  per-card `rotate` is clamped to -6..6 — author within ±2 so no card's text
+  slides under its neighbour.
+- **No gradients unless they describe real material** (metal, glass). No glowing
+  lines, no decorative grids or patterns: the accent dot next to the eyebrow is
+  the only decoration.
+
+Hero JSON schema: `kind: "hero"` (required, exact), `title` (required, <= 40
+chars; `\n` breaks the display line), `subtitle` (required, <= 90), `palette`
+(required, `dark` | `light`), `eyebrow` (optional, <= 40, author it uppercase),
+`meta` (optional, <= 60), `mode` (optional, `split` | `title-only`, default
+`split`), `motif` (optional, `none` | `grid` | `rule`; only `none` renders),
+`accent` (optional `#rrggbb`, overrides `--accent1`) and `cards` (optional, max
+4; each card has `heading` <= 30, `body` <= 90, `rotate` in -6..6 and `tone`
+`accent1` | `accent2` | `accent3`, default `accent1`). All injected text lands
+via `textContent` — repo metadata can never inject markup.
+
+Render and check:
+
+```bash
+node skills/repo-discoverability/scripts/check-slot.mjs demo/<name>.json
+node skills/repo-discoverability/scripts/rasterize.mjs \
+  --template skills/repo-discoverability/scripts/hero.html \
+  --data demo/<name>.json --out assets/<name>.png --width 900 --scale 2
+```
+
+Commit the PNG under `assets/` and the hero JSON under `demo/` next to it, then
+embed with the same `<picture>` pattern as the terminal demo: the dark render as
+the `prefers-color-scheme: dark` source, the light render (the same JSON with
+`"palette": "light"`) as the `<img>` fallback. A dark-only `<img>` is
+acceptable; the pair is the upgrade.
 
 ## Storing and embedding
 

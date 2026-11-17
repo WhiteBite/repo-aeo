@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
-import { validateSlot } from '../../../packages/rdk-cli/src/util/slot-validate.js';
+import { validateHero, validateSlot } from '../../../packages/rdk-cli/src/util/slot-validate.js';
 
 const files = process.argv.slice(2);
 if (files.length === 0) {
@@ -27,7 +27,8 @@ for (const file of files) {
   let fileOk = true;
   entries.forEach((entry, i) => {
     const label = Array.isArray(data) ? `${file}[${i}]` : file;
-    const { errors, warnings } = validateSlot(entry);
+    const isHero = entry !== null && typeof entry === 'object' && !Array.isArray(entry) && entry.kind === 'hero';
+    const { errors, warnings } = isHero ? validateHero(entry) : validateSlot(entry);
     for (const warning of warnings) console.error(`${label}: warning: ${warning}`);
     for (const error of errors) console.error(`${label}: error: ${error}`);
     if (errors.length > 0) fileOk = false;

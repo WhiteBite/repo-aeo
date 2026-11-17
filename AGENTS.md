@@ -50,7 +50,10 @@ every change.
 The before/after demo images and GIFs are produced by a skill-owned pipeline, not
 by the CLI. `skills/repo-discoverability/scripts/demo-terminal.html` is the locked
 template (surfaces `terminal`/`files`/`shots`/`single`, blocks incl. `gate`,
-`divider` and the `hud` strip); `render-demo.mjs` is the zero-dep preparer
+`divider` and the `hud` strip); `skills/repo-discoverability/scripts/hero.html`
+is the locked banner template for `kind: "hero"` hero docs validated by
+`validateHero` in `packages/rdk-cli/src/util/slot-validate.js`; `render-demo.mjs`
+is the zero-dep preparer
 (`--prepare`, `--frames`, `--from-command`); `rasterize.mjs` is the on-demand
 rasterizer that needs a scratch `playwright-core`; `check-slot.mjs` plus
 `packages/rdk-cli/src/util/slot-validate.js` are the schema gate wired into
