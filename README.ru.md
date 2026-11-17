@@ -23,21 +23,22 @@ RDK измеряет discoverability вашего репозитория, чин
 **Требования:** Node.js >= 18
 
 ```bash
-# 1. add RDK to your repository
-npm install --save-dev repo-aeo
-
-# 2. scaffold the config and the missing files
-npx repo-aeo init --apply
-
-# 3. see the score and the prioritised fix list
+# 1. попробуйте без установки чего-либо: аудит только на чтение, ~300 мс
 npx repo-aeo audit
 
-# 4. run the test suite
-npm test
+# 2. скаффолдите конфиг и недостающие файлы (просматриваемый дифф)
+npx repo-aeo init --apply
+
+# 3. превью безопасных автофиксов; примените, если дифф устраивает
+npx repo-aeo fix
+npx repo-aeo fix --apply
+
+# 4. решили остаться? зафиксируйте версию: команда и CI гоняют один движок
+npm install --save-dev repo-aeo
 ```
 
 Настройка за две минуты для репозитория, которым вы пока не владеете: склонировать,
-запустить `npx repo-aeo init --apply`, затем `npx repo-aeo audit`. Всё, что пишет CLI,
+запустить `npx repo-aeo audit`, затем `npx repo-aeo init --apply`. Всё, что пишет CLI,
 оформляется как просматриваемый дифф — он никогда не публикует, не тегает и не делает
 force-push. Единственное исключение живёт в CI: опциональный autofix-job делает
 force-push в свою датированную бот-ветку `rdk/autofix-<date>` и открывает PR на ревью.
@@ -95,15 +96,18 @@ RDK превращает это в тестируемое свойство: ау
 ## Команды
 
 ```bash
-npx repo-aeo init          # create .discoverability/project.yml + minimal safe files
-npx repo-aeo audit         # score 0-100 + findings (json | markdown | github-comment)
-npx repo-aeo fix           # preview safe autofixes; --apply to write them
-npx repo-aeo npm-surface   # package.json publish surface + npm pack --dry-run
-npx repo-aeo github-sync   # push description/homepage/topics (needs --apply --ack --reason --plan-digest)
-npx repo-aeo submit        # предложить проект в curated-списки (нужны --apply --ack --reason --plan-digest)
-npx repo-aeo skill install # link the agent skill into OpenCode/Claude/Codex skill dirs
+npx repo-aeo init          # создать .discoverability/project.yml + минимальные безопасные файлы
+npx repo-aeo audit         # оценка 0-100 + находки (json | markdown | github-comment)
+npx repo-aeo fix           # превью безопасных автофиксов; --apply чтобы записать
+npx repo-aeo npm-surface   # publish-поверхность package.json + npm pack --dry-run
+npx repo-aeo github-sync   # отправить description/homepage/topics (нужны --apply --ack --reason --plan-digest)
+npx repo-aeo channels      # все каналы распространения, применимость и следующий шаг (только чтение)
+npx repo-aeo submit        # предложить проект в curated-списки: --channel <id> (нужны --apply --ack --reason --plan-digest)
+npx repo-aeo share         # готовое сообщение для комьюнити-канала (--channel <id> | --list)
+npx repo-aeo track         # дашборд кампании: живой статус, adopt существующих PR, синк леджера
+npx repo-aeo skill install # связать агентский скилл с каталогами скиллов OpenCode/Claude/Codex
 
-npx repo-aeo-mcp serve # the same engine as an MCP server: 9 read-mostly tools
+npx repo-aeo-mcp serve # тот же движок как MCP-сервер: 9 инструментов, почти все на чтение
 claude mcp add rdk -- npx repo-aeo-mcp serve
 docker run -i repo-aeo-mcp serve
 ```
@@ -116,15 +120,15 @@ docker run -i repo-aeo-mcp serve
 ### 1. Оценить репозиторий
 
 ```bash
-$ npx repo-aeo audit            # measured on fixtures/demo-repo, offline
+$ npx repo-aeo audit            # замерено на fixtures/demo-repo, офлайн
 score: 58/100 (grade D) · checks: 26/48 passed · findings: 9 error, 13 warn, 13 info (19 autofixable) · mode: offline (use --online for link + GitHub checks)
 ```
 
 ### 2. Починить то, что безопасно чинится
 
 ```bash
-$ npx repo-aeo fix --dry-run     # review the diff
-$ npx repo-aeo fix --apply       # 16 files: README sections, AGENTS.md draft, llms.txt, CITATION.cff, ...
+$ npx repo-aeo fix --dry-run     # посмотреть дифф
+$ npx repo-aeo fix --apply       # 16 файлов: секции README, черновик AGENTS.md, llms.txt, CITATION.cff, ...
 ```
 
 ### 3. Проверить publish-поверхность

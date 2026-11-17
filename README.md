@@ -23,21 +23,22 @@ runtime dependencies**, so `npx` stays fast and the supply chain stays small.
 **Prerequisites:** Node.js >= 18
 
 ```bash
-# 1. add RDK to your repository
-npm install --save-dev repo-aeo
-
-# 2. scaffold the config and the missing files
-npx repo-aeo init --apply
-
-# 3. see the score and the prioritised fix list
+# 1. try it without installing anything (read-only audit, ~300 ms)
 npx repo-aeo audit
 
-# 4. run the test suite
-npm test
+# 2. scaffold the config and the missing files (reviewable diff)
+npx repo-aeo init --apply
+
+# 3. preview the safe autofixes, apply them if you like the diff
+npx repo-aeo fix
+npx repo-aeo fix --apply
+
+# 4. staying? pin the engine so your team and CI run the same version
+npm install --save-dev repo-aeo
 ```
 
 Two-minute setup for a repository you do not own yet: clone it, run
-`npx repo-aeo init --apply`, then `npx repo-aeo audit`. Everything the CLI writes is a
+`npx repo-aeo audit`, then `npx repo-aeo init --apply`. Everything the CLI writes is a
 reviewable diff — it never publishes, tags or force-pushes. The one exception
 lives in CI: the opt-in autofix job force-pushes its own dated
 `rdk/autofix-<date>` bot branch and opens a reviewable PR.
