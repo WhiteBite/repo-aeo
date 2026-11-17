@@ -551,7 +551,7 @@ same `check-slot.mjs`.
 
 - **58/42 split.** A 900 CSS px stage with **48px minimum edge padding**; the
   default `split` mode is a two-column grid — 58% carries the eyebrow, title,
-  subtitle and meta, 42% carries the card stack (up to 4). `mode: "title-only"`
+  subtitle and meta, 42% carries the card stack (up to 4). `mode: "copy-only"`
   hides the cards and centers the copy.
 - **Bimodal type scale, no middle sizes.** Display `>= 48px` (the template ships
   56px), body text `>= 15px` (17-20px), micro `>= 13px`. Never 30-40px: the
@@ -578,7 +578,7 @@ mode plus palette for every repository.
 
 - `split` (default): the 58/42 grid above — copy left, rotated card stack
   right.
-- `title-only`: no cards; the copy centers and typography carries it.
+- `copy-only`: no cards; the copy centers and typography carries it.
 - `strip`: the copy spans the full width above one row of equal-width cards;
   rotations do not apply.
 - `wall`: the copy spans the full width above a two-column card grid, equal
@@ -588,20 +588,20 @@ mode plus palette for every repository.
 | --- | --- | --- |
 | `tool` | `split` | command rhythm plus proof cards |
 | `mcp-server` | `split` | command rhythm plus proof cards |
-| `library` | `title-only` | no honest visual proof, typography carries it |
+| `library` | `copy-only` | no honest visual proof, typography carries it |
 | `app` | `wall` | real screenshots/outputs as a grid |
 | `research` | `strip` | method or evidence sequence |
 | `dataset` | `strip` | method or evidence sequence |
 | `template` | `split` | scaffold shape plus proof cards |
 
 Card minimums per mode: `strip` and `wall` require at least 3 cards (4 max, as
-everywhere); `title-only` takes none (cards present are ignored with a
+everywhere); `copy-only` takes none (cards present are ignored with a
 warning); `split` allows 0..4.
 
 Hero JSON schema: `kind: "hero"` (required, exact), `title` (required, <= 40
 chars; `\n` breaks the display line), `subtitle` (required, <= 90), `palette`
 (required, `dark` | `light`), `eyebrow` (optional, <= 40, author it uppercase),
-`meta` (optional, <= 60), `mode` (optional, `split` | `title-only` | `strip`
+`meta` (optional, <= 60), `mode` (optional, `split` | `copy-only` | `strip`
 | `wall`, default `split`), `motif` (optional, `none` | `grid` | `rule`; only
 `none` renders),
 `accent` (optional `#rrggbb`, overrides `--accent1`) and `cards` (optional, max

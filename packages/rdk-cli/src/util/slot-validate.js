@@ -53,7 +53,7 @@ function validateHud(hud, label, errors) {
   }
 }
 
-const HERO_MODES = new Set(['split', 'title-only', 'strip', 'wall']);
+const HERO_MODES = new Set(['split', 'copy-only', 'strip', 'wall']);
 const HERO_MIN_CARDS = new Set(['strip', 'wall']);
 const HERO_MOTIFS = new Set(['none', 'grid', 'rule']);
 const HERO_TONES = new Set(['accent1', 'accent2', 'accent3']);
@@ -102,7 +102,7 @@ export function validateHero(obj) {
   }
   const mode = obj.mode === undefined ? 'split' : obj.mode;
   if (!HERO_MODES.has(mode)) {
-    errors.push(`mode must be one of split|title-only|strip|wall, got ${JSON.stringify(obj.mode)}`);
+    errors.push(`mode must be one of split|copy-only|strip|wall, got ${JSON.stringify(obj.mode)}`);
   }
   if (obj.motif !== undefined && !HERO_MOTIFS.has(obj.motif)) {
     errors.push(`motif must be one of none|grid|rule, got ${JSON.stringify(obj.motif)}`);
@@ -139,8 +139,8 @@ export function validateHero(obj) {
           errors.push(`${label}.tone must be one of accent1|accent2|accent3, got ${JSON.stringify(card.tone)}`);
         }
       });
-      if (mode === 'title-only' && obj.cards.length > 0) {
-        warnings.push('mode is title-only; cards are ignored');
+      if (mode === 'copy-only' && obj.cards.length > 0) {
+        warnings.push('mode is copy-only; cards are ignored');
       }
     }
   }

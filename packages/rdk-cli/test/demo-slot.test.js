@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -395,11 +395,11 @@ test('validateHero rejects a missing title, a long subtitle, five cards, a big r
   assert.ok(doc({ cards: fiveCards }).some((error) => /4/.test(error)), 'expected a card-limit error');
   assert.ok(doc({ cards: [{ heading: 'h', body: 'b', rotate: 9 }] }).some((error) => /rotate/.test(error)), 'expected a rotate error');
   assert.ok(doc({ accent: 'abc' }).some((error) => /accent/.test(error)), 'expected an accent error');
-  assert.ok(doc({ mode: 'mesh' }).some((error) => /mode/.test(error) && /split\|title-only/.test(error)), 'expected a mode error');
+  assert.ok(doc({ mode: 'mesh' }).some((error) => /mode/.test(error) && /split\|copy-only/.test(error)), 'expected a mode error');
 });
 
-test('validateHero warns on title-only mode with cards and on a lowercase eyebrow', () => {
-  const withCards = validateHero(heroDoc({ mode: 'title-only', cards: [{ heading: 'h', body: 'b' }] }));
+test('validateHero warns on copy-only mode with cards and on a lowercase eyebrow', () => {
+  const withCards = validateHero(heroDoc({ mode: 'copy-only', cards: [{ heading: 'h', body: 'b' }] }));
   assert.deepEqual(withCards.errors, []);
   assert.ok(withCards.warnings.some((warning) => /ignored/.test(warning)), 'expected an ignored-cards warning');
   const withLower = validateHero(heroDoc({ eyebrow: 'Discoverability Kit' }));
@@ -431,11 +431,11 @@ test('validateHero rejects strip and wall modes with fewer than 3 cards', () => 
 
 test('validateHero rejects an unknown mode by listing all four modes', () => {
   const { errors } = validateHero(heroDoc({ mode: 'mesh' }));
-  assert.ok(errors.some((error) => /mode/.test(error) && /split\|title-only\|strip\|wall/.test(error)), 'expected a mode enum error');
+  assert.ok(errors.some((error) => /mode/.test(error) && /split\|copy-only\|strip\|wall/.test(error)), 'expected a mode enum error');
 });
 
-test('validateHero keeps title-only cards as a warning, not an error', () => {
-  const { errors, warnings } = validateHero(heroDoc({ mode: 'title-only', cards: [{ heading: 'h', body: 'b' }] }));
+test('validateHero keeps copy-only cards as a warning, not an error', () => {
+  const { errors, warnings } = validateHero(heroDoc({ mode: 'copy-only', cards: [{ heading: 'h', body: 'b' }] }));
   assert.deepEqual(errors, []);
   assert.ok(warnings.some((warning) => /ignored/.test(warning)), 'expected an ignored-cards warning');
 });
